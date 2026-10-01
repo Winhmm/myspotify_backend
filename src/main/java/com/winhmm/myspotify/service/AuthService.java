@@ -78,7 +78,6 @@ public class AuthService {
 //        userRepository.save(user);
 //    }
 
-
     public void verifyOtp(VerifyOtpRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("Email does not exist"));
@@ -89,6 +88,7 @@ public class AuthService {
 
         userRepository.save(user);
     }
+
     public LoginResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("Email does not exist"));

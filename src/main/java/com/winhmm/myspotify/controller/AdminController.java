@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -24,7 +25,7 @@ public class AdminController {
         List<UserProfileResponse> result = adminService.getAllUsers()
                 .stream()
                 .map(this::toResponse)
-                .toList();
+                .collect(Collectors.toList());
 
         return ResponseEntity.ok(result);
     }
@@ -46,7 +47,7 @@ public class AdminController {
         List<UserProfileResponse> result = adminService.getPendingArtistRequests()
                 .stream()
                 .map(this::toResponse)
-                .toList();
+                .collect(Collectors.toList());
 
         return ResponseEntity.ok(result);
     }
