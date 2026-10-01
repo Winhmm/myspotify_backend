@@ -194,7 +194,8 @@ public class UserService {
     public void requestBecomeArtist(Long userId, String artistName, String bio) {
         User user = getProfile(userId);
 
-        if(user.getArtistRequestStatus() != ArtistRequestStatus.NONE) {
+        if(user.getArtistRequestStatus() != ArtistRequestStatus.NONE
+                    && user.getArtistRequestStatus() != ArtistRequestStatus.REJECTED) {
             throw new IllegalArgumentException("An artist request already exists or has been approved");
         }
 

@@ -86,4 +86,40 @@ public class AdminService {
         user.setBio(null);
         userRepository.save(user);
     }
+
+    /*
+        Gán role cho User:
+
+        1. Không gán cho tài khoản đã xóa hoặc chưa xác thực.
+        2. Không gán trùng role hiện tại.
+        3. Gán ARTIST → artistRequestStatus = APPROVED.
+        4. Gỡ ARTIST → xoá artistName/bio, artistRequestStatus về NONE.
+    */
+    public void assignRole(Long userId, Role role) {
+        User user = findUser(userId);
+
+        if(role ==  null) {
+            throw new IllegalArgumentException("Role is required");
+        }
+
+        if(user.getAccountStatus() == AccountStatus.DELETED
+                || user.getAccountStatus() == AccountStatus.UNVERIFIED) {
+            throw new IllegalArgumentException("Cannot assign role to a deleted or unverified account");
+        }
+
+        if(user.getRole() == role) {
+            throw new IllegalArgumentException("User already has this role");
+        }
+
+        if(role == Role.ARTIST) {
+            user.setArtistRequestStatus(ArtistRequestStatus.APPROVED);
+        } else if(user.getRole() == Role.ARTIST) {
+            user.setArtistName(null);
+            user.setBio(null);
+            user.setArtistRequestStatus(ArtistRequestStatus.NONE);
+        }
+
+        user.setRole(role);
+        userRepository.save(user);
+    }
 }

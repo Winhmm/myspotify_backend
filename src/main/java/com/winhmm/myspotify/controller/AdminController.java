@@ -1,5 +1,6 @@
 package com.winhmm.myspotify.controller;
 
+import com.winhmm.myspotify.dto.request.AssignRoleRequest;
 import com.winhmm.myspotify.dto.response.UserProfileResponse;
 import com.winhmm.myspotify.entity.User;
 import com.winhmm.myspotify.service.AdminService;
@@ -60,6 +61,13 @@ public class AdminController {
     public ResponseEntity<Map<String, String>> rejectArtistRequest(@PathVariable Long userId) {
         adminService.rejectArtistRequest(userId);
         return ResponseEntity.ok(Map.of("message", "Artist request has been rejected"));
+    }
+
+    @PutMapping("/users/{userId}/role")
+    public ResponseEntity<Map<String, String>> assignRole(@PathVariable Long userId,
+                                                          @RequestBody AssignRoleRequest request) {
+        adminService.assignRole(userId, request.getRole());
+        return ResponseEntity.ok(Map.of("message", "Role has been assigned successfully"));
     }
 
     private UserProfileResponse toResponse(User user) {
