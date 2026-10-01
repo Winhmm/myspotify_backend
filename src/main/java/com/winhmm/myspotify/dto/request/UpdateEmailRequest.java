@@ -1,6 +1,9 @@
 package com.winhmm.myspotify.dto.request;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class UpdateEmailRequest {
+    @NotBlank(message = "OTP code is required")
     private String otpCode;
 
     public String getOtpCode() { return otpCode; }
