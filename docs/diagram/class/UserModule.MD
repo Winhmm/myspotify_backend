@@ -2,9 +2,9 @@
 
 ## 1. Tổng quan
 
-Class Diagram của **Module Người Dùng** mô tả cấu trúc các class và cách các thành phần trong module phối hợp với nhau.
+Class Diagram của **Module Người Dùng** mô tả cấu trúc các class, thuộc tính, phương thức và mối quan hệ giữa các thành phần trong module.
 
-Module được chia thành các package chính:
+Module được tổ chức thành các package chính:
 
 ```text
 entity
@@ -15,9 +15,7 @@ service
 controller
 ```
 
-Ngoài ra, package `entity` chứa các `enum` được sử dụng để biểu diễn trạng thái tài khoản, vai trò, mục đích OTP và trạng thái yêu cầu trở thành Artist.
-
-Kiến trúc tổng thể:
+Trong đó:
 
 ```text
 Controller
@@ -31,37 +29,76 @@ Entity
 Database
 ```
 
-Đối với xác thực và bảo mật:
+Ngoài kiến trúc chính, package `security` chịu trách nhiệm xử lý Authentication và Authorization:
 
 ```text
 Request
-   ↓
+    ↓
 JwtAuthenticationFilter
-   ↓
+    ↓
 JwtUtil
-   ↓
+    ↓
 CustomUserDetailsService
-   ↓
+    ↓
 SecurityConfig
+    ↓
+Controller
+```
+
+Module bao gồm các nhóm chức năng chính:
+
+```text
+Authentication
+    ↓
+Đăng ký
+Xác thực OTP
+Đăng nhập
+Quên mật khẩu
+Đặt lại mật khẩu
+
+User
+    ↓
+Profile
+Password
+Email
+Avatar
+Account
+
+Artist
+    ↓
+Gửi yêu cầu trở thành Artist
+Duyệt / Từ chối yêu cầu
+Cập nhật hồ sơ Artist
+
+Admin
+    ↓
+Quản lý User
+Khóa / Mở khóa tài khoản
+Duyệt Artist
+Phân quyền
 ```
 
 ---
 
 # 2. Package Entity
 
-Package `entity` chứa các class đại diện cho dữ liệu chính của hệ thống.
+Package `entity` chứa các class đại diện cho dữ liệu được lưu trữ trong Database.
 
-Trong diagram có 2 Entity:
+Diagram gồm hai Entity chính:
 
-* `User`
-* `OtpVerification`
+```text
+User
+OtpVerification
+```
 
-Ngoài ra còn có các enum:
+Ngoài ra package này chứa các enum:
 
-* `AccountStatus`
-* `OtpPurpose`
-* `Role`
-* `ArtistRequestStatus`
+```text
+AccountStatus
+OtpPurpose
+Role
+ArtistRequestStatus
+```
 
 ---
 
@@ -69,27 +106,50 @@ Ngoài ra còn có các enum:
 
 ## 3.1. Mục đích
 
-`User` là Entity chính đại diện cho người dùng trong hệ thống.
+`User` là Entity chính đại diện cho tài khoản người dùng trong hệ thống.
 
-User lưu các thông tin cơ bản của tài khoản, thông tin cá nhân và thông tin liên quan đến quyền Artist.
+Entity này lưu:
 
-## 3.2. Các thuộc tính
+* Thông tin tài khoản
+* Thông tin cá nhân
+* Trạng thái tài khoản
+* Role
+* Thông tin liên quan đến Artist
+
+## 3.2. Thuộc tính
 
 | Thuộc tính            | Kiểu dữ liệu        | Ý nghĩa                             |
 | --------------------- | ------------------- | ----------------------------------- |
-| `id`                  | Long                | ID của người dùng                   |
+| `id`                  | Long                | ID của User                         |
 | `username`            | String              | Tên đăng nhập                       |
-| `email`               | String              | Email của người dùng                |
+| `email`               | String              | Email của User                      |
 | `password`            | String              | Mật khẩu                            |
 | `fullName`            | String              | Họ và tên                           |
 | `avatarUrl`           | String              | Đường dẫn ảnh đại diện              |
 | `accountStatus`       | AccountStatus       | Trạng thái tài khoản                |
-| `role`                | Role                | Vai trò của người dùng              |
+| `role`                | Role                | Vai trò của User                    |
 | `artistRequestStatus` | ArtistRequestStatus | Trạng thái yêu cầu trở thành Artist |
 | `artistName`          | String              | Nghệ danh                           |
 | `bio`                 | String              | Thông tin giới thiệu Artist         |
 
-## 3.3. Ý nghĩa các nhóm thuộc tính
+## 3.3. Khai báo trong diagram
+
+```text
+User
+- id: Long
+- username: String
+- email: String
+- password: String
+- fullName: String
+- avatarUrl: String
+- accountStatus: AccountStatus
+- role: Role
+- artistRequestStatus: ArtistRequestStatus
+- artistName: String
+- bio: String
+```
+
+## 3.4. Nhóm thuộc tính
 
 ### Thông tin tài khoản
 
@@ -100,7 +160,7 @@ email
 password
 ```
 
-Dùng để xác định và xác thực tài khoản người dùng.
+Dùng để xác định và xác thực tài khoản.
 
 ### Thông tin cá nhân
 
@@ -109,7 +169,7 @@ fullName
 avatarUrl
 ```
 
-Dùng cho chức năng xem và cập nhật thông tin cá nhân.
+Dùng cho các chức năng liên quan đến Profile.
 
 ### Trạng thái tài khoản
 
@@ -117,7 +177,7 @@ Dùng cho chức năng xem và cập nhật thông tin cá nhân.
 accountStatus
 ```
 
-Dùng để xác định tài khoản đang ở trạng thái nào.
+Dùng để xác định trạng thái hiện tại của tài khoản.
 
 ### Phân quyền
 
@@ -125,13 +185,7 @@ Dùng để xác định tài khoản đang ở trạng thái nào.
 role
 ```
 
-Dùng để xác định người dùng là:
-
-```text
-USER
-ARTIST
-ADMIN
-```
+Dùng để xác định quyền của User.
 
 ### Thông tin Artist
 
@@ -141,7 +195,7 @@ artistName
 bio
 ```
 
-Được sử dụng trong quá trình User gửi yêu cầu trở thành Artist và sau đó cập nhật hồ sơ Artist.
+Dùng trong quá trình User gửi yêu cầu trở thành Artist và cập nhật hồ sơ Artist.
 
 ---
 
@@ -149,58 +203,78 @@ bio
 
 ## 4.1. Mục đích
 
-`OtpVerification` dùng để lưu thông tin OTP được sử dụng trong các chức năng xác thực của hệ thống.
+`OtpVerification` dùng để lưu thông tin OTP được sử dụng trong các chức năng xác thực.
 
-Các chức năng sử dụng OTP gồm:
+Các mục đích OTP trong diagram:
 
-* Đăng ký
-* Quên mật khẩu
-* Đổi mật khẩu
-* Cập nhật email
+```text
+REGISTER
+RESET_PASSWORD
+CHANGE_PASSWORD
+CHANGE_EMAIL
+```
 
-## 4.2. Các thuộc tính
+## 4.2. Thuộc tính
 
-| Thuộc tính  | Kiểu dữ liệu  | Ý nghĩa                                   |
-| ----------- | ------------- | ----------------------------------------- |
-| `id`        | Long          | ID của bản ghi OTP                        |
-| `user`      | User          | Người dùng sở hữu OTP                     |
-| `otpCode`   | String        | Mã OTP                                    |
-| `purpose`   | OtpPurpose    | Mục đích sử dụng OTP                      |
-| `newEmail`  | String        | Email mới trong trường hợp cập nhật email |
-| `expiredAt` | LocalDateTime | Thời gian hết hạn OTP                     |
-| `verified`  | boolean       | Xác định OTP đã được xác thực hay chưa    |
+| Thuộc tính  | Kiểu dữ liệu  | Ý nghĩa                      |
+| ----------- | ------------- | ---------------------------- |
+| `id`        | Long          | ID của bản ghi OTP           |
+| `user`      | User          | User sở hữu OTP              |
+| `otpCode`   | String        | Mã OTP                       |
+| `purpose`   | OtpPurpose    | Mục đích của OTP             |
+| `newEmail`  | String        | Email mới khi cập nhật email |
+| `expiredAt` | LocalDateTime | Thời gian hết hạn OTP        |
+| `verified`  | boolean       | Trạng thái xác thực OTP      |
 
-## 4.3. Quan hệ với User
+## 4.3. Khai báo trong diagram
 
-`OtpVerification` chứa thuộc tính:
+```text
+OtpVerification
+- id: Long
+- user: User
+- otpCode: String
+- purpose: OtpPurpose
+- newEmail: String
+- expiredAt: LocalDateTime
+- verified: boolean
+```
+
+## 4.4. Quan hệ với User
+
+`OtpVerification` có thuộc tính:
 
 ```text
 user: User
 ```
 
-Điều này thể hiện một OTP thuộc về một User.
-
-Có thể hiểu đơn giản:
+Quan hệ trong diagram:
 
 ```text
 User
-  │
-  │ 1
-  │
-  │
-  │ *
+  1
+  |
+  |
+  *
 OtpVerification
 ```
 
-Một User có thể có nhiều bản ghi OTP trong quá trình sử dụng hệ thống.
+Điều này thể hiện:
+
+```text
+Một User
+    ↓
+Có thể có nhiều OtpVerification
+```
+
+Mỗi bản ghi `OtpVerification` thuộc về một `User`.
 
 ---
 
 # 5. Enum AccountStatus
 
-`AccountStatus` biểu diễn trạng thái của tài khoản User.
+`AccountStatus` biểu diễn trạng thái của tài khoản.
 
-Các giá trị:
+## 5.1. Các giá trị
 
 ```text
 UNVERIFIED
@@ -209,9 +283,15 @@ DISABLED
 DELETED
 ```
 
-## 5.1. UNVERIFIED
+## 5.2. Ý nghĩa
 
-Tài khoản chưa hoàn thành xác thực OTP.
+### UNVERIFIED
+
+```text
+UNVERIFIED → chưa xác thực OTP
+```
+
+Được sử dụng khi tài khoản chưa hoàn thành quá trình xác thực.
 
 Liên quan đến:
 
@@ -220,39 +300,35 @@ UC01 – Đăng ký
 UC02 – Xác thực Email / OTP
 ```
 
-## 5.2. ACTIVE
+### ACTIVE
 
-Tài khoản đang hoạt động bình thường.
+```text
+ACTIVE → tài khoản đang hoạt động
+```
 
-## 5.3. DISABLED
+### DISABLED
+
+```text
+DISABLED → UC11 Vô hiệu hóa
+```
 
 Tài khoản đã bị vô hiệu hóa.
 
-Liên quan đến:
-
-```text
-UC11 – Vô hiệu hóa tài khoản
-```
-
-## 5.4. DELETED
-
-Tài khoản đã được đánh dấu xóa.
-
-Trong diagram ghi rõ:
+### DELETED
 
 ```text
 DELETED → UC12 Xóa (soft delete)
 ```
 
-Tức là tài khoản được đánh dấu trạng thái `DELETED` thay vì nhất thiết phải xóa vật lý khỏi Database.
+Tài khoản được đánh dấu là đã xóa thay vì nhất thiết phải xóa vật lý khỏi Database.
 
 ---
 
 # 6. Enum OtpPurpose
 
-`OtpPurpose` xác định OTP đang được sử dụng cho chức năng nào.
+`OtpPurpose` xác định mục đích của OTP.
 
-Các giá trị:
+## 6.1. Các giá trị
 
 ```text
 REGISTER
@@ -260,6 +336,8 @@ RESET_PASSWORD
 CHANGE_PASSWORD
 CHANGE_EMAIL
 ```
+
+## 6.2. Ý nghĩa
 
 | Giá trị           | Mục đích                    |
 | ----------------- | --------------------------- |
@@ -272,9 +350,9 @@ CHANGE_EMAIL
 
 # 7. Enum Role
 
-`Role` biểu diễn quyền của User trong hệ thống.
+`Role` biểu diễn vai trò của User.
 
-Các giá trị:
+## 7.1. Các giá trị
 
 ```text
 USER
@@ -282,25 +360,19 @@ ARTIST
 ADMIN
 ```
 
-## USER
-
-Đây là role mặc định khi người dùng đăng ký.
+## 7.2. USER
 
 ```text
 USER → mặc định khi đăng ký
 ```
 
-## ARTIST
-
-Được gán khi Admin duyệt yêu cầu trở thành Artist.
+## 7.3. ARTIST
 
 ```text
 ARTIST → được gán khi UC17 duyệt
 ```
 
-## ADMIN
-
-Role Admin được gán thủ công.
+## 7.4. ADMIN
 
 ```text
 ADMIN → gán thủ công qua UC18
@@ -312,7 +384,7 @@ ADMIN → gán thủ công qua UC18
 
 `ArtistRequestStatus` biểu diễn trạng thái yêu cầu trở thành Artist.
 
-Các giá trị:
+## 8.1. Các giá trị
 
 ```text
 NONE
@@ -320,6 +392,8 @@ PENDING
 APPROVED
 REJECTED
 ```
+
+## 8.2. Ý nghĩa
 
 | Trạng thái | Ý nghĩa                          |
 | ---------- | -------------------------------- |
@@ -328,20 +402,20 @@ REJECTED
 | `APPROVED` | Admin đã duyệt                   |
 | `REJECTED` | Admin đã từ chối                 |
 
-Chi tiết theo diagram:
+## 8.3. Luồng trạng thái
 
 ```text
 NONE
-→ chưa gửi yêu cầu
-
+    ↓
+User gửi yêu cầu
+    ↓
 PENDING
-→ UC14 vừa gửi, chờ duyệt
-
-APPROVED
-→ UC17 Admin duyệt
-
-REJECTED
-→ UC17 Admin từ chối
+    ↓
+Admin xử lý
+    ↓
+┌───────────┬───────────┐
+↓           ↓
+APPROVED    REJECTED
 ```
 
 ---
@@ -350,48 +424,66 @@ REJECTED
 
 Package `dto` chứa các class dùng để trao đổi dữ liệu giữa Client và Backend.
 
-Diagram hiện thể hiện:
+Diagram hiện có:
 
 ```text
 LoginResponse
 ```
 
-## 9.1. LoginResponse
+---
 
-`LoginResponse` là DTO được trả về sau khi User đăng nhập thành công.
+# 10. LoginResponse
 
-Các thuộc tính:
+`LoginResponse` là DTO được trả về sau khi đăng nhập thành công.
+
+## 10.1. Thuộc tính
 
 | Thuộc tính | Kiểu dữ liệu | Ý nghĩa       |
 | ---------- | ------------ | ------------- |
 | `token`    | String       | JWT Token     |
-| `userId`   | Long         | ID User       |
+| `userId`   | Long         | ID của User   |
 | `username` | String       | Username      |
 | `role`     | Role         | Role của User |
 
-Có thể hình dung response:
+## 10.2. Khai báo trong diagram
 
 ```text
-Đăng nhập
+LoginResponse
+- token: String
+- userId: Long
+- username: String
+- role: Role
+```
+
+## 10.3. Luồng
+
+```text
+Client
+    ↓
+AuthController
     ↓
 AuthService
     ↓
-Tạo JWT
+Kiểm tra thông tin đăng nhập
+    ↓
+JwtUtil
+    ↓
+JWT Token
     ↓
 LoginResponse
     ↓
 Client
 ```
 
-Client sử dụng `token` để thực hiện các request cần xác thực.
+Client sử dụng JWT Token cho các request yêu cầu Authentication.
 
 ---
 
-# 10. Package Repository
+# 11. Package Repository
 
-Repository là tầng giao tiếp trực tiếp với Database thông qua Entity.
+Repository là tầng giao tiếp với Database thông qua Entity.
 
-Diagram có 2 Repository:
+Diagram gồm:
 
 ```text
 UserRepository
@@ -400,13 +492,23 @@ OtpVerificationRepository
 
 ---
 
-# 11. UserRepository
+# 12. UserRepository
 
-`UserRepository` dùng để thao tác với dữ liệu `User`.
+`UserRepository` chịu trách nhiệm truy vấn dữ liệu `User`.
 
-## Các phương thức
+## 12.1. Các phương thức
 
-### findByEmail(email)
+```text
+findByEmail(email): Optional<User>
+
+existsByEmail(email): boolean
+
+existsByUsername(username): boolean
+
+findByArtistRequestStatus(status): List<User>
+```
+
+## 12.2. findByEmail()
 
 ```text
 findByEmail(email): Optional<User>
@@ -414,15 +516,16 @@ findByEmail(email): Optional<User>
 
 Dùng để tìm User dựa trên email.
 
-Có thể sử dụng trong:
+Có thể được sử dụng trong:
 
 ```text
 Đăng nhập
-JWT / Spring Security
+JWT Authentication
+Spring Security
 Các chức năng cần tìm User bằng email
 ```
 
-### existsByEmail(email)
+## 12.3. existsByEmail()
 
 ```text
 existsByEmail(email): boolean
@@ -430,7 +533,7 @@ existsByEmail(email): boolean
 
 Kiểm tra email đã tồn tại trong Database hay chưa.
 
-### existsByUsername(username)
+## 12.4. existsByUsername()
 
 ```text
 existsByUsername(username): boolean
@@ -438,7 +541,7 @@ existsByUsername(username): boolean
 
 Kiểm tra username đã tồn tại hay chưa.
 
-### findByArtistRequestStatus(status)
+## 12.5. findByArtistRequestStatus()
 
 ```text
 findByArtistRequestStatus(status): List<User>
@@ -452,15 +555,15 @@ Ví dụ:
 PENDING
 ```
 
-được sử dụng để lấy danh sách các User đang chờ Admin duyệt.
+được sử dụng để lấy các yêu cầu đang chờ Admin xử lý.
 
 ---
 
-# 12. OtpVerificationRepository
+# 13. OtpVerificationRepository
 
-`OtpVerificationRepository` dùng để thao tác với dữ liệu OTP.
+`OtpVerificationRepository` chịu trách nhiệm truy vấn dữ liệu OTP.
 
-Diagram thể hiện phương thức:
+## 13.1. Phương thức
 
 ```text
 findFirstByUserAndPurposeAndVerifiedFalseOrderByIdDesc(
@@ -469,32 +572,36 @@ findFirstByUserAndPurposeAndVerifiedFalseOrderByIdDesc(
 ): Optional<OtpVerification>
 ```
 
-Ý nghĩa:
+## 13.2. Ý nghĩa
 
-* Tìm OTP của một User.
-* OTP phải đúng `purpose`.
-* OTP chưa được xác thực.
-* Lấy bản ghi mới nhất dựa trên `id`.
+Phương thức này:
 
-Có thể hiểu đơn giản:
+```text
+1. Tìm OTP của User
+2. Kiểm tra đúng purpose
+3. Chỉ lấy OTP chưa được xác thực
+4. Lấy bản ghi mới nhất theo id
+```
+
+Có thể hình dung:
 
 ```text
 User
-  ↓
+    ↓
 Purpose
-  ↓
-OTP chưa xác thực
-  ↓
+    ↓
+OTP chưa verified
+    ↓
 Lấy OTP mới nhất
 ```
 
 ---
 
-# 13. Package Security
+# 14. Package Security
 
 Package `security` chịu trách nhiệm cho Authentication và Authorization.
 
-Diagram có:
+Diagram gồm:
 
 ```text
 JwtUtil
@@ -505,19 +612,25 @@ SecurityConfig
 
 ---
 
-# 14. JwtUtil
+# 15. JwtUtil
 
-`JwtUtil` chịu trách nhiệm xử lý JWT.
+`JwtUtil` chịu trách nhiệm tạo và xử lý JWT.
 
-Các phương thức:
+## 15.1. Các phương thức
 
 ```text
 generateToken(user): String
+
 validateToken(token): boolean
+
 getEmailFromToken(token): String
 ```
 
-## generateToken(user)
+## 15.2. generateToken()
+
+```text
+generateToken(user): String
+```
 
 Tạo JWT Token dựa trên thông tin User.
 
@@ -525,17 +638,21 @@ Luồng:
 
 ```text
 User đăng nhập thành công
-        ↓
+    ↓
 AuthService
-        ↓
+    ↓
 JwtUtil
-        ↓
+    ↓
 generateToken(user)
-        ↓
+    ↓
 JWT Token
 ```
 
-## validateToken(token)
+## 15.3. validateToken()
+
+```text
+validateToken(token): boolean
+```
 
 Kiểm tra JWT Token có hợp lệ hay không.
 
@@ -545,53 +662,63 @@ Kết quả:
 true
 ```
 
-hoặc
+hoặc:
 
 ```text
 false
 ```
 
-## getEmailFromToken(token)
+## 15.4. getEmailFromToken()
 
-Lấy email được lưu trong JWT Token.
+```text
+getEmailFromToken(token): String
+```
 
-Email sau đó có thể được sử dụng để tìm User.
+Lấy email từ JWT Token.
+
+Email được sử dụng để xác định User tương ứng.
 
 ---
 
-# 15. JwtAuthenticationFilter
+# 16. JwtAuthenticationFilter
 
-`JwtAuthenticationFilter` chịu trách nhiệm xử lý JWT trong các HTTP Request.
+`JwtAuthenticationFilter` xử lý JWT trong HTTP Request.
 
-Phương thức:
+## 16.1. Phương thức
 
 ```text
 doFilterInternal(req, res, chain): void
 ```
 
-Có thể hiểu luồng tổng quát:
+## 16.2. Luồng
 
 ```text
-Client gửi Request
-        ↓
+Client
+    ↓
+Request + JWT
+    ↓
 JwtAuthenticationFilter
-        ↓
+    ↓
 Đọc JWT
-        ↓
+    ↓
+JwtUtil
+    ↓
 Kiểm tra JWT
-        ↓
+    ↓
 Xác định User
-        ↓
-Cho Request tiếp tục
+    ↓
+Spring Security
+    ↓
+Controller
 ```
 
 ---
 
-# 16. CustomUserDetailsService
+# 17. CustomUserDetailsService
 
 `CustomUserDetailsService` kết nối User trong Database với Spring Security.
 
-Phương thức:
+## 17.1. Phương thức
 
 ```text
 loadUserByUsername(email): UserDetails
@@ -599,52 +726,73 @@ loadUserByUsername(email): UserDetails
 
 Trong thiết kế này, `email` được sử dụng để tìm User.
 
-Luồng:
+## 17.2. Luồng
 
 ```text
 Email
- ↓
+    ↓
 CustomUserDetailsService
- ↓
+    ↓
 UserRepository
- ↓
+    ↓
 User
- ↓
+    ↓
 UserDetails
+    ↓
+Spring Security
 ```
 
 ---
 
-# 17. SecurityConfig
+# 18. SecurityConfig
 
 `SecurityConfig` là class cấu hình Spring Security.
 
-Các phương thức:
+## 18.1. Các phương thức
 
 ```text
 filterChain(http): SecurityFilterChain
+
 passwordEncoder(): PasswordEncoder
 ```
 
-## filterChain(http)
+## 18.2. filterChain()
 
-Cấu hình Security Filter Chain của hệ thống.
+```text
+filterChain(http): SecurityFilterChain
+```
 
-Đây là nơi cấu hình cách Spring Security xử lý request.
+Dùng để cấu hình Security Filter Chain của hệ thống.
 
-## passwordEncoder()
+Đây là nơi cấu hình cách Spring Security xử lý các HTTP Request và kiểm tra quyền truy cập.
+
+## 18.3. passwordEncoder()
+
+```text
+passwordEncoder(): PasswordEncoder
+```
 
 Cung cấp cơ chế mã hóa mật khẩu.
 
 Mục đích là không lưu mật khẩu dạng plain text trong Database.
 
+## 18.4. Quyền Admin
+
+Theo diagram, toàn bộ API của `AdminController` yêu cầu:
+
+```text
+@PreAuthorize("hasRole('ADMIN')")
+```
+
+Cấu hình này đảm bảo các API Admin chỉ được truy cập bởi User có role `ADMIN`.
+
 ---
 
-# 18. Package Service
+# 19. Package Service
 
-Service chứa Business Logic của hệ thống.
+Package `service` chứa Business Logic của hệ thống.
 
-Diagram có:
+Diagram gồm:
 
 ```text
 AuthService
@@ -656,11 +804,11 @@ AdminService
 
 ---
 
-# 19. AuthService
+# 20. AuthService
 
 `AuthService` xử lý các chức năng Authentication.
 
-Các phương thức:
+## 20.1. Các phương thức
 
 ```text
 register(username, email, password): void
@@ -672,75 +820,105 @@ forgotPassword(email): void
 resetPassword(email, otp, newPassword): void
 ```
 
-## register()
+## 20.2. register()
 
-Xử lý đăng ký tài khoản.
+```text
+register(username, email, password): void
+```
+
+Xử lý quá trình đăng ký tài khoản.
 
 Luồng tổng quát:
 
 ```text
-Register Request
-       ↓
+Client
+    ↓
 AuthController
-       ↓
+    ↓
 AuthService.register()
-       ↓
+    ↓
+Kiểm tra thông tin đăng ký
+    ↓
 Tạo User
-       ↓
-OTP
-       ↓
-Xác thực
+    ↓
+OtpService
+    ↓
+Gửi OTP
 ```
 
-## login()
+## 20.3. login()
+
+```text
+login(email, password): LoginResponse
+```
 
 Xử lý đăng nhập.
 
 ```text
 Email + Password
-       ↓
+    ↓
 AuthService
-       ↓
+    ↓
 Kiểm tra User
-       ↓
+    ↓
+Kiểm tra Password
+    ↓
+JwtUtil
+    ↓
 JWT
-       ↓
+    ↓
 LoginResponse
 ```
 
-## forgotPassword()
+## 20.4. forgotPassword()
+
+```text
+forgotPassword(email): void
+```
 
 Xử lý yêu cầu quên mật khẩu.
 
 ```text
 Email
- ↓
+    ↓
 AuthService
- ↓
+    ↓
+Tìm User
+    ↓
+OtpService
+    ↓
 Gửi OTP
 ```
 
-## resetPassword()
+## 20.5. resetPassword()
 
-Xử lý đặt lại mật khẩu sau khi xác thực OTP.
+```text
+resetPassword(email, otp, newPassword): void
+```
+
+Đặt lại mật khẩu sau khi OTP được xác thực.
 
 ```text
 Email
- + OTP
- + New Password
-       ↓
++ OTP
++ New Password
+    ↓
 AuthService
-       ↓
-Reset Password
+    ↓
+OtpService
+    ↓
+Xác thực OTP
+    ↓
+Cập nhật Password
 ```
 
 ---
 
-# 20. OtpService
+# 21. OtpService
 
-`OtpService` chịu trách nhiệm tạo và xác thực OTP.
+`OtpService` chịu trách nhiệm tạo, gửi và xác thực OTP.
 
-Các phương thức:
+## 21.1. Các phương thức
 
 ```text
 generateAndSend(user, purpose): void
@@ -750,53 +928,85 @@ generateAndSend(user, purpose, newEmail): void
 verifyAndConsume(user, otp, purpose): OtpVerification
 ```
 
-## generateAndSend()
-
-Tạo OTP và gửi OTP cho User.
-
-Có 2 trường hợp:
+## 21.2. generateAndSend()
 
 ```text
-generateAndSend(user, purpose)
+generateAndSend(user, purpose): void
 ```
 
-và:
+Tạo OTP cho User theo một mục đích cụ thể và gửi OTP.
+
+## 21.3. generateAndSend() với newEmail
 
 ```text
-generateAndSend(user, purpose, newEmail)
+generateAndSend(user, purpose, newEmail): void
 ```
 
-Trường hợp có `newEmail` phục vụ cho chức năng cập nhật email.
+Phương thức này có thêm `newEmail`.
 
-## verifyAndConsume()
-
-Xác thực OTP.
+Dùng cho trường hợp cập nhật email:
 
 ```text
 User
- + OTP
- + Purpose
-       ↓
+    ↓
+newEmail
+    ↓
+Tạo OTP
+    ↓
+Lưu OtpVerification
+    ↓
+Gửi OTP
+```
+
+## 21.4. verifyAndConsume()
+
+```text
+verifyAndConsume(user, otp, purpose): OtpVerification
+```
+
+Xác thực OTP dựa trên:
+
+```text
+User
+OTP
+Purpose
+```
+
+Luồng:
+
+```text
+User
++ OTP
++ Purpose
+    ↓
 OtpService
-       ↓
+    ↓
+OtpVerificationRepository
+    ↓
+Tìm OTP
+    ↓
 Kiểm tra OTP
-       ↓
+    ↓
+Kiểm tra purpose
+    ↓
+Kiểm tra thời gian hết hạn
+    ↓
 OtpVerification
 ```
 
 ---
 
-# 21. EmailService
+# 22. EmailService
 
-`EmailService` chịu trách nhiệm gửi OTP qua email.
+`EmailService` chịu trách nhiệm gửi OTP qua Email.
 
-Phương thức:
+## 22.1. Phương thức
 
 ```text
 sendOtp(toEmail, otpCode): void
 ```
 
-Luồng:
+## 22.2. Luồng
 
 ```text
 OtpService
@@ -810,11 +1020,11 @@ OTP
 
 ---
 
-# 22. UserService
+# 23. UserService
 
-`UserService` xử lý các chức năng của User đã đăng nhập.
+`UserService` xử lý Business Logic dành cho User đã đăng nhập.
 
-Các phương thức:
+## 23.1. Các phương thức
 
 ```text
 getProfile(userId): User
@@ -840,29 +1050,49 @@ requestBecomeArtist(userId, artistName, bio): void
 updateArtistProfile(userId, artistName, bio): User
 ```
 
-## getProfile()
+---
 
-Lấy thông tin cá nhân của User.
+## 23.2. getProfile()
+
+```text
+getProfile(userId): User
+```
+
+Lấy thông tin Profile của User.
 
 ```text
 User ID
- ↓
+    ↓
 UserService
- ↓
+    ↓
+UserRepository
+    ↓
 User
 ```
 
-## updateProfile()
+---
 
-Cập nhật thông tin cá nhân.
+## 23.3. updateProfile()
 
-Trong diagram tham số cập nhật là:
+```text
+updateProfile(userId, fullName): User
+```
+
+Cập nhật thông tin cá nhân của User.
+
+Theo diagram, thông tin được cập nhật là:
 
 ```text
 fullName
 ```
 
-## requestChangePasswordOtp()
+---
+
+## 23.4. requestChangePasswordOtp()
+
+```text
+requestChangePasswordOtp(userId, currentPassword): void
+```
 
 Yêu cầu OTP để đổi mật khẩu.
 
@@ -876,14 +1106,24 @@ currentPassword
 Luồng:
 
 ```text
+User
+    ↓
 Current Password
-       ↓
-Kiểm tra
-       ↓
+    ↓
+Kiểm tra Password
+    ↓
+OtpService
+    ↓
 Gửi OTP
 ```
 
-## changePassword()
+---
+
+## 23.5. changePassword()
+
+```text
+changePassword(userId, otp, newPassword): void
+```
 
 Đổi mật khẩu sau khi OTP được xác thực.
 
@@ -895,7 +1135,29 @@ otp
 newPassword
 ```
 
-## updateAvatar()
+Luồng:
+
+```text
+User ID
++ OTP
++ New Password
+    ↓
+UserService
+    ↓
+OtpService
+    ↓
+Xác thực OTP
+    ↓
+Cập nhật Password
+```
+
+---
+
+## 23.6. updateAvatar()
+
+```text
+updateAvatar(userId, file): User
+```
 
 Cập nhật ảnh đại diện.
 
@@ -906,13 +1168,19 @@ userId
 file
 ```
 
-Kết quả trả về:
+Kết quả:
 
 ```text
 User
 ```
 
-## requestUpdateEmailOtp()
+---
+
+## 23.7. requestUpdateEmailOtp()
+
+```text
+requestUpdateEmailOtp(userId, newEmail): void
+```
 
 Yêu cầu OTP để cập nhật email.
 
@@ -923,7 +1191,31 @@ userId
 newEmail
 ```
 
-## updateEmail()
+Luồng:
+
+```text
+User
+    ↓
+New Email
+    ↓
+UserService
+    ↓
+OtpService
+    ↓
+Tạo OTP
+    ↓
+EmailService
+    ↓
+Gửi OTP
+```
+
+---
+
+## 23.8. updateEmail()
+
+```text
+updateEmail(userId, otp): void
+```
 
 Cập nhật email sau khi OTP được xác thực.
 
@@ -934,37 +1226,76 @@ userId
 otp
 ```
 
-## disableAccount()
+Luồng:
+
+```text
+User ID
++ OTP
+    ↓
+UserService
+    ↓
+OtpService
+    ↓
+Xác thực OTP
+    ↓
+Cập nhật Email
+```
+
+---
+
+## 23.9. disableAccount()
+
+```text
+disableAccount(userId, currentPassword): void
+```
 
 Vô hiệu hóa tài khoản.
 
-Yêu cầu:
+Input:
 
 ```text
 userId
 currentPassword
 ```
 
-## deleteAccount()
+Sau khi xử lý, trạng thái tài khoản:
+
+```text
+DISABLED
+```
+
+---
+
+## 23.10. deleteAccount()
+
+```text
+deleteAccount(userId, currentPassword): void
+```
 
 Xóa tài khoản.
 
-Yêu cầu:
+Input:
 
 ```text
 userId
 currentPassword
 ```
 
-Theo enum `AccountStatus`, tài khoản sau khi xóa có trạng thái:
+Theo diagram, tài khoản được xử lý theo hướng soft delete:
 
 ```text
-DELETED
+AccountStatus = DELETED
 ```
 
-## requestBecomeArtist()
+---
 
-Gửi yêu cầu trở thành Artist.
+## 23.11. requestBecomeArtist()
+
+```text
+requestBecomeArtist(userId, artistName, bio): void
+```
+
+User gửi yêu cầu trở thành Artist.
 
 Input:
 
@@ -974,15 +1305,35 @@ artistName
 bio
 ```
 
-Sau khi gửi:
+Sau khi gửi yêu cầu:
 
 ```text
 ArtistRequestStatus = PENDING
 ```
 
-## updateArtistProfile()
+Luồng:
 
-Cập nhật hồ sơ Artist.
+```text
+User
+    ↓
+UserController
+    ↓
+UserService
+    ↓
+requestBecomeArtist()
+    ↓
+ArtistRequestStatus = PENDING
+```
+
+---
+
+## 23.12. updateArtistProfile()
+
+```text
+updateArtistProfile(userId, artistName, bio): User
+```
+
+Cập nhật thông tin hồ sơ Artist.
 
 Input:
 
@@ -992,7 +1343,7 @@ artistName
 bio
 ```
 
-Kết quả trả về:
+Kết quả:
 
 ```text
 User
@@ -1000,11 +1351,11 @@ User
 
 ---
 
-# 23. AdminService
+# 24. AdminService
 
-`AdminService` xử lý các chức năng dành cho Admin.
+`AdminService` xử lý Business Logic dành cho Admin.
 
-Các phương thức:
+## 24.1. Các phương thức
 
 ```text
 getAllUsers(): List<User>
@@ -1022,11 +1373,23 @@ rejectArtistRequest(userId): void
 assignRole(userId, role): void
 ```
 
-## getAllUsers()
+---
 
-Lấy danh sách tất cả User.
+## 24.2. getAllUsers()
 
-## lockAccount()
+```text
+getAllUsers(): List<User>
+```
+
+Lấy danh sách User trong hệ thống.
+
+---
+
+## 24.3. lockAccount()
+
+```text
+lockAccount(userId): void
+```
 
 Khóa tài khoản User.
 
@@ -1036,7 +1399,13 @@ Input:
 userId
 ```
 
-## unlockAccount()
+---
+
+## 24.4. unlockAccount()
+
+```text
+unlockAccount(userId): void
+```
 
 Mở khóa tài khoản User.
 
@@ -1046,45 +1415,80 @@ Input:
 userId
 ```
 
-## getPendingArtistRequests()
+---
 
-Lấy danh sách các yêu cầu trở thành Artist đang chờ xử lý.
+## 24.5. getPendingArtistRequests()
 
-Có thể hiểu:
+```text
+getPendingArtistRequests(): List<User>
+```
+
+Lấy danh sách các User đang yêu cầu trở thành Artist.
+
+Điều kiện:
 
 ```text
 ArtistRequestStatus = PENDING
 ```
 
-## approveArtistRequest()
+---
+
+## 24.6. approveArtistRequest()
+
+```text
+approveArtistRequest(userId): void
+```
 
 Duyệt yêu cầu trở thành Artist.
 
-Sau khi Admin duyệt:
+Sau khi duyệt:
 
 ```text
 ArtistRequestStatus = APPROVED
-```
-
-và theo diagram:
-
-```text
 Role = ARTIST
 ```
 
-## rejectArtistRequest()
+Luồng:
+
+```text
+Admin
+    ↓
+AdminController
+    ↓
+AdminService
+    ↓
+approveArtistRequest()
+    ↓
+ArtistRequestStatus = APPROVED
+    ↓
+Role = ARTIST
+```
+
+---
+
+## 24.7. rejectArtistRequest()
+
+```text
+rejectArtistRequest(userId): void
+```
 
 Từ chối yêu cầu trở thành Artist.
 
-Theo enum:
+Sau khi từ chối:
 
 ```text
 ArtistRequestStatus = REJECTED
 ```
 
-## assignRole()
+---
 
-Gán role cho User.
+## 24.8. assignRole()
+
+```text
+assignRole(userId, role): void
+```
+
+Gán Role cho User.
 
 Input:
 
@@ -1093,7 +1497,7 @@ userId
 role
 ```
 
-Các role trong diagram:
+Các Role trong diagram:
 
 ```text
 USER
@@ -1103,11 +1507,11 @@ ADMIN
 
 ---
 
-# 24. Package Controller
+# 25. Package Controller
 
-Controller là tầng tiếp nhận HTTP Request từ Client.
+Package `controller` là tầng tiếp nhận HTTP Request từ Client.
 
-Diagram có:
+Diagram gồm:
 
 ```text
 AuthController
@@ -1115,13 +1519,15 @@ UserController
 AdminController
 ```
 
+Controller không trực tiếp xử lý Business Logic mà chuyển request xuống Service tương ứng.
+
 ---
 
-# 25. AuthController
+# 26. AuthController
 
-`AuthController` xử lý các API liên quan đến Authentication.
+`AuthController` xử lý các API Authentication.
 
-Các phương thức:
+## 26.1. Các phương thức
 
 ```text
 register()
@@ -1135,7 +1541,7 @@ forgotPassword()
 resetPassword()
 ```
 
-Chức năng:
+## 26.2. Chức năng
 
 | Method             | Chức năng        |
 | ------------------ | ---------------- |
@@ -1145,27 +1551,27 @@ Chức năng:
 | `forgotPassword()` | Quên mật khẩu    |
 | `resetPassword()`  | Đặt lại mật khẩu |
 
-Luồng:
+## 26.3. Luồng
 
 ```text
 Client
-  ↓
+    ↓
 AuthController
-  ↓
+    ↓
 AuthService
-  ↓
+    ↓
 Repository / Security / OTP
-  ↓
+    ↓
 Database
 ```
 
 ---
 
-# 26. UserController
+# 27. UserController
 
-`UserController` xử lý API dành cho User.
+`UserController` xử lý các API dành cho User.
 
-Các phương thức:
+## 27.1. Các phương thức
 
 ```text
 logout()
@@ -1193,9 +1599,7 @@ requestBecomeArtist()
 updateArtistProfile()
 ```
 
-Có thể chia thành các nhóm:
-
-### Profile
+## 27.2. Nhóm Profile
 
 ```text
 getProfile()
@@ -1203,21 +1607,21 @@ updateProfile()
 updateAvatar()
 ```
 
-### Password
+## 27.3. Nhóm Password
 
 ```text
 requestChangePasswordOtp()
 changePassword()
 ```
 
-### Email
+## 27.4. Nhóm Email
 
 ```text
 requestUpdateEmailOtp()
 updateEmail()
 ```
 
-### Account
+## 27.5. Nhóm Account
 
 ```text
 logout()
@@ -1225,7 +1629,7 @@ disableAccount()
 deleteAccount()
 ```
 
-### Artist
+## 27.6. Nhóm Artist
 
 ```text
 requestBecomeArtist()
@@ -1234,11 +1638,11 @@ updateArtistProfile()
 
 ---
 
-# 27. AdminController
+# 28. AdminController
 
-`AdminController` xử lý API dành cho Admin.
+`AdminController` xử lý các API dành cho Admin.
 
-Các phương thức:
+## 28.1. Các phương thức
 
 ```text
 getAllUsers()
@@ -1256,58 +1660,98 @@ rejectArtistRequest()
 assignRole()
 ```
 
-Tất cả API của `AdminController` trong diagram được ghi chú:
+## 28.2. Authorization
+
+Theo diagram, toàn bộ API của `AdminController` được bảo vệ bằng:
 
 ```text
-Toàn bộ API của AdminController
-gắn @PreAuthorize("hasRole('ADMIN')")
-trong SecurityConfig
+@PreAuthorize("hasRole('ADMIN')")
 ```
 
-Điều này có nghĩa là các API của Admin được giới hạn cho User có role `ADMIN`.
-
-Luồng:
+Do đó:
 
 ```text
 Client
-   ↓
+    ↓
 AdminController
-   ↓
-Kiểm tra quyền ADMIN
-   ↓
+    ↓
+Kiểm tra Role
+    ↓
+ADMIN ?
+    ↓
 AdminService
-   ↓
-UserRepository
-   ↓
-Database
+```
+
+Chỉ User có role `ADMIN` mới được phép thực hiện các API này.
+
+---
+
+# 29. Luồng Authentication
+
+## 29.1. Đăng ký
+
+```text
+Client
+    ↓
+AuthController
+    ↓
+AuthService
+    ↓
+Kiểm tra Username / Email
+    ↓
+Tạo User
+    ↓
+AccountStatus = UNVERIFIED
+    ↓
+OtpService
+    ↓
+EmailService
+    ↓
+Gửi OTP
 ```
 
 ---
 
-# 28. Luồng tổng thể của Module
-
-## 28.1. Authentication
+## 29.2. Xác thực OTP
 
 ```text
 Client
-  ↓
-AuthController
-  ↓
-AuthService
-  ↓
-UserRepository
-  ↓
-User
+    ↓
+AuthController.verifyOtp()
+    ↓
+OtpService
+    ↓
+OtpVerificationRepository
+    ↓
+Tìm OTP
+    ↓
+Kiểm tra OTP
+    ↓
+Xác thực thành công
+    ↓
+AccountStatus = ACTIVE
 ```
 
-Khi đăng nhập thành công:
+---
+
+## 29.3. Đăng nhập
 
 ```text
+Client
+    ↓
+AuthController.login()
+    ↓
 AuthService
+    ↓
+UserRepository
+    ↓
+Kiểm tra Email
+    ↓
+Kiểm tra Password
     ↓
 JwtUtil
     ↓
-JWT
+Tạo JWT
     ↓
 LoginResponse
     ↓
@@ -1316,37 +1760,41 @@ Client
 
 ---
 
-# 29. Luồng JWT Authentication
+# 30. Luồng JWT Authentication
 
-Đối với các API cần đăng nhập:
+Đối với API yêu cầu đăng nhập:
 
 ```text
 Client
-  ↓
+    ↓
 Request + JWT
-  ↓
+    ↓
 JwtAuthenticationFilter
-  ↓
+    ↓
 JwtUtil
-  ↓
-Validate JWT
-  ↓
+    ↓
+validateToken()
+    ↓
+getEmailFromToken()
+    ↓
 CustomUserDetailsService
-  ↓
+    ↓
 UserRepository
-  ↓
+    ↓
 User
-  ↓
+    ↓
+UserDetails
+    ↓
 Spring Security
-  ↓
+    ↓
 Controller
 ```
 
 ---
 
-# 30. Luồng OTP
+# 31. Luồng OTP
 
-OTP được xử lý chủ yếu thông qua:
+OTP được xử lý thông qua các thành phần:
 
 ```text
 OtpService
@@ -1355,251 +1803,721 @@ OtpVerificationRepository
 OtpVerification
 ```
 
-Luồng tổng quát:
+## 31.1. Tạo và gửi OTP
 
 ```text
 Service
-   ↓
+    ↓
 OtpService
-   ↓
+    ↓
 Tạo OTP
-   ↓
+    ↓
 OtpVerification
-   ↓
+    ↓
 OtpVerificationRepository
-   ↓
+    ↓
 Database
 
 OtpService
-   ↓
+    ↓
 EmailService
-   ↓
+    ↓
 Email
-   ↓
+    ↓
 User
 ```
 
-Khi User nhập OTP:
+## 31.2. Xác thực OTP
 
 ```text
 User
- ↓
+    ↓
 Controller
- ↓
+    ↓
 Service
- ↓
+    ↓
 OtpService
- ↓
+    ↓
 OtpVerificationRepository
- ↓
+    ↓
+Tìm OTP
+    ↓
 Kiểm tra OTP
+    ↓
+Xác thực
 ```
 
 ---
 
-# 31. Luồng User trở thành Artist
+# 32. Luồng Quên mật khẩu
 
 ```text
 User
- ↓
+    ↓
+Nhập Email
+    ↓
+AuthController
+    ↓
+AuthService.forgotPassword()
+    ↓
+UserRepository
+    ↓
+Tìm User
+    ↓
+OtpService
+    ↓
+OtpPurpose = RESET_PASSWORD
+    ↓
+EmailService
+    ↓
+Gửi OTP
+```
+
+Sau đó User nhập OTP và mật khẩu mới:
+
+```text
+User
+    ↓
+Email
++ OTP
++ New Password
+    ↓
+AuthController
+    ↓
+AuthService.resetPassword()
+    ↓
+OtpService
+    ↓
+Xác thực OTP
+    ↓
+Cập nhật Password
+```
+
+---
+
+# 33. Luồng Đổi mật khẩu
+
+Đổi mật khẩu gồm hai bước.
+
+## Bước 1 – Yêu cầu OTP
+
+```text
+User
+    ↓
+Current Password
+    ↓
 UserController
- ↓
+    ↓
+UserService.requestChangePasswordOtp()
+    ↓
+Kiểm tra Current Password
+    ↓
+OtpService
+    ↓
+OtpPurpose = CHANGE_PASSWORD
+    ↓
+EmailService
+    ↓
+Gửi OTP
+```
+
+## Bước 2 – Đổi mật khẩu
+
+```text
+User
+    ↓
+OTP + New Password
+    ↓
+UserController
+    ↓
+UserService.changePassword()
+    ↓
+OtpService
+    ↓
+Xác thực OTP
+    ↓
+Cập nhật Password
+```
+
+---
+
+# 34. Luồng Cập nhật Email
+
+Đổi email cũng gồm hai bước.
+
+## Bước 1 – Yêu cầu OTP
+
+```text
+User
+    ↓
+New Email
+    ↓
+UserController
+    ↓
+UserService.requestUpdateEmailOtp()
+    ↓
+OtpService
+    ↓
+OtpPurpose = CHANGE_EMAIL
+    ↓
+EmailService
+    ↓
+Gửi OTP
+```
+
+## Bước 2 – Cập nhật Email
+
+```text
+User
+    ↓
+OTP
+    ↓
+UserController
+    ↓
+UserService.updateEmail()
+    ↓
+OtpService
+    ↓
+Xác thực OTP
+    ↓
+Cập nhật Email
+```
+
+---
+
+# 35. Luồng User trở thành Artist
+
+## 35.1. User gửi yêu cầu
+
+```text
+User
+    ↓
+UserController
+    ↓
 UserService
- ↓
+    ↓
 requestBecomeArtist()
- ↓
+    ↓
 ArtistRequestStatus = PENDING
 ```
 
-Sau đó Admin xử lý:
+## 35.2. Admin xem yêu cầu
 
 ```text
 Admin
- ↓
+    ↓
 AdminController
- ↓
+    ↓
 AdminService
- ↓
+    ↓
 getPendingArtistRequests()
- ↓
-Danh sách yêu cầu
+    ↓
+UserRepository
+    ↓
+ArtistRequestStatus = PENDING
+    ↓
+Danh sách User
 ```
 
-Nếu Admin chấp nhận:
+## 35.3. Admin duyệt
 
 ```text
+Admin
+    ↓
+AdminController
+    ↓
+AdminService
+    ↓
 approveArtistRequest()
-        ↓
+    ↓
 ArtistRequestStatus = APPROVED
-        ↓
+    ↓
 Role = ARTIST
 ```
 
-Nếu Admin từ chối:
+## 35.4. Admin từ chối
 
 ```text
+Admin
+    ↓
+AdminController
+    ↓
+AdminService
+    ↓
 rejectArtistRequest()
-        ↓
+    ↓
 ArtistRequestStatus = REJECTED
 ```
 
 ---
 
-# 32. Quan hệ giữa các tầng
+# 36. Luồng quản lý tài khoản
 
-Có thể hiểu Class Diagram theo cấu trúc:
+## 36.1. Vô hiệu hóa tài khoản
 
 ```text
-                    ┌─────────────────┐
-                    │    Controller   │
-                    │                 │
-                    │ AuthController  │
-                    │ UserController  │
-                    │ AdminController │
-                    └────────┬────────┘
-                             │
-                             ↓
-                    ┌─────────────────┐
-                    │     Service     │
-                    │                 │
-                    │ AuthService     │
-                    │ OtpService      │
-                    │ EmailService    │
-                    │ UserService     │
-                    │ AdminService    │
-                    └────────┬────────┘
-                             │
-                             ↓
-                    ┌─────────────────┐
-                    │   Repository    │
-                    │                 │
-                    │ UserRepository  │
-                    │ OtpVerification │
-                    │ Repository      │
-                    └────────┬────────┘
-                             │
-                             ↓
-                    ┌─────────────────┐
-                    │     Entity      │
-                    │                 │
-                    │ User            │
-                    │ OtpVerification │
-                    └─────────────────┘
+User
+    ↓
+Current Password
+    ↓
+UserController
+    ↓
+UserService.disableAccount()
+    ↓
+Kiểm tra Password
+    ↓
+AccountStatus = DISABLED
 ```
 
-Security hoạt động xuyên suốt quá trình xác thực:
+## 36.2. Xóa tài khoản
 
 ```text
-             ┌──────────────────────┐
-             │    SecurityConfig    │
-             └──────────┬───────────┘
-                        │
-                        ↓
-             ┌──────────────────────┐
-             │ JwtAuthentication    │
-             │ Filter               │
-             └──────────┬───────────┘
-                        │
-                        ↓
-             ┌──────────────────────┐
-             │       JwtUtil        │
-             └──────────┬───────────┘
-                        │
-                        ↓
-             ┌──────────────────────┐
-             │ CustomUserDetails    │
-             │ Service              │
-             └──────────┬───────────┘
-                        │
-                        ↓
-                 UserRepository
+User
+    ↓
+Current Password
+    ↓
+UserController
+    ↓
+UserService.deleteAccount()
+    ↓
+Kiểm tra Password
+    ↓
+AccountStatus = DELETED
+```
+
+Đây là hướng xử lý soft delete được thể hiện trong diagram.
+
+---
+
+# 37. Luồng Admin
+
+Các API Admin được bảo vệ bởi Role:
+
+```text
+@PreAuthorize("hasRole('ADMIN')")
+```
+
+Luồng tổng quát:
+
+```text
+Client
+    ↓
+JWT
+    ↓
+JwtAuthenticationFilter
+    ↓
+Spring Security
+    ↓
+Kiểm tra Role
+    ↓
+ADMIN
+    ↓
+AdminController
+    ↓
+AdminService
+    ↓
+UserRepository
+    ↓
+Database
+```
+
+Các chức năng Admin:
+
+```text
+getAllUsers()
+lockAccount()
+unlockAccount()
+getPendingArtistRequests()
+approveArtistRequest()
+rejectArtistRequest()
+assignRole()
 ```
 
 ---
 
-# 33. Tổng hợp toàn bộ Class
+# 38. Quan hệ giữa các tầng
 
-| Package    | Class                       | Vai trò                       |
-| ---------- | --------------------------- | ----------------------------- |
-| Entity     | `User`                      | Thông tin người dùng          |
-| Entity     | `OtpVerification`           | Lưu thông tin OTP             |
-| Enum       | `AccountStatus`             | Trạng thái tài khoản          |
-| Enum       | `OtpPurpose`                | Mục đích OTP                  |
-| Enum       | `Role`                      | Vai trò User                  |
-| Enum       | `ArtistRequestStatus`       | Trạng thái yêu cầu Artist     |
-| DTO        | `LoginResponse`             | Response sau đăng nhập        |
-| Repository | `UserRepository`            | Truy vấn User                 |
-| Repository | `OtpVerificationRepository` | Truy vấn OTP                  |
-| Security   | `JwtUtil`                   | Tạo và kiểm tra JWT           |
-| Security   | `JwtAuthenticationFilter`   | Xử lý JWT trong Request       |
-| Security   | `CustomUserDetailsService`  | Load User cho Spring Security |
-| Security   | `SecurityConfig`            | Cấu hình Spring Security      |
-| Service    | `AuthService`               | Authentication                |
-| Service    | `OtpService`                | Xử lý OTP                     |
-| Service    | `EmailService`              | Gửi OTP qua Email             |
-| Service    | `UserService`               | Business logic của User       |
-| Service    | `AdminService`              | Business logic của Admin      |
-| Controller | `AuthController`            | API Authentication            |
-| Controller | `UserController`            | API User                      |
-| Controller | `AdminController`           | API Admin                     |
+Kiến trúc chính của Module Người Dùng:
+
+```text
+                    ┌─────────────────────┐
+                    │     Controller      │
+                    │                     │
+                    │ AuthController      │
+                    │ UserController      │
+                    │ AdminController     │
+                    └──────────┬──────────┘
+                               │
+                               ↓
+                    ┌─────────────────────┐
+                    │       Service       │
+                    │                     │
+                    │ AuthService         │
+                    │ OtpService          │
+                    │ EmailService        │
+                    │ UserService         │
+                    │ AdminService        │
+                    └──────────┬──────────┘
+                               │
+                               ↓
+                    ┌─────────────────────┐
+                    │     Repository      │
+                    │                     │
+                    │ UserRepository      │
+                    │ OtpVerification     │
+                    │ Repository          │
+                    └──────────┬──────────┘
+                               │
+                               ↓
+                    ┌─────────────────────┐
+                    │       Entity        │
+                    │                     │
+                    │ User                │
+                    │ OtpVerification     │
+                    └─────────────────────┘
+```
 
 ---
 
-# 34. Tổng kết
+# 39. Security hoạt động xuyên suốt
 
-Class Diagram của Module Người Dùng được tổ chức thành các tầng chính:
+Security không nằm hoàn toàn trong luồng Controller → Service → Repository mà tham gia vào quá trình xác thực Request.
+
+```text
+                 ┌──────────────────────┐
+                 │    SecurityConfig     │
+                 └──────────┬───────────┘
+                            │
+                            ↓
+                 ┌──────────────────────┐
+                 │ JwtAuthentication    │
+                 │ Filter               │
+                 └──────────┬───────────┘
+                            │
+                            ↓
+                 ┌──────────────────────┐
+                 │       JwtUtil        │
+                 └──────────┬───────────┘
+                            │
+                            ↓
+                 ┌──────────────────────┐
+                 │ CustomUserDetails    │
+                 │ Service              │
+                 └──────────┬───────────┘
+                            │
+                            ↓
+                      UserRepository
+```
+
+---
+
+# 40. Mối quan hệ giữa các thành phần
+
+## User và OtpVerification
+
+```text
+User
+  1
+  |
+  *
+OtpVerification
+```
+
+Một User có thể có nhiều bản ghi OTP.
+
+## User và các Enum
+
+`User` sử dụng:
+
+```text
+AccountStatus
+Role
+ArtistRequestStatus
+```
+
+Có thể hình dung:
+
+```text
+User
+ ├── accountStatus: AccountStatus
+ ├── role: Role
+ └── artistRequestStatus: ArtistRequestStatus
+```
+
+## OtpVerification và OtpPurpose
+
+```text
+OtpVerification
+    |
+    └── purpose: OtpPurpose
+```
+
+OTP được xác định mục đích thông qua `OtpPurpose`.
+
+---
+
+# 41. Tổng hợp toàn bộ Class
+
+| Package       | Class                       | Vai trò                       |
+| ------------- | --------------------------- | ----------------------------- |
+| Entity        | `User`                      | Đại diện tài khoản User       |
+| Entity        | `OtpVerification`           | Lưu thông tin OTP             |
+| Entity / Enum | `AccountStatus`             | Trạng thái tài khoản          |
+| Entity / Enum | `OtpPurpose`                | Mục đích OTP                  |
+| Entity / Enum | `Role`                      | Vai trò User                  |
+| Entity / Enum | `ArtistRequestStatus`       | Trạng thái yêu cầu Artist     |
+| DTO           | `LoginResponse`             | Response sau đăng nhập        |
+| Repository    | `UserRepository`            | Truy vấn User                 |
+| Repository    | `OtpVerificationRepository` | Truy vấn OTP                  |
+| Security      | `JwtUtil`                   | Tạo và kiểm tra JWT           |
+| Security      | `JwtAuthenticationFilter`   | Xử lý JWT Request             |
+| Security      | `CustomUserDetailsService`  | Load User cho Spring Security |
+| Security      | `SecurityConfig`            | Cấu hình Spring Security      |
+| Service       | `AuthService`               | Authentication                |
+| Service       | `OtpService`                | Tạo và xác thực OTP           |
+| Service       | `EmailService`              | Gửi OTP qua Email             |
+| Service       | `UserService`               | Business Logic của User       |
+| Service       | `AdminService`              | Business Logic của Admin      |
+| Controller    | `AuthController`            | API Authentication            |
+| Controller    | `UserController`            | API User                      |
+| Controller    | `AdminController`           | API Admin                     |
+
+---
+
+# 42. Tổng hợp Method
+
+## AuthController
+
+```text
+register()
+verifyOtp()
+login()
+forgotPassword()
+resetPassword()
+```
+
+## UserController
+
+```text
+logout()
+getProfile()
+updateProfile()
+updateAvatar()
+requestChangePasswordOtp()
+changePassword()
+requestUpdateEmailOtp()
+updateEmail()
+disableAccount()
+deleteAccount()
+requestBecomeArtist()
+updateArtistProfile()
+```
+
+## AdminController
+
+```text
+getAllUsers()
+lockAccount()
+unlockAccount()
+getPendingArtistRequests()
+approveArtistRequest()
+rejectArtistRequest()
+assignRole()
+```
+
+## AuthService
+
+```text
+register(username, email, password): void
+login(email, password): LoginResponse
+forgotPassword(email): void
+resetPassword(email, otp, newPassword): void
+```
+
+## OtpService
+
+```text
+generateAndSend(user, purpose): void
+generateAndSend(user, purpose, newEmail): void
+verifyAndConsume(user, otp, purpose): OtpVerification
+```
+
+## EmailService
+
+```text
+sendOtp(toEmail, otpCode): void
+```
+
+## UserService
+
+```text
+getProfile(userId): User
+updateProfile(userId, fullName): User
+requestChangePasswordOtp(userId, currentPassword): void
+changePassword(userId, otp, newPassword): void
+updateAvatar(userId, file): User
+requestUpdateEmailOtp(userId, newEmail): void
+updateEmail(userId, otp): void
+disableAccount(userId, currentPassword): void
+deleteAccount(userId, currentPassword): void
+requestBecomeArtist(userId, artistName, bio): void
+updateArtistProfile(userId, artistName, bio): User
+```
+
+## AdminService
+
+```text
+getAllUsers(): List<User>
+lockAccount(userId): void
+unlockAccount(userId): void
+getPendingArtistRequests(): List<User>
+approveArtistRequest(userId): void
+rejectArtistRequest(userId): void
+assignRole(userId, role): void
+```
+
+## UserRepository
+
+```text
+findByEmail(email): Optional<User>
+existsByEmail(email): boolean
+existsByUsername(username): boolean
+findByArtistRequestStatus(status): List<User>
+```
+
+## OtpVerificationRepository
+
+```text
+findFirstByUserAndPurposeAndVerifiedFalseOrderByIdDesc(
+    user,
+    purpose
+): Optional<OtpVerification>
+```
+
+## JwtUtil
+
+```text
+generateToken(user): String
+validateToken(token): boolean
+getEmailFromToken(token): String
+```
+
+## JwtAuthenticationFilter
+
+```text
+doFilterInternal(req, res, chain): void
+```
+
+## CustomUserDetailsService
+
+```text
+loadUserByUsername(email): UserDetails
+```
+
+## SecurityConfig
+
+```text
+filterChain(http): SecurityFilterChain
+passwordEncoder(): PasswordEncoder
+```
+
+---
+
+# 43. Tổng kết kiến trúc
+
+Module Người Dùng được xây dựng theo kiến trúc nhiều tầng:
+
+```text
+Client
+   ↓
+Controller
+   ↓
+Service
+   ↓
+Repository
+   ↓
+Entity
+   ↓
+Database
+```
+
+Mỗi tầng có trách nhiệm riêng:
 
 ```text
 Controller
-    ↓
+→ Tiếp nhận HTTP Request và trả Response
+
 Service
-    ↓
+→ Xử lý Business Logic
+
 Repository
-    ↓
+→ Truy vấn và thao tác dữ liệu
+
 Entity
+→ Đại diện cho dữ liệu trong Database
+
+DTO
+→ Trao đổi dữ liệu giữa Client và Backend
+
+Security
+→ Authentication và Authorization
+
+Enum
+→ Biểu diễn các trạng thái và giá trị cố định
 ```
 
-Trong đó:
-
-* **Controller** tiếp nhận request từ Client.
-* **Service** xử lý Business Logic.
-* **Repository** làm việc với Database.
-* **Entity** đại diện cho dữ liệu trong Database.
-* **DTO** dùng để trao đổi dữ liệu giữa Client và Backend.
-* **Security** chịu trách nhiệm Authentication và Authorization.
-* **Enum** giúp biểu diễn các trạng thái và quyền cố định.
-
-Module hiện bao phủ các nhóm chức năng chính:
+Các thành phần Security:
 
 ```text
-Authentication
-    ↓
-Đăng ký
-Đăng nhập
-OTP
-Quên mật khẩu
-Đặt lại mật khẩu
-
-User
-    ↓
-Profile
-Password
-Email
-Avatar
-Account
-
-Artist
-    ↓
-Gửi yêu cầu trở thành Artist
-Duyệt / Từ chối yêu cầu
-Cập nhật hồ sơ Artist
-
-Admin
-    ↓
-Quản lý User
-Khóa / Mở khóa
-Duyệt Artist
-Phân quyền
+JwtAuthenticationFilter
+JwtUtil
+CustomUserDetailsService
+SecurityConfig
 ```
 
-Đây là cấu trúc Class Diagram được sử dụng để làm cơ sở triển khai các class Java tương ứng trong Module Người Dùng.
+phối hợp để xử lý Authentication và Authorization.
+
+Các thành phần OTP:
+
+```text
+OtpService
+EmailService
+OtpVerificationRepository
+OtpVerification
+```
+
+phối hợp để thực hiện các chức năng:
+
+```text
+Đăng ký
+Quên mật khẩu
+Đổi mật khẩu
+Cập nhật email
+```
+
+Các thành phần Artist:
+
+```text
+UserService
+AdminService
+ArtistRequestStatus
+Role
+```
+
+phối hợp để thực hiện:
+
+```text
+User gửi yêu cầu
+    ↓
+PENDING
+    ↓
+Admin xử lý
+    ↓
+APPROVED / REJECTED
+    ↓
+Nếu APPROVED
+    ↓
+Role = ARTIST
+```
+
+Như vậy, Class Diagram của Module Người Dùng là cơ sở để triển khai các class thực tế trong Backend và thể hiện rõ trách nhiệm của từng package, từng class cũng như luồng phối hợp giữa các tầng.

@@ -1,10 +1,19 @@
 # ERD – Module Người Dùng
 
-# 1. Tổng quan
+## 1. Tổng quan
 
-ERD (Entity Relationship Diagram) của **Module Người Dùng** mô tả cấu trúc Database và mối quan hệ giữa các bảng.
+ERD (Entity Relationship Diagram) của **Module Người Dùng** mô tả cấu trúc dữ liệu được lưu trữ trong Database, bao gồm:
 
-Hiện tại module gồm 2 bảng chính:
+* Các bảng trong Database
+* Các thuộc tính của từng bảng
+* Kiểu dữ liệu của các thuộc tính
+* Primary Key
+* Foreign Key
+* Unique Constraint
+* Các mối quan hệ giữa các bảng
+* Một số giá trị mặc định và trạng thái được sử dụng trong hệ thống
+
+Module hiện tại gồm 2 bảng chính:
 
 ```text
 users
@@ -15,169 +24,234 @@ Quan hệ giữa hai bảng:
 
 ```text
 users
-  │
-  │ 1
-  │
-  │
-  │ N
+  1
+  |
+  |
+  *
 otp_verifications
 ```
 
-Có nghĩa:
+Điều này có nghĩa:
 
-> Một User có thể có nhiều bản ghi OTP.
+```text
+Một User có thể có nhiều OTP
+
+Mỗi OTP thuộc về một User
+```
 
 ---
 
-# 2. Bảng `users`
+# 2. Cấu trúc Database
 
-Bảng `users` lưu toàn bộ thông tin liên quan đến tài khoản người dùng.
+Database của Module Người Dùng gồm:
 
-## 2.1. Cấu trúc bảng
+```text
+users
+    |
+    | 1 - N
+    |
+otp_verifications
+```
+
+Trong đó:
+
+* `users` lưu thông tin tài khoản người dùng.
+* `otp_verifications` lưu các OTP được tạo cho người dùng.
+* `users.id` là Primary Key của bảng `users`.
+* `otp_verifications.id` là Primary Key của bảng `otp_verifications`.
+* `otp_verifications.user_id` là Foreign Key tham chiếu đến `users.id`.
+
+---
+
+# 3. Bảng users
+
+## 3.1. Mục đích
+
+Bảng `users` lưu trữ thông tin của tài khoản người dùng trong hệ thống.
+
+Bảng này chứa:
+
+* Thông tin đăng nhập
+* Thông tin cá nhân
+* Trạng thái tài khoản
+* Vai trò của tài khoản
+* Thông tin liên quan đến Artist
+
+---
+
+## 3.2. Cấu trúc bảng
 
 | Column                  | Data Type    | Constraint | Ý nghĩa                             |
 | ----------------------- | ------------ | ---------- | ----------------------------------- |
 | `id`                    | BIGINT       | PK         | ID của User                         |
-| `username`              | VARCHAR(50)  | UNIQUE     | Tên người dùng                      |
-| `email`                 | VARCHAR(100) | UNIQUE     | Email                               |
+| `username`              | VARCHAR(50)  | UNIQUE     | Tên đăng nhập                       |
+| `email`                 | VARCHAR(100) | UNIQUE     | Email của User                      |
 | `password`              | VARCHAR(255) | NOT NULL   | Mật khẩu                            |
-| `full_name`             | VARCHAR(100) | —          | Họ và tên                           |
-| `avatar_url`            | VARCHAR(255) | —          | URL ảnh đại diện                    |
+| `full_name`             | VARCHAR(100) |            | Họ và tên                           |
+| `avatar_url`            | VARCHAR(255) |            | Đường dẫn ảnh đại diện              |
 | `account_status`        | VARCHAR(20)  | NOT NULL   | Trạng thái tài khoản                |
 | `role`                  | VARCHAR(20)  | NOT NULL   | Vai trò của User                    |
 | `artist_request_status` | VARCHAR(20)  | NOT NULL   | Trạng thái yêu cầu trở thành Artist |
-| `artist_name`           | VARCHAR(100) | —          | Nghệ danh                           |
-| `bio`                   | VARCHAR(255) | —          | Thông tin giới thiệu                |
+| `artist_name`           | VARCHAR(100) |            | Nghệ danh                           |
+| `bio`                   | VARCHAR(255) |            | Thông tin giới thiệu                |
 
 ---
 
-# 3. Chi tiết bảng `users`
+# 4. Chi tiết bảng users
 
-## 3.1. `id`
+## 4.1. id
 
 ```text
-BIGINT
+id : BIGINT
+```
+
+`id` là định danh của User.
+
+Đây là:
+
+```text
 PRIMARY KEY
 ```
 
-Dùng để định danh duy nhất mỗi User.
+Mỗi User có một `id` duy nhất.
+
+Ví dụ về mặt ý nghĩa:
+
+```text
+User A → id = 1
+User B → id = 2
+User C → id = 3
+```
+
+`id` được sử dụng để xác định chính xác một User trong Database.
+
+---
+
+## 4.2. username
+
+```text
+username : VARCHAR(50)
+```
+
+Lưu tên đăng nhập của User.
+
+Constraint:
+
+```text
+UNIQUE
+```
+
+Điều này có nghĩa là hai User không được có cùng `username`.
 
 Ví dụ:
 
 ```text
-1
-2
-3
-4
+User 1 → phong123
+User 2 → abc123
 ```
 
-Mỗi User chỉ có một `id`.
-
-`id` cũng được sử dụng để liên kết User với các bảng khác trong Database.
-
----
-
-## 3.2. `username`
+Không thể tồn tại:
 
 ```text
-VARCHAR(50)
-UNIQUE
-```
-
-Lưu username của User.
-
-`UNIQUE` đảm bảo hai User không thể có cùng username.
-
-Ví dụ:
-
-```text
-nguyenvana
-phong123
-user01
+User 1 → phong123
+User 2 → phong123
 ```
 
 ---
 
-## 3.3. `email`
+## 4.3. email
 
 ```text
-VARCHAR(100)
-UNIQUE
+email : VARCHAR(100)
 ```
 
 Lưu email của User.
 
-Email được đánh dấu `UNIQUE`, vì vậy mỗi email chỉ được sử dụng cho một tài khoản.
-
-Ví dụ:
+Constraint:
 
 ```text
-user@gmail.com
-example@gmail.com
+UNIQUE
+```
+
+Mỗi email chỉ được sử dụng cho một tài khoản.
+
+Email có thể được sử dụng để:
+
+```text
+Đăng nhập
+Xác thực tài khoản
+Gửi OTP
+Quên mật khẩu
+Cập nhật email
 ```
 
 ---
 
-## 3.4. `password`
+## 4.4. password
 
 ```text
-VARCHAR(255)
-NOT NULL
+password : VARCHAR(255)
 ```
 
 Lưu mật khẩu của User.
 
-Trong hệ thống thực tế, giá trị lưu trong Database phải là **mật khẩu đã được mã hóa**, không phải mật khẩu plain text.
-
----
-
-## 3.5. `full_name`
-
-```text
-VARCHAR(100)
-```
-
-Lưu họ và tên của User.
-
-Ví dụ:
-
-```text
-Nguyễn Văn A
-Trần Thị B
-```
-
-Thuộc tính này phục vụ cho thông tin cá nhân của User.
-
----
-
-## 3.6. `avatar_url`
+Độ dài:
 
 ```text
 VARCHAR(255)
 ```
 
-Lưu đường dẫn đến ảnh đại diện của User.
+Cột này được đánh dấu bắt buộc trong diagram.
 
-Ví dụ:
-
-```text
-https://example.com/avatar/user1.jpg
-```
-
-Database chỉ lưu URL thay vì lưu trực tiếp file ảnh.
+Mật khẩu trong Database cần được lưu dưới dạng đã mã hóa thay vì lưu trực tiếp mật khẩu gốc.
 
 ---
 
-# 4. `account_status`
+## 4.5. full_name
 
 ```text
-VARCHAR(20)
-NOT NULL
+full_name : VARCHAR(100)
 ```
 
-Lưu trạng thái hiện tại của tài khoản.
+Lưu họ và tên của User.
 
-Diagram định nghĩa 4 giá trị:
+Ví dụ về mặt ý nghĩa:
+
+```text
+Nguyễn Thanh Phong
+```
+
+Thuộc tính này phục vụ cho thông tin Profile của User.
+
+---
+
+## 4.6. avatar_url
+
+```text
+avatar_url : VARCHAR(255)
+```
+
+Lưu đường dẫn đến ảnh đại diện của User.
+
+Ví dụ về mặt ý nghĩa:
+
+```text
+/uploads/avatar/user_1.jpg
+```
+
+Database chỉ lưu đường dẫn hoặc URL đến ảnh, không lưu trực tiếp file ảnh trong cột này.
+
+---
+
+# 5. account_status
+
+```text
+account_status : VARCHAR(20)
+```
+
+`account_status` biểu diễn trạng thái hiện tại của tài khoản.
+
+Diagram xác định các giá trị:
 
 ```text
 UNVERIFIED
@@ -186,52 +260,81 @@ DISABLED
 DELETED
 ```
 
-## UNVERIFIED
+## 5.1. UNVERIFIED
 
-Tài khoản chưa hoàn tất quá trình xác thực.
+```text
+UNVERIFIED
+```
 
-Liên quan đến quá trình:
+Tài khoản chưa hoàn thành quá trình xác thực.
+
+Trạng thái này được sử dụng trong quá trình đăng ký và xác thực OTP.
+
+Luồng:
 
 ```text
 Đăng ký
     ↓
-Gửi OTP
+UNVERIFIED
     ↓
-Xác thực Email / OTP
+Xác thực OTP
+    ↓
+ACTIVE
 ```
-
-## ACTIVE
-
-Tài khoản đang hoạt động bình thường.
-
-## DISABLED
-
-Tài khoản đang bị vô hiệu hóa.
-
-## DELETED
-
-Tài khoản đã được đánh dấu xóa.
-
-Theo diagram:
-
-```text
-DELETED → Xóa tài khoản (soft delete)
-```
-
-Tức là tài khoản có thể được đánh dấu `DELETED` thay vì xóa hoàn toàn bản ghi khỏi Database.
 
 ---
 
-# 5. `role`
+## 5.2. ACTIVE
 
 ```text
-VARCHAR(20)
-NOT NULL
+ACTIVE
 ```
 
-Lưu vai trò của User.
+Tài khoản đã được xác thực và đang hoạt động bình thường.
 
-Diagram định nghĩa:
+---
+
+## 5.3. DISABLED
+
+```text
+DISABLED
+```
+
+Tài khoản đang bị vô hiệu hóa.
+
+Tài khoản vẫn có thể tồn tại trong Database nhưng không còn hoạt động bình thường như tài khoản `ACTIVE`.
+
+---
+
+## 5.4. DELETED
+
+```text
+DELETED
+```
+
+Tài khoản được đánh dấu là đã xóa.
+
+Theo thiết kế của diagram, việc xóa tài khoản được biểu diễn thông qua trạng thái:
+
+```text
+DELETED
+```
+
+thay vì nhất thiết phải xóa bản ghi khỏi Database.
+
+Đây là cách tiếp cận thường được gọi là **soft delete**.
+
+---
+
+# 6. role
+
+```text
+role : VARCHAR(20)
+```
+
+`role` xác định vai trò của User trong hệ thống.
+
+Diagram xác định ba giá trị:
 
 ```text
 USER
@@ -239,40 +342,65 @@ ARTIST
 ADMIN
 ```
 
-## USER
-
-Role mặc định khi User đăng ký.
+## 6.1. USER
 
 ```text
-Đăng ký
-   ↓
-role = USER
+USER
 ```
 
-## ARTIST
+Là role mặc định khi User đăng ký tài khoản.
 
-Role được sử dụng cho User đã trở thành Artist.
+Diagram ghi rõ:
 
-Theo diagram, Role này được gán khi Admin duyệt yêu cầu trở thành Artist.
-
-## ADMIN
-
-Role dành cho Admin.
-
-Role này được sử dụng để thực hiện các chức năng quản trị hệ thống.
+```text
+Mặc định USER khi đăng ký
+```
 
 ---
 
-# 6. `artist_request_status`
+## 6.2. ARTIST
 
 ```text
-VARCHAR(20)
-NOT NULL
+ARTIST
 ```
 
-Lưu trạng thái yêu cầu trở thành Artist.
+Được sử dụng khi User trở thành Artist.
 
-Diagram định nghĩa:
+Role này liên quan đến quá trình:
+
+```text
+User gửi yêu cầu
+    ↓
+PENDING
+    ↓
+Admin xử lý
+    ↓
+APPROVED
+    ↓
+Role = ARTIST
+```
+
+---
+
+## 6.3. ADMIN
+
+```text
+ADMIN
+```
+
+Là role dành cho tài khoản có quyền quản trị hệ thống.
+
+---
+
+# 7. artist_request_status
+
+```text
+artist_request_status : VARCHAR(20)
+```
+
+Thuộc tính này lưu trạng thái yêu cầu trở thành Artist của User.
+
+Diagram xác định các giá trị:
 
 ```text
 NONE
@@ -281,173 +409,196 @@ APPROVED
 REJECTED
 ```
 
-## NONE
+---
+
+## 7.1. NONE
+
+```text
+NONE
+```
 
 User chưa gửi yêu cầu trở thành Artist.
 
-Đây là trạng thái mặc định.
+Đây là trạng thái mặc định theo diagram.
+
+---
+
+## 7.2. PENDING
 
 ```text
-artist_request_status = NONE
-```
-
-## PENDING
-
-User đã gửi yêu cầu và đang chờ Admin xử lý.
-
-Theo diagram:
-
-```text
-UC14 – Gửi yêu cầu trở thành Artist
-        ↓
 PENDING
 ```
 
-## APPROVED
+User đã gửi yêu cầu trở thành Artist và đang chờ Admin xử lý.
 
-Admin đã chấp nhận yêu cầu.
-
-```text
-Admin duyệt
-     ↓
-APPROVED
-```
-
-## REJECTED
-
-Admin đã từ chối yêu cầu.
+Luồng:
 
 ```text
-Admin từ chối
-     ↓
-REJECTED
+NONE
+    ↓
+User gửi yêu cầu
+    ↓
+PENDING
 ```
 
 ---
 
-# 7. `artist_name`
+## 7.3. APPROVED
 
 ```text
-VARCHAR(100)
+APPROVED
 ```
 
-Lưu nghệ danh của User.
+Yêu cầu trở thành Artist đã được Admin chấp thuận.
 
-Thuộc tính này liên quan đến chức năng trở thành Artist.
-
-Ví dụ:
+Theo diagram:
 
 ```text
-artist_name = "Sơn Tùng M-TP"
+PENDING
+    ↓
+Admin duyệt
+    ↓
+APPROVED
 ```
 
-Theo diagram, `artist_name` chỉ có giá trị khi:
+Khi yêu cầu được duyệt, User có thể chuyển sang:
 
 ```text
 role = ARTIST
 ```
 
-và liên quan đến:
+---
+
+## 7.4. REJECTED
 
 ```text
-UC19 – Cập nhật hồ sơ Artist
+REJECTED
+```
+
+Yêu cầu trở thành Artist đã bị Admin từ chối.
+
+Luồng:
+
+```text
+PENDING
+    ↓
+Admin từ chối
+    ↓
+REJECTED
 ```
 
 ---
 
-# 8. `bio`
+# 8. artist_name
 
 ```text
-VARCHAR(255)
+artist_name : VARCHAR(100)
+```
+
+Lưu nghệ danh của User khi User hoạt động với vai trò Artist.
+
+Diagram ghi chú rằng:
+
+```text
+artist_name, bio
+chỉ có giá trị khi role = ARTIST
+```
+
+Do đó hai thuộc tính:
+
+```text
+artist_name
+bio
+```
+
+phục vụ cho thông tin hồ sơ Artist.
+
+---
+
+# 9. bio
+
+```text
+bio : VARCHAR(255)
 ```
 
 Lưu phần giới thiệu của Artist.
 
-Ví dụ:
+Thuộc tính này liên quan đến hồ sơ Artist và theo diagram chỉ có giá trị khi:
 
 ```text
-bio = "Singer and songwriter..."
-```
-
-Theo diagram:
-
-```text
-bio
-↓
-chỉ có giá trị khi role = ARTIST
-```
-
-và được sử dụng trong:
-
-```text
-UC19 – Cập nhật hồ sơ Artist
+role = ARTIST
 ```
 
 ---
 
-# 9. Bảng `otp_verifications`
+# 10. Bảng otp_verifications
 
-Bảng `otp_verifications` dùng để lưu các mã OTP được tạo trong hệ thống.
+## 10.1. Mục đích
 
-Bảng này phục vụ các chức năng xác thực như:
+Bảng `otp_verifications` lưu các mã OTP được tạo trong quá trình xác thực.
+
+OTP có thể phục vụ các mục đích:
 
 ```text
-Đăng ký
-Quên mật khẩu
-Đổi mật khẩu
-Cập nhật email
+REGISTER
+RESET_PASSWORD
+CHANGE_PASSWORD
+CHANGE_EMAIL
 ```
 
----
-
-# 10. Cấu trúc bảng `otp_verifications`
-
-| Column       | Data Type    | Constraint | Ý nghĩa                  |
-| ------------ | ------------ | ---------- | ------------------------ |
-| `id`         | BIGINT       | PK         | ID của OTP               |
-| `user_id`    | BIGINT       | FK         | User sở hữu OTP          |
-| `otp_code`   | VARCHAR(10)  | NOT NULL   | Mã OTP                   |
-| `purpose`    | VARCHAR(20)  | NOT NULL   | Mục đích của OTP         |
-| `new_email`  | VARCHAR(100) | —          | Email mới                |
-| `expired_at` | TIMESTAMP    | NOT NULL   | Thời gian OTP hết hạn    |
-| `verified`   | BOOLEAN      | NOT NULL   | OTP đã xác thực hay chưa |
+Mỗi bản ghi OTP thuộc về một User cụ thể.
 
 ---
 
-# 11. Chi tiết bảng `otp_verifications`
+# 11. Cấu trúc bảng otp_verifications
 
-## 11.1. `id`
+| Column       | Data Type    | Constraint | Ý nghĩa                       |
+| ------------ | ------------ | ---------- | ----------------------------- |
+| `id`         | BIGINT       | PK         | ID của OTP                    |
+| `user_id`    | BIGINT       | FK         | User sở hữu OTP               |
+| `otp_code`   | VARCHAR(10)  | NOT NULL   | Mã OTP                        |
+| `purpose`    | VARCHAR(20)  | NOT NULL   | Mục đích của OTP              |
+| `new_email`  | VARCHAR(100) |            | Email mới                     |
+| `expired_at` | TIMESTAMP    | NOT NULL   | Thời điểm OTP hết hạn         |
+| `verified`   | BOOLEAN      | NOT NULL   | OTP đã được xác thực hay chưa |
+
+---
+
+# 12. Chi tiết bảng otp_verifications
+
+## 12.1. id
 
 ```text
-BIGINT
+id : BIGINT
+```
+
+Là định danh của bản ghi OTP.
+
+Đây là:
+
+```text
 PRIMARY KEY
 ```
 
-ID duy nhất của mỗi bản ghi OTP.
-
-Ví dụ:
-
-```text
-1
-2
-3
-4
-```
-
-Mỗi lần tạo một OTP có thể tạo một bản ghi mới trong bảng.
+Mỗi bản ghi OTP có một `id` riêng.
 
 ---
 
-# 12. `user_id`
+## 12.2. user_id
 
 ```text
-BIGINT
+user_id : BIGINT
+```
+
+Lưu ID của User sở hữu OTP.
+
+Đây là:
+
+```text
 FOREIGN KEY
 ```
 
-`user_id` dùng để xác định OTP thuộc về User nào.
-
-Đây là Foreign Key liên kết với:
+`user_id` tham chiếu đến:
 
 ```text
 users.id
@@ -458,68 +609,39 @@ Quan hệ:
 ```text
 users.id
       ↑
-      │
+      |
 otp_verifications.user_id
 ```
 
-Ví dụ:
-
-```text
-users
-
-id
 ---
-1
-2
-3
-```
 
-và:
+## 12.3. otp_code
 
 ```text
-otp_verifications
-
-id   user_id
-------------
-1      1
-2      1
-3      2
-4      1
+otp_code : VARCHAR(10)
 ```
 
-Có thể thấy User có `id = 1` sở hữu nhiều OTP.
+Lưu mã OTP được tạo cho User.
+
+Ví dụ về mặt ý nghĩa:
+
+```text
+123456
+```
+
+OTP được sử dụng để xác thực các thao tác yêu cầu xác minh.
 
 ---
 
-# 13. `otp_code`
+## 12.4. purpose
 
 ```text
-VARCHAR(10)
-NOT NULL
+purpose : VARCHAR(20)
 ```
 
-Lưu mã OTP.
+Xác định OTP được tạo ra để phục vụ chức năng nào.
 
-Ví dụ:
-
-```text
-482913
-```
-
-OTP được gửi đến email của User để thực hiện xác thực.
-
----
-
-# 14. `purpose`
-
-```text
-VARCHAR(20)
-NOT NULL
-```
-
-Xác định OTP được sử dụng cho mục đích gì.
-
-Các giá trị được sử dụng trong thiết kế:
+Các giá trị được thiết kế:
 
 ```text
 REGISTER
@@ -528,148 +650,179 @@ CHANGE_PASSWORD
 CHANGE_EMAIL
 ```
 
-## REGISTER
+### REGISTER
 
-OTP dùng để xác thực đăng ký tài khoản.
+```text
+REGISTER
+```
 
-## RESET_PASSWORD
+OTP dùng để xác thực tài khoản khi đăng ký.
 
-OTP dùng trong quá trình quên và đặt lại mật khẩu.
+### RESET_PASSWORD
 
-## CHANGE_PASSWORD
+```text
+RESET_PASSWORD
+```
 
-OTP dùng để xác nhận đổi mật khẩu.
+OTP dùng trong quá trình đặt lại mật khẩu.
 
-## CHANGE_EMAIL
+### CHANGE_PASSWORD
 
-OTP dùng để xác nhận cập nhật email.
+```text
+CHANGE_PASSWORD
+```
+
+OTP dùng trong quá trình thay đổi mật khẩu.
+
+### CHANGE_EMAIL
+
+```text
+CHANGE_EMAIL
+```
+
+OTP dùng trong quá trình thay đổi email.
 
 ---
 
-# 15. `new_email`
+# 13. new_email
 
 ```text
-VARCHAR(100)
+new_email : VARCHAR(100)
 ```
 
-Lưu email mới trong trường hợp User muốn thay đổi email.
+Lưu email mới trong trường hợp User thực hiện thay đổi email.
 
-Ví dụ:
+Thuộc tính này đặc biệt liên quan đến:
 
 ```text
-Email hiện tại:
-old@gmail.com
-
-Email mới:
-new@gmail.com
+purpose = CHANGE_EMAIL
 ```
 
-Trong quá trình xác thực:
+Luồng dữ liệu:
 
 ```text
-new_email = new@gmail.com
+Email hiện tại
+    ↓
+User nhập email mới
+    ↓
+new_email
+    ↓
+Tạo OTP
+    ↓
+Xác thực OTP
+    ↓
+Cập nhật email
 ```
 
-Sau khi OTP hợp lệ, hệ thống có thể sử dụng giá trị này để cập nhật email của User.
+Đối với các mục đích OTP khác, `new_email` không cần sử dụng.
 
 ---
 
-# 16. `expired_at`
+# 14. expired_at
 
 ```text
-TIMESTAMP
-NOT NULL
+expired_at : TIMESTAMP
 ```
 
 Lưu thời điểm OTP hết hạn.
 
-Ví dụ:
+Mục đích là xác định OTP còn hợp lệ hay không.
+
+Khi kiểm tra OTP:
 
 ```text
-OTP được tạo:
-20:00:00
-
-OTP hết hạn:
-20:05:00
+Thời gian hiện tại < expired_at
 ```
 
-Khi User nhập OTP, hệ thống cần kiểm tra OTP còn thời hạn hay không.
+thì OTP vẫn còn trong thời gian hiệu lực.
+
+Ngược lại:
+
+```text
+Thời gian hiện tại >= expired_at
+```
+
+thì OTP đã hết hạn.
 
 ---
 
-# 17. `verified`
+# 15. verified
 
 ```text
-BOOLEAN
-NOT NULL
+verified : BOOLEAN
 ```
 
 Cho biết OTP đã được xác thực hay chưa.
 
-Có thể hiểu:
-
-```text
-false
-↓
-OTP chưa được xác thực
-```
-
-và:
+Có hai trạng thái:
 
 ```text
 true
-↓
-OTP đã được xác thực
+false
 ```
+
+Ý nghĩa:
+
+```text
+false → OTP chưa được xác thực
+
+true → OTP đã được xác thực
+```
+
+Thuộc tính này giúp hệ thống phân biệt OTP đã sử dụng và OTP chưa được sử dụng.
 
 ---
 
-# 18. Quan hệ giữa `users` và `otp_verifications`
+# 16. Quan hệ giữa users và otp_verifications
 
-ERD thể hiện quan hệ:
+## 16.1. Cardinality
+
+Diagram thể hiện quan hệ:
 
 ```text
 users
-  │
-  │ has
-  │
-  │ 1
-  │
-  │
-  │ N
+  1
+  |
+  |
+  *
 otp_verifications
 ```
 
 Đây là quan hệ:
 
 ```text
-1 User
-   ↓
-N OTP Verification
+1 - N
 ```
 
-Hay:
+hay:
 
-> Một User có thể có nhiều bản ghi OTP.
+```text
+One-to-Many
+```
 
-Ví dụ:
+---
+
+## 16.2. Ý nghĩa
+
+Một User có thể có nhiều bản ghi OTP.
+
+Ví dụ về mặt dữ liệu:
 
 ```text
 User
 id = 1
-email = user@gmail.com
 ```
 
 có thể có:
 
 ```text
-OTP 1 → REGISTER
-OTP 2 → CHANGE_PASSWORD
-OTP 3 → CHANGE_EMAIL
-OTP 4 → RESET_PASSWORD
+OTP 1
+OTP 2
+OTP 3
+OTP 4
 ```
 
-Tất cả đều có:
+Tất cả các OTP này đều có:
 
 ```text
 user_id = 1
@@ -677,449 +830,615 @@ user_id = 1
 
 ---
 
-# 19. Vì sao cần bảng `otp_verifications` riêng?
+## 16.3. Chiều ngược lại
 
-OTP không được lưu trực tiếp trong bảng `users`.
+Mỗi OTP chỉ thuộc về một User.
 
-Thay vào đó:
+Ví dụ:
+
+```text
+otp_verifications.id = 10
+otp_verifications.user_id = 1
+```
+
+có nghĩa:
+
+```text
+OTP 10 → thuộc User 1
+```
+
+Không thể để một OTP thuộc đồng thời nhiều User.
+
+---
+
+# 17. Foreign Key
+
+Foreign Key nằm trong bảng:
+
+```text
+otp_verifications
+```
+
+Cụ thể:
+
+```text
+user_id : BIGINT
+```
+
+tham chiếu:
+
+```text
+users.id
+```
+
+Quan hệ:
 
 ```text
 users
+┌──────────────┐
+│ id (PK)      │
+└──────┬───────┘
+       │
+       │ 1
+       │
+       │ N
+┌──────▼─────────────────┐
+│ otp_verifications      │
+│                        │
+│ id (PK)                │
+│ user_id (FK)           │
+│ otp_code               │
+│ purpose                │
+│ new_email              │
+│ expired_at             │
+│ verified               │
+└────────────────────────┘
 ```
 
-chứa thông tin tài khoản.
-
-```text
-otp_verifications
-```
-
-chứa thông tin xác thực OTP.
-
-Tách thành hai bảng giúp phân biệt rõ:
-
-```text
-Thông tin User
-        ↓
-users
-
-Thông tin OTP
-        ↓
-otp_verifications
-```
-
-Ngoài ra, một User có thể tạo nhiều OTP trong quá trình sử dụng hệ thống.
+Foreign Key giúp Database xác định OTP thuộc về User nào.
 
 ---
 
-# 20. Ví dụ dữ liệu
+# 18. Primary Key
 
-## Bảng `users`
-
-```text
-id | username | email              | role | account_status | artist_request_status
--------------------------------------------------------------------------------------
-1  | phong    | phong@gmail.com     | USER | ACTIVE         | NONE
-2  | artist1  | artist@gmail.com    | ARTIST | ACTIVE      | APPROVED
-```
-
-## Bảng `otp_verifications`
+Database có hai Primary Key:
 
 ```text
-id | user_id | otp_code | purpose          | new_email       | verified
-----------------------------------------------------------------------
-1  | 1       | 123456   | REGISTER         | NULL            | true
-2  | 1       | 654321   | CHANGE_PASSWORD  | NULL            | false
-3  | 1       | 987654   | CHANGE_EMAIL     | new@gmail.com   | false
-```
-
-Ví dụ trên minh họa rằng User có `id = 1` có thể có nhiều OTP khác nhau.
-
----
-
-# 21. Luồng đăng ký
-
-```text
-User
- ↓
-Đăng ký
- ↓
-users
- ↓
-account_status = UNVERIFIED
- ↓
-Tạo OTP
- ↓
-otp_verifications
- ↓
-purpose = REGISTER
- ↓
-Gửi OTP qua Email
- ↓
-User nhập OTP
- ↓
-Xác thực thành công
- ↓
-account_status = ACTIVE
-```
-
----
-
-# 22. Luồng quên mật khẩu
-
-```text
-User nhập Email
-        ↓
-Tạo OTP
-        ↓
-otp_verifications
-        ↓
-purpose = RESET_PASSWORD
-        ↓
-Gửi OTP
-        ↓
-User nhập OTP
-        ↓
-Xác thực OTP
-        ↓
-Đặt mật khẩu mới
-```
-
----
-
-# 23. Luồng đổi mật khẩu
-
-```text
-User
- ↓
-Nhập mật khẩu hiện tại
- ↓
-Kiểm tra mật khẩu
- ↓
-Tạo OTP
- ↓
-otp_verifications
- ↓
-purpose = CHANGE_PASSWORD
- ↓
-Gửi OTP
- ↓
-Xác thực OTP
- ↓
-Đổi mật khẩu
-```
-
----
-
-# 24. Luồng cập nhật email
-
-```text
-User
- ↓
-Nhập email mới
- ↓
-Kiểm tra email mới
- ↓
-Tạo OTP
- ↓
-otp_verifications
- ↓
-purpose = CHANGE_EMAIL
- ↓
-new_email = Email mới
- ↓
-Gửi OTP
- ↓
-User nhập OTP
- ↓
-Xác thực
- ↓
-Cập nhật email
-```
-
----
-
-# 25. Luồng trở thành Artist
-
-Thông tin liên quan đến Artist được lưu trực tiếp trong bảng `users`.
-
-Ban đầu:
-
-```text
-role = USER
-artist_request_status = NONE
-```
-
-User gửi yêu cầu:
-
-```text
-UC14
- ↓
-artist_name
-bio
- ↓
-artist_request_status = PENDING
-```
-
-Admin xử lý:
-
-### Trường hợp duyệt
-
-```text
-artist_request_status = APPROVED
-role = ARTIST
-```
-
-### Trường hợp từ chối
-
-```text
-artist_request_status = REJECTED
-```
-
-Sau khi trở thành Artist, User có thể cập nhật:
-
-```text
-artist_name
-bio
-```
-
-theo:
-
-```text
-UC19 – Cập nhật hồ sơ Artist
-```
-
----
-
-# 26. Luồng khóa / vô hiệu hóa tài khoản
-
-Trạng thái tài khoản được lưu trong:
-
-```text
-users.account_status
-```
-
-Khi tài khoản bị vô hiệu hóa:
-
-```text
-account_status = DISABLED
-```
-
-Khi tài khoản được mở lại:
-
-```text
-account_status = ACTIVE
-```
-
----
-
-# 27. Luồng xóa tài khoản
-
-Theo ERD, `account_status` có trạng thái:
-
-```text
-DELETED
-```
-
-Do đó chức năng xóa tài khoản được thiết kế theo hướng:
-
-```text
-User
- ↓
-Xác nhận xóa
- ↓
-account_status = DELETED
-```
-
-Thay vì nhất thiết phải xóa toàn bộ record khỏi bảng `users`.
-
-Đây là cách biểu diễn **soft delete** theo ghi chú trong diagram.
-
----
-
-# 28. Sơ đồ Database tổng quát
-
-```text
-┌──────────────────────────────────────┐
-│                users                 │
-├──────────────────────────────────────┤
-│ PK  id                               │
-│     username       UNIQUE            │
-│     email          UNIQUE            │
-│     password                         │
-│     full_name                        │
-│     avatar_url                       │
-│     account_status                   │
-│     role                             │
-│     artist_request_status            │
-│     artist_name                      │
-│     bio                              │
-└──────────────────┬───────────────────┘
-                   │
-                   │ 1
-                   │
-                   │
-                   │ N
-┌──────────────────▼───────────────────┐
-│          otp_verifications           │
-├──────────────────────────────────────┤
-│ PK  id                               │
-│ FK  user_id                          │
-│     otp_code                         │
-│     purpose                          │
-│     new_email                        │
-│     expired_at                       │
-│     verified                         │
-└──────────────────────────────────────┘
-```
-
----
-
-# 29. Tổng hợp Database
-
-## Bảng `users`
-
-Chịu trách nhiệm lưu:
-
-```text
-Thông tin tài khoản
-Thông tin cá nhân
-Trạng thái tài khoản
-Role
-Thông tin yêu cầu Artist
-Thông tin hồ sơ Artist
-```
-
-## Bảng `otp_verifications`
-
-Chịu trách nhiệm lưu:
-
-```text
-OTP
-User sở hữu OTP
-Mục đích OTP
-Email mới
-Thời gian hết hạn
-Trạng thái xác thực
-```
-
-## Quan hệ
-
-```text
-users 1 ─────────── N otp_verifications
-```
-
----
-
-# 30. Mapping giữa Entity và Database
-
-Trong Backend:
-
-```text
-User Entity
-     ↓
-users table
-```
-
-và:
-
-```text
-OtpVerification Entity
-     ↓
-otp_verifications table
-```
-
-Mapping quan trọng:
-
-| Java Entity                 | Database                       |
-| --------------------------- | ------------------------------ |
-| `User.id`                   | `users.id`                     |
-| `User.username`             | `users.username`               |
-| `User.email`                | `users.email`                  |
-| `User.password`             | `users.password`               |
-| `User.fullName`             | `users.full_name`              |
-| `User.avatarUrl`            | `users.avatar_url`             |
-| `User.accountStatus`        | `users.account_status`         |
-| `User.role`                 | `users.role`                   |
-| `User.artistRequestStatus`  | `users.artist_request_status`  |
-| `User.artistName`           | `users.artist_name`            |
-| `User.bio`                  | `users.bio`                    |
-| `OtpVerification.id`        | `otp_verifications.id`         |
-| `OtpVerification.user`      | `otp_verifications.user_id`    |
-| `OtpVerification.otpCode`   | `otp_verifications.otp_code`   |
-| `OtpVerification.purpose`   | `otp_verifications.purpose`    |
-| `OtpVerification.newEmail`  | `otp_verifications.new_email`  |
-| `OtpVerification.expiredAt` | `otp_verifications.expired_at` |
-| `OtpVerification.verified`  | `otp_verifications.verified`   |
-
----
-
-# 31. Kết luận
-
-ERD của Module Người Dùng hiện được thiết kế với hai bảng chính:
-
-```text
-users
-otp_verifications
+users.id
+otp_verifications.id
 ```
 
 Trong đó:
 
 ```text
+users.id
+    ↓
+Primary Key của users
+
+otp_verifications.id
+    ↓
+Primary Key của otp_verifications
+```
+
+Primary Key dùng để định danh duy nhất mỗi record trong bảng.
+
+---
+
+# 19. Unique Constraint
+
+Diagram xác định hai thuộc tính có `UNIQUE`:
+
+```text
+users.username
+users.email
+```
+
+Điều này đảm bảo:
+
+```text
+username không trùng
+email không trùng
+```
+
+Có thể hình dung:
+
+```text
 users
+│
+├── id        → PK
+├── username  → UNIQUE
+└── email     → UNIQUE
 ```
 
-là bảng trung tâm, lưu thông tin tài khoản, trạng thái, role và thông tin Artist.
+---
 
-```text
-otp_verifications
-```
+# 20. Các trạng thái của User
 
-lưu các OTP liên quan đến User.
-
-Quan hệ giữa hai bảng:
-
-```text
-users 1 ─────────── N otp_verifications
-```
-
-Các trạng thái và vai trò quan trọng được lưu dưới dạng `VARCHAR`:
+Bảng `users` chứa hai nhóm trạng thái quan trọng:
 
 ```text
 account_status
-    ↓
+artist_request_status
+```
+
+Hai thuộc tính này có mục đích khác nhau.
+
+## account_status
+
+Theo dõi trạng thái tài khoản:
+
+```text
 UNVERIFIED
 ACTIVE
 DISABLED
 DELETED
+```
 
-role
-    ↓
-USER
-ARTIST
-ADMIN
+## artist_request_status
 
-artist_request_status
-    ↓
+Theo dõi trạng thái yêu cầu trở thành Artist:
+
+```text
 NONE
 PENDING
 APPROVED
 REJECTED
 ```
 
-Thiết kế này là cơ sở để triển khai tiếp:
+Không nên nhầm hai thuộc tính này với nhau.
+
+Ví dụ:
 
 ```text
-ERD
- ↓
-Database
- ↓
-Entity
- ↓
-Repository
- ↓
-Service
- ↓
-Controller
- ↓
-API
+account_status = ACTIVE
+artist_request_status = PENDING
 ```
+
+có nghĩa là:
+
+```text
+Tài khoản đang hoạt động
+nhưng yêu cầu trở thành Artist đang chờ Admin xử lý
+```
+
+---
+
+# 21. Quan hệ giữa Role và Artist
+
+Bảng `users` có:
+
+```text
+role
+artist_request_status
+artist_name
+bio
+```
+
+Các thuộc tính này phối hợp để quản lý quá trình trở thành Artist.
+
+Luồng tổng quát:
+
+```text
+User đăng ký
+    ↓
+role = USER
+    ↓
+artist_request_status = NONE
+```
+
+Khi User gửi yêu cầu:
+
+```text
+artist_request_status = PENDING
+```
+
+Admin xử lý:
+
+```text
+             PENDING
+              /   \
+             /     \
+            ↓       ↓
+       APPROVED   REJECTED
+            |
+            ↓
+      role = ARTIST
+```
+
+Khi User trở thành Artist:
+
+```text
+role = ARTIST
+artist_name
+bio
+```
+
+được sử dụng cho thông tin Artist.
+
+---
+
+# 22. Quan hệ giữa OTP và User
+
+OTP không tồn tại độc lập với User.
+
+Cấu trúc:
+
+```text
+User
+  |
+  | has
+  |
+  └──────< OTP
+```
+
+Một User có thể phát sinh nhiều OTP vì User có thể thực hiện nhiều thao tác cần xác thực.
+
+Ví dụ:
+
+```text
+User
+ │
+ ├── OTP REGISTER
+ │
+ ├── OTP RESET_PASSWORD
+ │
+ ├── OTP CHANGE_PASSWORD
+ │
+ └── OTP CHANGE_EMAIL
+```
+
+Các bản ghi OTP được phân biệt bằng:
+
+```text
+purpose
+```
+
+và:
+
+```text
+id
+```
+
+---
+
+# 23. Luồng dữ liệu đăng ký
+
+Khi User đăng ký:
+
+```text
+User
+    ↓
+Tạo record trong users
+    ↓
+account_status = UNVERIFIED
+    ↓
+role = USER
+    ↓
+artist_request_status = NONE
+```
+
+Sau đó hệ thống tạo OTP:
+
+```text
+users
+    ↓
+otp_verifications
+    ↓
+purpose = REGISTER
+```
+
+OTP được liên kết với User thông qua:
+
+```text
+otp_verifications.user_id
+```
+
+Sau khi xác thực thành công:
+
+```text
+account_status
+    ↓
+ACTIVE
+```
+
+---
+
+# 24. Luồng quên mật khẩu
+
+Khi User quên mật khẩu:
+
+```text
+User
+    ↓
+Email
+    ↓
+Tạo OTP
+```
+
+OTP được lưu vào:
+
+```text
+otp_verifications
+```
+
+với:
+
+```text
+purpose = RESET_PASSWORD
+```
+
+Cấu trúc dữ liệu:
+
+```text
+user_id
+otp_code
+purpose = RESET_PASSWORD
+expired_at
+verified
+```
+
+Sau khi OTP được xác thực, User có thể thực hiện quá trình đặt lại mật khẩu.
+
+---
+
+# 25. Luồng đổi mật khẩu
+
+Khi User muốn đổi mật khẩu:
+
+```text
+User
+    ↓
+Yêu cầu đổi mật khẩu
+    ↓
+Tạo OTP
+```
+
+OTP được lưu với:
+
+```text
+purpose = CHANGE_PASSWORD
+```
+
+Sau khi OTP hợp lệ:
+
+```text
+OTP
+    ↓
+Xác thực
+    ↓
+Đổi mật khẩu
+```
+
+---
+
+# 26. Luồng thay đổi Email
+
+Khi User muốn thay đổi email:
+
+```text
+User
+    ↓
+Nhập email mới
+    ↓
+new_email
+    ↓
+Tạo OTP
+```
+
+Bản ghi OTP có:
+
+```text
+purpose = CHANGE_EMAIL
+new_email = email mới
+```
+
+Sau khi OTP được xác thực:
+
+```text
+OTP hợp lệ
+    ↓
+Lấy new_email
+    ↓
+Cập nhật users.email
+```
+
+---
+
+# 27. Tổng quan dữ liệu
+
+Có thể hình dung toàn bộ Module như sau:
+
+```text
+┌──────────────────────────────────────┐
+│                users                 │
+├──────────────────────────────────────┤
+│ id               BIGINT       PK     │
+│ username         VARCHAR(50)  UNIQUE │
+│ email            VARCHAR(100) UNIQUE │
+│ password         VARCHAR(255)        │
+│ full_name        VARCHAR(100)        │
+│ avatar_url       VARCHAR(255)        │
+│ account_status   VARCHAR(20)         │
+│ role             VARCHAR(20)         │
+│ artist_request_status VARCHAR(20)    │
+│ artist_name      VARCHAR(100)        │
+│ bio              VARCHAR(255)        │
+└──────────────────┬───────────────────┘
+                   │
+                   │ 1
+                   │
+                   │ N
+┌──────────────────▼───────────────────┐
+│          otp_verifications            │
+├───────────────────────────────────────┤
+│ id               BIGINT       PK      │
+│ user_id          BIGINT       FK      │
+│ otp_code         VARCHAR(10)          │
+│ purpose          VARCHAR(20)          │
+│ new_email        VARCHAR(100)         │
+│ expired_at       TIMESTAMP            │
+│ verified         BOOLEAN              │
+└───────────────────────────────────────┘
+```
+
+---
+
+# 28. Tổng hợp các bảng
+
+| Bảng                | Mục đích                     |
+| ------------------- | ---------------------------- |
+| `users`             | Lưu thông tin tài khoản User |
+| `otp_verifications` | Lưu các OTP của User         |
+
+---
+
+# 29. Tổng hợp Primary Key và Foreign Key
+
+| Bảng                | Column    | Loại | Tham chiếu |
+| ------------------- | --------- | ---- | ---------- |
+| `users`             | `id`      | PK   | —          |
+| `otp_verifications` | `id`      | PK   | —          |
+| `otp_verifications` | `user_id` | FK   | `users.id` |
+
+---
+
+# 30. Tổng hợp Unique
+
+```text
+users.username
+users.email
+```
+
+Cả hai đều có:
+
+```text
+UNIQUE
+```
+
+---
+
+# 31. Tổng hợp các giá trị trạng thái
+
+## account_status
+
+```text
+UNVERIFIED
+ACTIVE
+DISABLED
+DELETED
+```
+
+## role
+
+```text
+USER
+ARTIST
+ADMIN
+```
+
+## artist_request_status
+
+```text
+NONE
+PENDING
+APPROVED
+REJECTED
+```
+
+## purpose
+
+```text
+REGISTER
+RESET_PASSWORD
+CHANGE_PASSWORD
+CHANGE_EMAIL
+```
+
+---
+
+# 32. Tổng kết ERD
+
+Module Người Dùng hiện tại được xây dựng dựa trên hai bảng:
+
+```text
+users
+otp_verifications
+```
+
+Bảng `users` là bảng trung tâm, lưu thông tin tài khoản và các trạng thái liên quan đến User.
+
+Bảng `otp_verifications` lưu các OTP được tạo cho User.
+
+Quan hệ giữa hai bảng là:
+
+```text
+users 1 ───── N otp_verifications
+```
+
+Trong đó:
+
+```text
+users.id
+    ↑
+    |
+    | FK
+    |
+otp_verifications.user_id
+```
+
+Bảng `users` quản lý:
+
+```text
+Thông tin tài khoản
+Thông tin cá nhân
+Trạng thái tài khoản
+Role
+Thông tin Artist
+```
+
+Bảng `otp_verifications` quản lý:
+
+```text
+OTP
+Mục đích OTP
+Email mới
+Thời gian hết hạn
+Trạng thái xác thực
+```
+
+Các trạng thái chính của tài khoản:
+
+```text
+UNVERIFIED
+ACTIVE
+DISABLED
+DELETED
+```
+
+Các Role:
+
+```text
+USER
+ARTIST
+ADMIN
+```
+
+Các trạng thái yêu cầu Artist:
+
+```text
+NONE
+PENDING
+APPROVED
+REJECTED
+```
+
+Các mục đích OTP:
+
+```text
+REGISTER
+RESET_PASSWORD
+CHANGE_PASSWORD
+CHANGE_EMAIL
+```
+
+Như vậy, ERD này cung cấp cấu trúc dữ liệu nền tảng cho Module Người Dùng và là cơ sở để triển khai Entity, Repository và các tầng xử lý trong Spring Boot.
