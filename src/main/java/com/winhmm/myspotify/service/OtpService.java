@@ -6,13 +6,14 @@ import com.winhmm.myspotify.enums.OtpPurpose;
 import com.winhmm.myspotify.repository.OtpVerificationRepository;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Random;
 
 @Service
 public class OtpService {
     private final OtpVerificationRepository otpVerificationRepository;
     private final EmailService emailService;
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     public OtpService(OtpVerificationRepository otpVerificationRepository, EmailService emailService) {
         this.otpVerificationRepository = otpVerificationRepository;
@@ -46,7 +47,7 @@ public class OtpService {
     }
 
     private void createAndSend(User user, OtpPurpose purpose, String newEmail, String toEmail) {
-        String otpCode = String.format("%06d", new Random().nextInt(1_000_000));
+        String otpCode = String.format("%06d", RANDOM.nextInt(1_000_000));
 
         OtpVerification otp = new OtpVerification();
         otp.setUser(user);

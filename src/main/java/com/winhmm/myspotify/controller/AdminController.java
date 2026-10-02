@@ -4,6 +4,7 @@ import com.winhmm.myspotify.dto.request.AssignRoleRequest;
 import com.winhmm.myspotify.dto.response.UserProfileResponse;
 import com.winhmm.myspotify.entity.User;
 import com.winhmm.myspotify.service.AdminService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -66,7 +67,7 @@ public class AdminController {
 
     @PutMapping("/users/{userId}/role")
     public ResponseEntity<Map<String, String>> assignRole(@PathVariable Long userId,
-                                                          @RequestBody AssignRoleRequest request) {
+                                                          @Valid @RequestBody AssignRoleRequest request) {
         adminService.assignRole(userId, request.getRole());
         return ResponseEntity.ok(Map.of("message", "Role has been assigned successfully"));
     }

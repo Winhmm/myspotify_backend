@@ -7,31 +7,51 @@ import com.winhmm.myspotify.enums.AccountStatus;
 import com.winhmm.myspotify.enums.OtpPurpose;
 import com.winhmm.myspotify.enums.Role;
 import com.winhmm.myspotify.repository.UserRepository;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.Optional;
 
 @Service
 public class AuthService {
     private final UserRepository userRepository;
     private final OtpService otpService;
+    private final PasswordEncoder passwordEncoder;
 
-    public AuthService(UserRepository userRepository, OtpService otpService) {
+    public AuthService(UserRepository userRepository, OtpService otpService, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.otpService = otpService;
+        this.passwordEncoder = passwordEncoder;
     }
 
+    @Transactional
     public void register(RegisterRequest request) {
-        if(userRepository.existsByEmail(request.getEmail())) {
+        Optional<User> existing = userRepository.findByEmail(request.getEmail());
+        if(existing.isPresent()) {
+            User oldUser = existing.get();
+
+            /*
+                Nếu email đã tồn tại nhưng tài khoản chưa được xác thực, thì gửi lại OTP để xác thực.
+
+                Nếu email đã tồn tại và tài khoản đã được xác thực, thì báo lỗi "Email already exists".
+            */
+            if(oldUser.getAccountStatus() == AccountStatus.UNVERIFIED) {
+                otpService.generateAndSend(oldUser, OtpPurpose.REGISTER);
+                return;
+            }
+
             throw new IllegalArgumentException("Email already exists");
         }
 
-        if (userRepository.existsByUsername(request.getUsername())) {
+        if(userRepository.existsByUsername(request.getUsername())) {
             throw new IllegalArgumentException("Username already exists");
         }
 
         User user = new User();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
-        user.setPassword(request.getPassword());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setAccountStatus(AccountStatus.UNVERIFIED);
         user.setRole(Role.USER);
 
@@ -40,44 +60,7 @@ public class AuthService {
         otpService.generateAndSend(user, OtpPurpose.REGISTER);
     }
 
-//    private void generateAndSaveOtp(User user, OtpPurpose purpose) {
-//        String otpCode = String.format("%06d", new Random().nextInt(1_000_000));
-//
-//        OtpVerification otp = new OtpVerification();
-//        otp.setUser(user);
-//        otp.setOtpCode(otpCode);
-//        otp.setPurpose(purpose);
-//        otp.setExpiredAt(LocalDateTime.now().plusMinutes(5));
-//        otp.setVerified(false);
-//
-//        otpVerificationRepository.save(otp);
-//
-//        System.out.println("=== OTP cho " + user.getEmail() + " (" + purpose + "): " + otpCode + " ===");
-//    }
-
-//    public void verifyOtp(VerifyOtpRequest request) {
-//        User user = userRepository.findByEmail(request.getEmail())
-//                .orElseThrow(() -> new IllegalArgumentException("Email does not exist"));
-//
-//        OtpVerification otp = otpVerificationRepository
-//                .findFirstByUserAndPurposeAndVerifiedFalseOrderByIdDesc(user, OtpPurpose.REGISTER)
-//                .orElseThrow(() -> new IllegalArgumentException("Otp code does not exist"));
-//
-//        if(otp.getExpiredAt().isBefore(LocalDateTime.now())) {
-//            throw new IllegalArgumentException("Otp code has expired");
-//        }
-//
-//        if(!otp.getOtpCode().equals(request.getOtpCode())) {
-//            throw new IllegalArgumentException("Otp code does not match");
-//        }
-//
-//        otp.setVerified(true);
-//        otpVerificationRepository.save(otp);
-//
-//        user.setAccountStatus(AccountStatus.ACTIVE);
-//        userRepository.save(user);
-//    }
-
+    @Transactional
     public void verifyOtp(VerifyOtpRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("Email does not exist"));
@@ -85,25 +68,20 @@ public class AuthService {
         otpService.verifyAndConsume(user, request.getOtpCode(), OtpPurpose.REGISTER);
 
         user.setAccountStatus(AccountStatus.ACTIVE);
-
         userRepository.save(user);
     }
 
+    /*
+        Dùng chung 1 message cho cả sai email và sai mật khẩu.
+    */
     public LoginResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Email does not exist"));
+                .orElseThrow(() -> new IllegalArgumentException("Email or password is incorrect"));
 
-        if(!user.getPassword().equals(request.getPassword())) {
-            throw new IllegalArgumentException("Password does not match");
+        if(!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("Email or password is incorrect");
         }
 
-        /*
-            Không cho phép đăng nhập khi:
-
-            - Tài khoản chưa được xác thực.
-            - Tài khoản đã bị vô hiệu hóa.
-            - Tài khoản đã bị xóa.
-        */
         if(user.getAccountStatus() == AccountStatus.UNVERIFIED) {
             throw new IllegalArgumentException("Account is not verified yet");
         }
@@ -117,7 +95,7 @@ public class AuthService {
         }
 
         /*
-            Hiện tại token đang truyền là null vì chưa tạo JWT.
+            Token tạm thời là null vì chưa làm JWT
         */
         return new LoginResponse(null, user.getId(), user.getUsername(), user.getRole());
     }
@@ -140,37 +118,14 @@ public class AuthService {
         otpService.generateAndSend(user, OtpPurpose.RESET_PASSWORD);
     }
 
-//    public void resetPassword(ResetPasswordRequest request) {
-//        User user = userRepository.findByEmail(request.getEmail())
-//                .orElseThrow(() -> new IllegalArgumentException("Email does not exist"));
-//
-//        OtpVerification otp = otpVerificationRepository
-//                .findFirstByUserAndPurposeAndVerifiedFalseOrderByIdDesc(user, OtpPurpose.RESET_PASSWORD)
-//                .orElseThrow(() -> new IllegalArgumentException("Otp code does not exist"));
-//
-//        if(otp.getExpiredAt().isBefore(LocalDateTime.now())) {
-//            throw new IllegalArgumentException("Otp code has expired");
-//        }
-//
-//        if(!otp.getOtpCode().equals(request.getOtpCode())) {
-//            throw new IllegalArgumentException("Otp code does not match");
-//        }
-//
-//        otp.setVerified(true);
-//        otpVerificationRepository.save(otp);
-//
-//        user.setPassword(request.getNewPassword());
-//        userRepository.save(user);
-//    }
-
+    @Transactional
     public void resetPassword(ResetPasswordRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("Email does not exist"));
 
         otpService.verifyAndConsume(user, request.getOtpCode(), OtpPurpose.RESET_PASSWORD);
 
-        user.setPassword(request.getNewPassword());
-
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
     }
 }

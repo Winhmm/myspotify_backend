@@ -4,6 +4,7 @@ import com.winhmm.myspotify.dto.request.*;
 import com.winhmm.myspotify.dto.response.UserProfileResponse;
 import com.winhmm.myspotify.entity.User;
 import com.winhmm.myspotify.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -62,7 +63,7 @@ public class UserController {
     */
     @PutMapping("/{userId}/profile")
     public ResponseEntity<UserProfileResponse> updateProfile(@PathVariable Long userId,
-                                                             @RequestBody UpdateProfileRequest request) {
+                                                             @Valid @RequestBody UpdateProfileRequest request) {
         User user = userService.updateProfile(userId, request.getFullName());
         return ResponseEntity.ok(toResponse(user));
     }
@@ -73,7 +74,7 @@ public class UserController {
     */
     @PostMapping("/{userId}/change-password/request-otp")
     public ResponseEntity<Map<String, String>> requestChangePasswordOtp(@PathVariable Long userId,
-                                                                        @RequestBody RequestChangePasswordOtpRequest request) {
+                                                                        @Valid @RequestBody RequestChangePasswordOtpRequest request) {
         userService.requestChangePasswordOtp(userId, request.getCurrentPassword());
         return ResponseEntity.ok(Map.of("message", "OTP code has been sent to your email"));
     }
@@ -84,14 +85,14 @@ public class UserController {
     */
     @PutMapping("/{userId}/change-password")
     public ResponseEntity<Map<String, String>> changePassword(@PathVariable Long userId,
-                                                              @RequestBody ChangePasswordRequest request) {
+                                                              @Valid @RequestBody ChangePasswordRequest request) {
         userService.changePassword(userId, request.getOtpCode(), request.getNewPassword());
         return ResponseEntity.ok(Map.of("message", "Password has been changed successfully"));
     }
 
     @PutMapping("/{userId}/avatar")
     public ResponseEntity<UserProfileResponse> updateAvatar(@PathVariable Long userId,
-                                                            @RequestParam("file") MultipartFile file) {
+                                                            @Valid @RequestParam("file") MultipartFile file) {
         User user = userService.updateAvatar(userId, file);
         return ResponseEntity.ok(toResponse(user));
     }
@@ -101,7 +102,7 @@ public class UserController {
     */
     @PostMapping("/{userId}/email/request-otp")
     public ResponseEntity<Map<String, String>> requestUpdateEmailOtp(@PathVariable Long userId,
-                                                                     @RequestBody RequestUpdateEmailOtpRequest request) {
+                                                                     @Valid @RequestBody RequestUpdateEmailOtpRequest request) {
         userService.requestUpdateEmailOtp(userId, request.getNewEmail());
         return ResponseEntity.ok(Map.of("message", "OTP code has been sent to your new email"));
     }
@@ -111,28 +112,28 @@ public class UserController {
     */
     @PutMapping("/{userId}/email")
     public ResponseEntity<UserProfileResponse> updateEmail(@PathVariable Long userId,
-                                                           @RequestBody UpdateEmailRequest request) {
+                                                           @Valid @RequestBody UpdateEmailRequest request) {
         User user = userService.updateEmail(userId, request.getOtpCode());
         return ResponseEntity.ok(toResponse(user));
     }
 
     @PutMapping("/{userId}/disable")
     public ResponseEntity<Map<String, String>> disableAccount(@PathVariable Long userId,
-                                                              @RequestBody AccountActionRequest request) {
+                                                              @Valid @RequestBody AccountActionRequest request) {
         userService.disableAccount(userId, request.getPassword());
         return ResponseEntity.ok(Map.of("message", "Account has been disabled"));
     }
 
     @PutMapping("/{userId}/delete")
     public ResponseEntity<Map<String, String>> deleteAccount(@PathVariable Long userId,
-                                                             @RequestBody AccountActionRequest request) {
+                                                             @Valid @RequestBody AccountActionRequest request) {
         userService.deleteAccount(userId, request.getPassword());
         return ResponseEntity.ok(Map.of("message", "Account has been deleted"));
     }
 
     @PostMapping("/{userId}/artist-request")
     public ResponseEntity<Map<String, String>> requestBecomeArtist(@PathVariable Long userId,
-                                                                   @RequestBody ArtistRequest request) {
+                                                                   @Valid @RequestBody ArtistRequest request) {
         userService.requestBecomeArtist(userId, request.getArtistName(), request.getBio());
         return ResponseEntity.ok(Map.of("message", "Artist request has been submitted"));
     }

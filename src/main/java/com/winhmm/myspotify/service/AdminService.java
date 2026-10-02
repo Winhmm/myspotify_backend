@@ -34,6 +34,10 @@ public class AdminService {
     public void lockAccount(Long userId) {
         User user = findUser(userId);
 
+        if(user.getRole() == Role.ADMIN) {
+            throw new IllegalArgumentException("Cannot lock an admin account");
+        }
+
         if(user.getAccountStatus() != AccountStatus.ACTIVE) {
             throw new IllegalArgumentException("Only active accounts can be locked");
         }
