@@ -4,6 +4,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mail.MailException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -73,5 +74,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleMaxSize(MaxUploadSizeExceededException e) {
         return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
                 .body(Map.of("message", "File size must not exceed 2MB"));
+    }
+
+    /*
+        Gửi email thất bại (sai cấu hình Gmail, mất kết nối, ...) → 503.
+    */
+    @ExceptionHandler(MailException.class)
+    public ResponseEntity<Map<String, String>> handleMail(MailException e) {
+        System.out.println("=== Lỗi gửi email: " + e.getMessage() + " ===");
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("message", "Could not send email, please try again later"));
     }
 }
