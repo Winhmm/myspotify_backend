@@ -7,6 +7,7 @@ import com.winhmm.myspotify.enums.AccountStatus;
 import com.winhmm.myspotify.enums.OtpPurpose;
 import com.winhmm.myspotify.enums.Role;
 import com.winhmm.myspotify.repository.UserRepository;
+import com.winhmm.myspotify.security.JwtUtil;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -18,11 +19,14 @@ public class AuthService {
     private final UserRepository userRepository;
     private final OtpService otpService;
     private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
-    public AuthService(UserRepository userRepository, OtpService otpService, PasswordEncoder passwordEncoder) {
+    public AuthService(UserRepository userRepository, OtpService otpService,
+                       PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
         this.userRepository = userRepository;
         this.otpService = otpService;
         this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
     }
 
     @Transactional
@@ -94,10 +98,8 @@ public class AuthService {
             throw new IllegalArgumentException("Account has been deleted");
         }
 
-        /*
-            Token tạm thời là null vì chưa làm JWT
-        */
-        return new LoginResponse(null, user.getId(), user.getUsername(), user.getRole());
+        String token = jwtUtil.generateToken(user);
+        return new LoginResponse(token, user.getId(), user.getUsername(), user.getRole());
     }
 
     /*

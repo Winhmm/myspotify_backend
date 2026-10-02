@@ -40,6 +40,11 @@ public class UserService {
                 .orElseThrow(() -> new IllegalArgumentException("User does not exist"));
     }
 
+    public User getByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User does not exist"));
+    }
+
     private void checkPassword(User user, String rawPassword) {
         if(!passwordEncoder.matches(rawPassword, user.getPassword())) {
             throw new IllegalArgumentException("Password does not match");
