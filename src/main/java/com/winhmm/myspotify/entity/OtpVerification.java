@@ -6,7 +6,12 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "otp_verifications")
+@Table(
+        name = "otp_verifications",
+        indexes = {
+                @Index(name = "idx_otp_user_purpose_verified", columnList = "user_id, purpose, verified")
+        }
+)
 public class OtpVerification {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

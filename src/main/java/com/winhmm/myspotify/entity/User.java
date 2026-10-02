@@ -6,7 +6,12 @@ import com.winhmm.myspotify.enums.Role;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "users")
+@Table(
+        name = "users",
+        indexes = {
+                @Index(name = "idx_users_artist_request_status", columnList = "artist_request_status")
+        }
+)
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
