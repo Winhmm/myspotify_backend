@@ -73,6 +73,10 @@ public class AdminService {
             throw new IllegalArgumentException("No pending artist request for this user");
         }
 
+        if(user.getRole() != Role.USER) {
+            throw new IllegalArgumentException("Only users with role USER can become an artist");
+        }
+
         user.setArtistRequestStatus(ArtistRequestStatus.APPROVED);
         user.setRole(Role.ARTIST);
         userRepository.save(user);
@@ -97,12 +101,13 @@ public class AdminService {
         1. Không gán cho tài khoản đã xóa hoặc chưa xác thực.
         2. Không gán trùng role hiện tại.
         3. Gán ARTIST → artistRequestStatus = APPROVED.
-        4. Gỡ ARTIST → xoá artistName/bio, artistRequestStatus về NONE.
+        4. Gán role khác ARTIST, mà User đang là ARTIST hoặc đang có yêu cầu PENDING
+           → xoá artistName/bio, artistRequestStatus về NONE.
     */
     public void assignRole(Long userId, Role role) {
         User user = findUser(userId);
 
-        if(role ==  null) {
+        if(role == null) {
             throw new IllegalArgumentException("Role is required");
         }
 
@@ -117,7 +122,10 @@ public class AdminService {
 
         if(role == Role.ARTIST) {
             user.setArtistRequestStatus(ArtistRequestStatus.APPROVED);
-        } else if(user.getRole() == Role.ARTIST) {
+        } else if(user.getRole() == Role.ARTIST || user.getArtistRequestStatus() == ArtistRequestStatus.PENDING) {
+            /*
+                Thu hồi quyền/trạng thái Artist.
+            */
             user.setArtistName(null);
             user.setBio(null);
             user.setArtistRequestStatus(ArtistRequestStatus.NONE);

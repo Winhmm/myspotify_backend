@@ -13,7 +13,7 @@ public class ResetPasswordRequest {
     private String otpCode;
 
     @NotBlank(message = "New password is required")
-    @Size(min = 6, max = 72, message = "Password must be between 6 and 72 characters")
+    @Size(min = 6, max = 72, message = "New password must be between 6 and 72 characters")
     private String newPassword;
 
     public String getEmail() { return email; }

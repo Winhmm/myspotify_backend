@@ -16,7 +16,7 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     /*
-        Lỗi nghiệp vụ trong service (email trùng, sai OTP, ...) → 400
+        Lỗi nghiệp vụ trong service (email trùng, sai OTP, ...) → 400.
     */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException e) {
@@ -24,7 +24,7 @@ public class GlobalExceptionHandler {
     }
 
     /*
-        Lỗi validation từ @Valid (@NotBlank, @Email, ...) → 400, lấy message lỗi đầu tiên
+        Lỗi validation từ @Valid (@NotBlank, @Email, ...) → 400, lấy message lỗi đầu tiên.
     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException e) {
@@ -33,7 +33,7 @@ public class GlobalExceptionHandler {
     }
 
     /*
-        JSON sai định dạng, hoặc gửi role không tồn tại (vd "SUPERADMIN") → 400
+        JSON sai định dạng, hoặc gửi role không tồn tại (vd "SUPERADMIN") → 400.
     */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, String>> handleNotReadable(HttpMessageNotReadableException e) {
@@ -41,7 +41,7 @@ public class GlobalExceptionHandler {
     }
 
     /*
-        Gọi API upload avatar nhưng không gửi kèm file (thiếu key "file") → 400
+        Gọi API upload avatar nhưng không gửi kèm file (thiếu key "file") → 400.
     */
     @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<Map<String, String>> handleMissingFile(MissingServletRequestPartException e) {
@@ -49,7 +49,7 @@ public class GlobalExceptionHandler {
     }
 
     /*
-        Tham số trên URL sai kiểu, vd /api/users/abc/profile (userId phải là số) → 400
+        Tham số trên URL sai kiểu, vd /api/admin/users/abc/lock (userId phải là số) → 400.
     */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, String>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
@@ -58,7 +58,7 @@ public class GlobalExceptionHandler {
 
     /*
         Vi phạm ràng buộc UNIQUE trong Database
-        (vd 2 người đăng ký cùng username đúng cùng lúc) → 409
+        (vd 2 người đăng ký cùng username đúng cùng lúc) → 409.
     */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, String>> handleDataIntegrity(DataIntegrityViolationException e) {
@@ -67,11 +67,11 @@ public class GlobalExceptionHandler {
     }
 
     /*
-        File tải lên vượt quá kích thước cho phép → 413
+        File tải lên vượt quá kích thước cho phép → 413.
     */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, String>> handleMaxSize(MaxUploadSizeExceededException e) {
-        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
                 .body(Map.of("message", "File size must not exceed 2MB"));
     }
 }

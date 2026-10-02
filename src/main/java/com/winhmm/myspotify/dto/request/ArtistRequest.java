@@ -4,8 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public class ArtistRequest {
-    @NotBlank(message = "Artist Name is required")
-    @Size(max = 100, message = "Artist Name must not exceed 100 characters")
+    @NotBlank(message = "Artist name is required")
+    @Size(max = 100, message = "Artist name must not exceed 100 characters")
     private String artistName;
 
     @Size(max = 255, message = "Bio must not exceed 255 characters")
