@@ -1,7 +1,6 @@
 package com.winhmm.myspotify.service;
 
-import com.winhmm.myspotify.dto.request.*;
-import com.winhmm.myspotify.dto.response.LoginResponse;
+import com.winhmm.myspotify.dto.auth.*;
 import com.winhmm.myspotify.entity.User;
 import com.winhmm.myspotify.enums.AccountStatus;
 import com.winhmm.myspotify.enums.OtpPurpose;

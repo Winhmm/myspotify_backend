@@ -1,4 +1,4 @@
-package com.winhmm.myspotify.dto.response;
+package com.winhmm.myspotify.dto.user;
 
 import com.winhmm.myspotify.enums.AccountStatus;
 import com.winhmm.myspotify.enums.ArtistRequestStatus;

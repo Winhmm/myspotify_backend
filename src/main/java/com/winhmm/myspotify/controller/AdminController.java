@@ -1,7 +1,7 @@
 package com.winhmm.myspotify.controller;
 
-import com.winhmm.myspotify.dto.request.AssignRoleRequest;
-import com.winhmm.myspotify.dto.response.UserProfileResponse;
+import com.winhmm.myspotify.dto.user.AssignRoleRequest;
+import com.winhmm.myspotify.dto.user.UserProfileResponse;
 import com.winhmm.myspotify.entity.User;
 import com.winhmm.myspotify.service.AdminService;
 import jakarta.validation.Valid;

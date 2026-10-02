@@ -1,7 +1,6 @@
 package com.winhmm.myspotify.controller;
 
-import com.winhmm.myspotify.dto.request.*;
-import com.winhmm.myspotify.dto.response.LoginResponse;
+import com.winhmm.myspotify.dto.auth.*;
 import com.winhmm.myspotify.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;

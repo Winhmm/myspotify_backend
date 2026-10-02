@@ -1,4 +1,4 @@
-package com.winhmm.myspotify.dto.request;
+package com.winhmm.myspotify.dto.user;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

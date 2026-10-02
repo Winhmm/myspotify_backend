@@ -1,4 +1,4 @@
-package com.winhmm.myspotify.dto.request;
+package com.winhmm.myspotify.dto.user;
 
 import com.winhmm.myspotify.enums.Role;
 import jakarta.validation.constraints.NotNull;

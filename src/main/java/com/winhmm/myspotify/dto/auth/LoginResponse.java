@@ -1,4 +1,4 @@
-package com.winhmm.myspotify.dto.response;
+package com.winhmm.myspotify.dto.auth;
 
 import com.winhmm.myspotify.enums.Role;
 
