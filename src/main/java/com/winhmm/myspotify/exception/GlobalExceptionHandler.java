@@ -1,10 +1,16 @@
 package com.winhmm.myspotify.exception;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mail.MailException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -16,12 +22,21 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    /*
+        Tạo body lỗi, tránh lỗi Map.of khi message bị null.
+    */
+    private Map<String, String> body(String message, String fallback) {
+        return Map.of("message", message != null ? message : fallback);
+    }
+
     /*
         Lỗi nghiệp vụ trong service (email trùng, sai OTP, ...) → 400.
     */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException e) {
-        return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        return ResponseEntity.badRequest().body(body(e.getMessage(), "Invalid request"));
     }
 
     /*
@@ -30,7 +45,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getAllErrors().get(0).getDefaultMessage();
-        return ResponseEntity.badRequest().body(Map.of("message", message));
+        return ResponseEntity.badRequest().body(body(message, "Invalid request data"));
     }
 
     /*
@@ -42,7 +57,7 @@ public class GlobalExceptionHandler {
     }
 
     /*
-        Gọi API upload avatar nhưng không gửi kèm file (thiếu key "file") → 400.
+        Gọi API upload nhưng không gửi kèm file (thiếu key "file") → 400.
     */
     @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<Map<String, String>> handleMissingFile(MissingServletRequestPartException e) {
@@ -55,6 +70,24 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, String>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
         return ResponseEntity.badRequest().body(Map.of("message", "Invalid parameter: " + e.getName()));
+    }
+
+    /*
+        Chưa đăng nhập / sai thông tin đăng nhập (Spring Security) → 401.
+    */
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<Map<String, String>> handleAuthentication(AuthenticationException e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Unauthorized, please login"));
+    }
+
+    /*
+        Đã đăng nhập nhưng không đủ quyền (bị @PreAuthorize chặn) → 403.
+    */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, String>> handleAccessDenied(AccessDeniedException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "You do not have permission to access this resource"));
     }
 
     /*
@@ -73,7 +106,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, String>> handleMaxSize(MaxUploadSizeExceededException e) {
         return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
-                .body(Map.of("message", "File size must not exceed 2MB"));
+                .body(Map.of("message", "File is too large"));
     }
 
     /*
@@ -81,8 +114,27 @@ public class GlobalExceptionHandler {
     */
     @ExceptionHandler(MailException.class)
     public ResponseEntity<Map<String, String>> handleMail(MailException e) {
-        System.out.println("=== Lỗi gửi email: " + e.getMessage() + " ===");
+        log.error("Lỗi gửi email: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(Map.of("message", "Could not send email, please try again later"));
+    }
+
+    /*
+        Bắt mọi lỗi còn lại:
+        - Lỗi chuẩn của Spring (sai URL → 404, sai method → 405,
+          sai Content-Type → 415, thiếu tham số → 400, ...) → giữ đúng status của nó.
+        - Lỗi không mong muốn (NullPointerException, ...) → 500, ghi log để debug.
+    */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, String>> handleOther(Exception e) {
+        if (e instanceof ErrorResponse errorResponse) {
+            HttpStatusCode status = errorResponse.getStatusCode();
+            String detail = errorResponse.getBody().getDetail();
+            return ResponseEntity.status(status).body(body(detail, "Request error"));
+        }
+
+        log.error("Lỗi không mong muốn", e);
+        return ResponseEntity.internalServerError()
+                .body(Map.of("message", "Internal server error"));
     }
 }

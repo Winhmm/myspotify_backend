@@ -7,6 +7,11 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.nio.file.Paths;
 
+/*
+    Cho phép truy cập file đã upload qua đường dẫn /uploads/**.
+    VD: file lưu tại {uploadDir}/avatars/a.jpg → GET /uploads/avatars/a.jpg
+    Spring tự hỗ trợ Range request (HTTP 206) → frontend tua nhạc được.
+*/
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
     @Value("${app.upload-dir}")
@@ -20,6 +25,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
         }
 
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations(location);
+                .addResourceLocations(location)
+                .setCachePeriod(3600);
     }
 }
