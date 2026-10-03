@@ -28,33 +28,48 @@ public class AuthService {
         this.jwtUtil = jwtUtil;
     }
 
+    /*
+        UC01 - Đăng ký.
+
+        - Email chưa tồn tại → tạo User UNVERIFIED → gửi OTP.
+
+        - Email đã tồn tại nhưng UNVERIFIED (đăng ký lại vì OTP hết hạn)
+          → cập nhật username/password mới → gửi lại OTP.
+
+        - Email đã tồn tại và đã xác thực → báo lỗi.
+    */
     @Transactional
-    public void register(RegisterRequest request) {
-        Optional<User> existing = userRepository.findByEmail(request.getEmail());
-        if(existing.isPresent()) {
+    public void register(String username, String email, String password) {
+        Optional<User> existing = userRepository.findByEmail(email);
+
+        if (existing.isPresent()) {
             User oldUser = existing.get();
 
-            /*
-                Nếu email đã tồn tại nhưng tài khoản chưa được xác thực, thì gửi lại OTP để xác thực.
-
-                Nếu email đã tồn tại và tài khoản đã được xác thực, thì báo lỗi "Email already exists".
-            */
-            if(oldUser.getAccountStatus() == AccountStatus.UNVERIFIED) {
-                otpService.generateAndSend(oldUser, OtpPurpose.REGISTER);
-                return;
+            if (oldUser.getAccountStatus() != AccountStatus.UNVERIFIED) {
+                throw new IllegalArgumentException("Email already exists");
             }
 
-            throw new IllegalArgumentException("Email already exists");
+            if (!oldUser.getUsername().equalsIgnoreCase(username)
+                    && userRepository.existsByUsername(username)) {
+                throw new IllegalArgumentException("Username already exists");
+            }
+
+            oldUser.setUsername(username);
+            oldUser.setPassword(passwordEncoder.encode(password));
+            userRepository.save(oldUser);
+
+            otpService.generateAndSend(oldUser, OtpPurpose.REGISTER);
+            return;
         }
 
-        if(userRepository.existsByUsername(request.getUsername())) {
+        if (userRepository.existsByUsername(username)) {
             throw new IllegalArgumentException("Username already exists");
         }
 
         User user = new User();
-        user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setUsername(username);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(password));
         user.setAccountStatus(AccountStatus.UNVERIFIED);
         user.setRole(Role.USER);
 
@@ -63,37 +78,46 @@ public class AuthService {
         otpService.generateAndSend(user, OtpPurpose.REGISTER);
     }
 
+    /*
+        UC02 - Xác thực Email / OTP: chỉ dành cho tài khoản UNVERIFIED.
+    */
     @Transactional
-    public void verifyOtp(VerifyOtpRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
+    public void verifyOtp(String email, String otpCode) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Email does not exist"));
 
-        otpService.verifyAndConsume(user, request.getOtpCode(), OtpPurpose.REGISTER);
+        if (user.getAccountStatus() != AccountStatus.UNVERIFIED) {
+            throw new IllegalArgumentException("Account is already verified");
+        }
+
+        otpService.verifyAndConsume(user, otpCode, OtpPurpose.REGISTER);
 
         user.setAccountStatus(AccountStatus.ACTIVE);
         userRepository.save(user);
     }
 
     /*
+        UC03 - Đăng nhập.
+
         Dùng chung 1 message cho cả sai email và sai mật khẩu.
     */
-    public LoginResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
+    public LoginResponse login(String email, String password) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Email or password is incorrect"));
 
-        if(!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new IllegalArgumentException("Email or password is incorrect");
         }
 
-        if(user.getAccountStatus() == AccountStatus.UNVERIFIED) {
+        if (user.getAccountStatus() == AccountStatus.UNVERIFIED) {
             throw new IllegalArgumentException("Account is not verified yet");
         }
 
-        if(user.getAccountStatus() == AccountStatus.DISABLED) {
+        if (user.getAccountStatus() == AccountStatus.DISABLED) {
             throw new IllegalArgumentException("Account has been disabled");
         }
 
-        if(user.getAccountStatus() == AccountStatus.DELETED) {
+        if (user.getAccountStatus() == AccountStatus.DELETED) {
             throw new IllegalArgumentException("Account has been deleted");
         }
 
@@ -102,31 +126,27 @@ public class AuthService {
     }
 
     /*
-        Quên mật khẩu được chia thành 2 request riêng:
-
-        1. Request forgotPassword:
-        - User nhập email → Backend gửi OTP về email.
-
-        2. Request resetPassword:
-        - User nhập OTP + mật khẩu mới.
-        - Frontend tự gửi lại email đã nhập ở bước 1, User không cần nhập email lần 2.
-        - Backend dùng email để tìm User, kiểm tra OTP hợp lệ → đổi mật khẩu mới.
+        UC04 - Quên mật khẩu (bước 1): nhập email → gửi OTP.
     */
-    public void forgotPassword(ForgotPasswordRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
+    @Transactional
+    public void forgotPassword(String email) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Email does not exist"));
 
         otpService.generateAndSend(user, OtpPurpose.RESET_PASSWORD);
     }
 
+    /*
+        UC05 - Đặt lại mật khẩu (bước 2): email (frontend tự gửi lại) + OTP + mật khẩu mới.
+    */
     @Transactional
-    public void resetPassword(ResetPasswordRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
+    public void resetPassword(String email, String otpCode, String newPassword) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Email does not exist"));
 
-        otpService.verifyAndConsume(user, request.getOtpCode(), OtpPurpose.RESET_PASSWORD);
+        otpService.verifyAndConsume(user, otpCode, OtpPurpose.RESET_PASSWORD);
 
-        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
     }
 }

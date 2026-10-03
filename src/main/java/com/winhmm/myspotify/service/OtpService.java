@@ -8,12 +8,21 @@ import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Service
 public class OtpService {
     private final OtpVerificationRepository otpVerificationRepository;
     private final EmailService emailService;
     private static final SecureRandom RANDOM = new SecureRandom();
+
+    /*
+        OTP hết hạn sau 5 phút.
+
+        Phải chờ 60 giây mới được yêu cầu OTP mới.
+    */
+    private static final int OTP_EXPIRE_MINUTES = 5;
+    private static final int RESEND_COOLDOWN_SECONDS = 60;
 
     public OtpService(OtpVerificationRepository otpVerificationRepository, EmailService emailService) {
         this.otpVerificationRepository = otpVerificationRepository;
@@ -47,6 +56,43 @@ public class OtpService {
     }
 
     private void createAndSend(User user, OtpPurpose purpose, String newEmail, String toEmail) {
+        LocalDateTime now = LocalDateTime.now();
+
+        /*
+            Chống spam: OTP gần nhất được tạo chưa đủ 60 giây → báo lỗi.
+
+            Thời điểm tạo = expiredAt - 5 phút.
+        */
+        Optional<OtpVerification> latest = otpVerificationRepository
+                .findFirstByUserAndPurposeAndVerifiedFalseOrderByIdDesc(user, purpose);
+
+        if(latest.isPresent()) {
+            LocalDateTime createdAt = latest.get().getExpiredAt().minusMinutes(OTP_EXPIRE_MINUTES);
+            if(createdAt.plusSeconds(RESEND_COOLDOWN_SECONDS).isAfter(now)) {
+                throw new IllegalArgumentException(
+                        "Please wait " + RESEND_COOLDOWN_SECONDS + " seconds before requesting a new OTP");
+            }
+        }
+
+        /*
+            Vô hiệu hóa toàn bộ OTP cũ chưa dùng (cùng User, cùng mục đích)
+             → chỉ OTP mới nhất dùng được.
+
+             verified = true nghĩa là "đã dùng / không còn dùng được".
+        */
+        Optional<OtpVerification> old = latest;
+        while(old.isPresent()) {
+            OtpVerification otp = old.get();
+            otp.setVerified(true);
+            otpVerificationRepository.save(otp);
+
+            old = otpVerificationRepository
+                    .findFirstByUserAndPurposeAndVerifiedFalseOrderByIdDesc(user, purpose);
+        }
+
+        /*
+            Tạo OTP mới → lưu → gửi email.
+        */
         String otpCode = String.format("%06d", RANDOM.nextInt(1_000_000));
 
         OtpVerification otp = new OtpVerification();
@@ -54,7 +100,7 @@ public class OtpService {
         otp.setOtpCode(otpCode);
         otp.setPurpose(purpose);
         otp.setNewEmail(newEmail);
-        otp.setExpiredAt(LocalDateTime.now().plusMinutes(5));
+        otp.setExpiredAt(now.plusMinutes(OTP_EXPIRE_MINUTES));
         otp.setVerified(false);
 
         otpVerificationRepository.save(otp);

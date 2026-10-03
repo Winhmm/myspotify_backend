@@ -5,6 +5,7 @@ import com.winhmm.myspotify.dto.user.UserProfileResponse;
 import com.winhmm.myspotify.entity.User;
 import com.winhmm.myspotify.service.UserService;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +31,7 @@ public class UserController {
     }
 
     /*
+        UC06 - Đăng xuất.
         JWT không lưu trên server → đăng xuất = Frontend tự xóa token.
     */
     @PostMapping("/logout")
@@ -37,11 +39,17 @@ public class UserController {
         return ResponseEntity.ok(Map.of("message", "Logout successful"));
     }
 
+    /*
+        UC07 - Xem thông tin cá nhân.
+    */
     @GetMapping("/me/profile")
     public ResponseEntity<UserProfileResponse> getProfile(Authentication authentication) {
         return ResponseEntity.ok(toResponse(userService.getProfile(me(authentication))));
     }
 
+    /*
+        UC08 - Cập nhật thông tin cá nhân.
+    */
     @PutMapping("/me/profile")
     public ResponseEntity<UserProfileResponse> updateProfile(Authentication authentication,
                                                              @Valid @RequestBody UpdateProfileRequest request) {
@@ -50,7 +58,7 @@ public class UserController {
     }
 
     /*
-        Bước 1 của đổi mật khẩu:
+        UC09 - Đổi mật khẩu (bước 1):
         Nhận mật khẩu hiện tại → Backend kiểm tra rồi gửi OTP về email.
     */
     @PostMapping("/me/change-password/request-otp")
@@ -61,7 +69,7 @@ public class UserController {
     }
 
     /*
-        Bước 2 của đổi mật khẩu:
+        UC09 - Đổi mật khẩu (bước 2):
         Nhận OTP + mật khẩu mới → Backend kiểm tra OTP rồi đổi mật khẩu.
     */
     @PutMapping("/me/change-password")
@@ -71,7 +79,11 @@ public class UserController {
         return ResponseEntity.ok(Map.of("message", "Password has been changed successfully"));
     }
 
-    @PutMapping("/me/avatar")
+    /*
+        UC10 - Cập nhật ảnh đại diện.
+        Frontend gửi multipart/form-data, key = "file".
+    */
+    @PostMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<UserProfileResponse> updateAvatar(Authentication authentication,
                                                             @RequestParam("file") MultipartFile file) {
         User user = userService.updateAvatar(me(authentication), file);
@@ -79,6 +91,7 @@ public class UserController {
     }
 
     /*
+        UC13 - Cập nhật email (bước 1):
         Nhận email mới → Backend kiểm tra rồi gửi OTP tới email mới.
     */
     @PostMapping("/me/email/request-otp")
@@ -89,15 +102,20 @@ public class UserController {
     }
 
     /*
+        UC13 - Cập nhật email (bước 2):
         Nhận OTP → Backend xác thực rồi đổi sang email mới.
+        Token cũ hết hiệu lực → Frontend phải đăng nhập lại bằng email mới.
     */
     @PutMapping("/me/email")
-    public ResponseEntity<UserProfileResponse> updateEmail(Authentication authentication,
+    public ResponseEntity<Map<String, String>> updateEmail(Authentication authentication,
                                                            @Valid @RequestBody UpdateEmailRequest request) {
-        User user = userService.updateEmail(me(authentication), request.getOtpCode());
-        return ResponseEntity.ok(toResponse(user));
+        userService.updateEmail(me(authentication), request.getOtpCode());
+        return ResponseEntity.ok(Map.of("message", "Email has been updated, please login again"));
     }
 
+    /*
+        UC11 - Vô hiệu hóa tài khoản.
+    */
     @PutMapping("/me/disable")
     public ResponseEntity<Map<String, String>> disableAccount(Authentication authentication,
                                                               @Valid @RequestBody AccountActionRequest request) {
@@ -105,6 +123,9 @@ public class UserController {
         return ResponseEntity.ok(Map.of("message", "Account has been disabled"));
     }
 
+    /*
+        UC12 - Xóa tài khoản (soft delete).
+    */
     @PutMapping("/me/delete")
     public ResponseEntity<Map<String, String>> deleteAccount(Authentication authentication,
                                                              @Valid @RequestBody AccountActionRequest request) {
@@ -112,6 +133,9 @@ public class UserController {
         return ResponseEntity.ok(Map.of("message", "Account has been deleted"));
     }
 
+    /*
+        UC14 - Gửi yêu cầu trở thành Artist.
+    */
     @PostMapping("/me/artist-request")
     public ResponseEntity<Map<String, String>> requestBecomeArtist(Authentication authentication,
                                                                    @Valid @RequestBody ArtistRequest request) {
@@ -119,6 +143,9 @@ public class UserController {
         return ResponseEntity.ok(Map.of("message", "Artist request has been submitted"));
     }
 
+    /*
+        UC19 - Cập nhật hồ sơ Artist.
+    */
     @PutMapping("/me/artist-profile")
     public ResponseEntity<UserProfileResponse> updateArtistProfile(Authentication authentication,
                                                                    @Valid @RequestBody ArtistRequest request) {
