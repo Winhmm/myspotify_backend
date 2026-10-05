@@ -19,13 +19,16 @@ public class AuthService {
     private final OtpService otpService;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final SessionService sessionService;
 
     public AuthService(UserRepository userRepository, OtpService otpService,
-                       PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
+                       PasswordEncoder passwordEncoder, JwtUtil jwtUtil,
+                       SessionService sessionService) {
         this.userRepository = userRepository;
         this.otpService = otpService;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.sessionService = sessionService;
     }
 
     /*
@@ -121,7 +124,13 @@ public class AuthService {
             throw new IllegalArgumentException("Account has been deleted");
         }
 
-        String token = jwtUtil.generateToken(user);
+        /*
+            Tạo phiên mới trong Redis (ghi đè phiên cũ nếu đang đăng nhập ở thiết bị khác),
+            rồi ghi mã phiên vào token.
+        */
+        String sessionId = sessionService.createSession(user.getEmail());
+        String token = jwtUtil.generateToken(user, sessionId);
+
         return new LoginResponse(token, user.getId(), user.getUsername(), user.getRole());
     }
 
@@ -148,5 +157,11 @@ public class AuthService {
 
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
+
+        /*
+            Đăng xuất khỏi mọi thiết bị: nếu ai đó đang dùng tài khoản
+            (lý do thường gặp khiến người dùng phải đặt lại mật khẩu) → bị đá ra ngay.
+        */
+        sessionService.deleteSession(user.getEmail());
     }
 }

@@ -3,6 +3,7 @@ package com.winhmm.myspotify.config;
 import com.winhmm.myspotify.security.CustomUserDetailsService;
 import com.winhmm.myspotify.security.JwtAuthenticationFilter;
 import com.winhmm.myspotify.security.JwtUtil;
+import com.winhmm.myspotify.service.SessionService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,61 +26,53 @@ import java.io.IOException;
 public class SecurityConfig {
     private final JwtUtil jwtUtil;
     private final CustomUserDetailsService userDetailsService;
+    private final SessionService sessionService;
 
-    public SecurityConfig(JwtUtil jwtUtil, CustomUserDetailsService userDetailsService) {
+    public SecurityConfig(JwtUtil jwtUtil,
+                          CustomUserDetailsService userDetailsService,
+                          SessionService sessionService) {
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
+        this.sessionService = sessionService;
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-                /*
-                    Dùng bean corsConfigurationSource trong CorsConfig.
-                */
                 .cors(Customizer.withDefaults())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        /*
-                            Cho phép mọi request preflight của trình duyệt.
-                        */
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        /*
-                            Các API không cần đăng nhập:
-                            - /api/auth/**: đăng nhập, đăng ký, OTP, quên mật khẩu.
-                            - /uploads/**: file tĩnh (ảnh, nhạc).
-                            - /actuator/health: kiểm tra sức khỏe ứng dụng.
-                            - Swagger: tài liệu API.
-                            - /error: trang lỗi mặc định của Spring Boot.
-                        */
                         .requestMatchers("/api/auth/**", "/uploads/**", "/actuator/health",
                                 "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
                                 "/error").permitAll()
-                        /*
-                            Các API còn lại cần đăng nhập.
-                        */
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
                         /*
-                            Chưa đăng nhập / token sai / token hết hạn → 401.
+                            Chưa đăng nhập / token sai / phiên không hợp lệ → 401.
+
+                            Nếu filter có ghi chú "phiên không hợp lệ" → trả message đó,
+                            để frontend biết vì sao bị đăng xuất.
                         */
-                        .authenticationEntryPoint((request, response, authException) ->
-                                writeJsonError(response, 401, "Unauthorized, please login"))
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            Object sessionError = request.getAttribute(JwtAuthenticationFilter.SESSION_ERROR);
+                            String message = (sessionError != null)
+                                    ? sessionError.toString()
+                                    : "Unauthorized, please login";
+                            writeJsonError(response, 401, message);
+                        })
                         /*
-                            Đã đăng nhập nhưng không đủ quyền (VD: USER gọi API ADMIN) → 403.
+                            Đã đăng nhập nhưng không đủ quyền → 403.
                         */
                         .accessDeniedHandler((request, response, accessDeniedException) ->
                                 writeJsonError(response, 403, "You do not have permission to access this resource"))
                 )
                 /*
-                    JwtAuthenticationFilter chạy trước UsernamePasswordAuthenticationFilter:
-                    1. Lấy token từ header.
-                    2. Token hợp lệ → tìm User → báo cho Spring "request này của User X".
-                    3. Không có token / token sai → bỏ qua, Spring sẽ tự chặn nếu API cần đăng nhập.
+                    Truyền thêm sessionService vào filter.
                 */
-                .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, userDetailsService),
+                .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, userDetailsService, sessionService),
                         UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

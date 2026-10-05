@@ -12,9 +12,11 @@ import java.util.List;
 @Service
 public class AdminService {
     private final UserRepository userRepository;
+    private final SessionService sessionService;
 
-    public AdminService(UserRepository userRepository) {
+    public AdminService(UserRepository userRepository, SessionService sessionService) {
         this.userRepository = userRepository;
+        this.sessionService = sessionService;
     }
 
     private User findUser(Long userId) {
@@ -44,6 +46,11 @@ public class AdminService {
 
         user.setAccountStatus(AccountStatus.DISABLED);
         userRepository.save(user);
+
+        /*
+            Người bị khóa → đá ra khỏi mọi thiết bị ngay lập tức.
+        */
+        sessionService.deleteSession(user.getEmail());
     }
 
     /*

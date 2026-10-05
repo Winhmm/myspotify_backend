@@ -22,11 +22,15 @@ public class JwtUtil {
     }
 
     /*
-        Tạo token chứa email của User, hết hạn sau expirationMs
+        Tạo token chứa:
+        - subject: email của User.
+        - id (jti): mã phiên đăng nhập, lấy từ SessionService.createSession().
+        - Hết hạn sau expirationMs.
     */
-    public String generateToken(User user) {
+    public String generateToken(User user, String sessionId) {
         return Jwts.builder()
                 .subject(user.getEmail())
+                .id(sessionId)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(key)
@@ -53,5 +57,15 @@ public class JwtUtil {
                 .parseSignedClaims(token)
                 .getPayload()
                 .getSubject();
+    }
+
+    /*
+        Lấy mã phiên (jti) từ token.
+    */
+    public String getSessionIdFromToken(String token) {
+        return Jwts.parser().verifyWith(key).build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getId();
     }
 }

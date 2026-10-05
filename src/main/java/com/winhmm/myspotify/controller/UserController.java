@@ -3,6 +3,7 @@ package com.winhmm.myspotify.controller;
 import com.winhmm.myspotify.dto.user.*;
 import com.winhmm.myspotify.dto.user.UserProfileResponse;
 import com.winhmm.myspotify.entity.User;
+import com.winhmm.myspotify.service.SessionService;
 import com.winhmm.myspotify.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
@@ -17,9 +18,11 @@ import java.util.Map;
 @RequestMapping("/api/users")
 public class UserController {
     private final UserService userService;
+    private final SessionService sessionService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, SessionService sessionService) {
         this.userService = userService;
+        this.sessionService = sessionService;
     }
 
     /*
@@ -33,9 +36,14 @@ public class UserController {
     /*
         UC06 - Đăng xuất.
         JWT không lưu trên server → đăng xuất = Frontend tự xóa token.
+
+        Xóa phiên trong Redis → token hiện tại mất hiệu lực ngay lập tức.
+        Frontend vẫn cần tự xóa token đã lưu.
+
+        authentication.getName() trả về email của người đang đăng nhập.
     */
-    @PostMapping("/logout")
-    public ResponseEntity<Map<String, String>> logout() {
+    public ResponseEntity<Map<String, String>> logout(Authentication authentication) {
+        sessionService.deleteSession(authentication.getName());
         return ResponseEntity.ok(Map.of("message", "Logout successful"));
     }
 

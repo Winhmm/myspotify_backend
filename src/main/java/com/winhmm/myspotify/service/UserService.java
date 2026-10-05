@@ -28,14 +28,17 @@ public class UserService {
     private final UserRepository userRepository;
     private final OtpService otpService;
     private final PasswordEncoder passwordEncoder;
+    private final SessionService sessionService;
 
     @Value("${app.upload-dir}")
     private String uploadDir;
 
-    public UserService(UserRepository userRepository, OtpService otpService, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, OtpService otpService,
+                       PasswordEncoder passwordEncoder, SessionService sessionService) {
         this.userRepository = userRepository;
         this.otpService = otpService;
         this.passwordEncoder = passwordEncoder;
+        this.sessionService = sessionService;
     }
 
     public User getProfile(Long userId) {
@@ -93,6 +96,12 @@ public class UserService {
 
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
+
+        /*
+            Đổi mật khẩu → đăng xuất khỏi mọi thiết bị (kể cả thiết bị hiện tại).
+            Frontend chuyển về trang đăng nhập để đăng nhập bằng mật khẩu mới.
+        */
+        sessionService.deleteSession(user.getEmail());
     }
 
     /*
@@ -193,6 +202,12 @@ public class UserService {
             throw new IllegalArgumentException("Email already exists");
         }
 
+        /*
+            Xóa phiên của EMAIL CŨ trước khi đổi
+            (key Redis là session:<email cũ>).
+        */
+        sessionService.deleteSession(user.getEmail());
+
         user.setEmail(otp.getNewEmail());
         userRepository.save(user);
     }
@@ -207,6 +222,8 @@ public class UserService {
 
         user.setAccountStatus(AccountStatus.DISABLED);
         userRepository.save(user);
+
+        sessionService.deleteSession(user.getEmail());
     }
 
     /*
@@ -219,6 +236,8 @@ public class UserService {
 
         user.setAccountStatus(AccountStatus.DELETED);
         userRepository.save(user);
+
+        sessionService.deleteSession(user.getEmail());
     }
 
     /*
