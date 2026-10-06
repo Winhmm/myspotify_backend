@@ -35,13 +35,12 @@ public class UserController {
 
     /*
         UC06 - Đăng xuất.
-        JWT không lưu trên server → đăng xuất = Frontend tự xóa token.
-
         Xóa phiên trong Redis → token hiện tại mất hiệu lực ngay lập tức.
         Frontend vẫn cần tự xóa token đã lưu.
 
         authentication.getName() trả về email của người đang đăng nhập.
     */
+    @PostMapping("/logout")
     public ResponseEntity<Map<String, String>> logout(Authentication authentication) {
         sessionService.deleteSession(authentication.getName());
         return ResponseEntity.ok(Map.of("message", "Logout successful"));
