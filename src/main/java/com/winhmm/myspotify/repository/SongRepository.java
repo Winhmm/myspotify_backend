@@ -1,6 +1,9 @@
 package com.winhmm.myspotify.repository;
 
 import com.winhmm.myspotify.entity.Song;
+import com.winhmm.myspotify.entity.User;
+import com.winhmm.myspotify.enums.AccountStatus;
+import com.winhmm.myspotify.enums.Role;
 import com.winhmm.myspotify.enums.SongStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,7 +36,7 @@ public interface SongRepository extends JpaRepository<Song, Long> {
         1. Tài khoản đang ACTIVE.
         2. Vẫn còn role ARTIST.
 
-        Dùng khi TÌM KIẾM theo tên Artist feat. (UC21):
+        Dùng khi tìm kiếm theo tên Artist feat. (UC21):
         → Artist feat. bị khóa thì tên của họ KHÔNG được tính khi tìm.
         (Bài hát vẫn hiển thị bình thường, chỉ ẩn tên người đó.)
     */

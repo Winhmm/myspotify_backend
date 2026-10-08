@@ -20,8 +20,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /* ================= MODULE BÀI HÁT ================= */
 
     /*
-        Tìm nghệ sĩ để feat.
-    */
-    List<User> findTop10ByRoleAndAccountStatusAndArtistNameContainingIgnoreCase(
-            Role role, AccountStatus accountStatus, String keyword);
+       UC37 - Tìm nghệ sĩ để feat.
+       Lấy tối đa 10 người: đúng role, đúng trạng thái,
+       nghệ danh chứa từ khóa (không phân biệt hoa thường),
+       và khác id truyền vào (để loại chính mình).
+   */
+    List<User> findTop10ByRoleAndAccountStatusAndArtistNameContainingIgnoreCaseAndIdNot(
+            Role role, AccountStatus accountStatus, String keyword, Long excludeId);
 }

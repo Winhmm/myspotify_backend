@@ -1,7 +1,6 @@
 package com.winhmm.myspotify.entity;
 
 import com.winhmm.myspotify.enums.SongStatus;
-import jakarta.persistence.Entity;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
