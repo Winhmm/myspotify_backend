@@ -17,8 +17,6 @@ public class EmailService {
     }
 
     public void sendOtp(String toEmail, String otpCode) {
-        System.out.println("=== OTP gửi tới " + toEmail + ": " + otpCode + " ===");
-
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom("MySpotify <" + fromEmail + ">");
         message.setTo(toEmail);

@@ -142,6 +142,10 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Email does not exist"));
 
+        if(user.getAccountStatus() != AccountStatus.ACTIVE) {
+            throw new IllegalArgumentException("Account is not active");
+        }
+
         otpService.generateAndSend(user, OtpPurpose.RESET_PASSWORD);
     }
 

@@ -3,6 +3,8 @@ package com.winhmm.myspotify.config;
 import com.winhmm.myspotify.security.CustomUserDetailsService;
 import com.winhmm.myspotify.security.JwtAuthenticationFilter;
 import com.winhmm.myspotify.security.JwtUtil;
+import com.winhmm.myspotify.security.RateLimitFilter;
+import com.winhmm.myspotify.service.RateLimitService;
 import com.winhmm.myspotify.service.SessionService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
@@ -27,13 +29,16 @@ public class SecurityConfig {
     private final JwtUtil jwtUtil;
     private final CustomUserDetailsService userDetailsService;
     private final SessionService sessionService;
+    private final RateLimitService rateLimitService;
 
     public SecurityConfig(JwtUtil jwtUtil,
                           CustomUserDetailsService userDetailsService,
-                          SessionService sessionService) {
+                          SessionService sessionService,
+                          RateLimitService rateLimitService) {
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
         this.sessionService = sessionService;
+        this.rateLimitService = rateLimitService;
     }
 
     @Bean
@@ -70,10 +75,17 @@ public class SecurityConfig {
                                 writeJsonError(response, 403, "You do not have permission to access this resource"))
                 )
                 /*
-                    Truyền thêm sessionService vào filter.
+                    1. JWT filter: đọc token → biết request của tài khoản nào.
                 */
                 .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, userDetailsService, sessionService),
-                        UsernamePasswordAuthenticationFilter.class);
+                        UsernamePasswordAuthenticationFilter.class)
+
+                /*
+                    2. MỚI - Rate limit filter: chạy ngay sau JWT filter
+                       → đã biết email → đếm theo tài khoản.
+                */
+                .addFilterAfter(new RateLimitFilter(rateLimitService),
+                        JwtAuthenticationFilter.class);
 
         return http.build();
     }

@@ -2,6 +2,7 @@ package com.winhmm.myspotify.dto.auth;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public class ResetPasswordRequest {
@@ -10,6 +11,7 @@ public class ResetPasswordRequest {
     private String email;
 
     @NotBlank(message = "OTP code is required")
+    @Pattern(regexp = "^\\d{6}$", message = "OTP code must be 6 digits")
     private String otpCode;
 
     @NotBlank(message = "New password is required")

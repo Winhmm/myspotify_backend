@@ -22,7 +22,7 @@ public interface SongRepository extends JpaRepository<Song, Long> {
         Điều kiện "bài đã phát hành" - người nghe thấy được (UC20 - UC25):
         1. Bài đã được Admin duyệt (APPROVED).
         2. Đã tới giờ phát hành (releaseAt <= hiện tại).
-        3. Artist CHÍNH đang hoạt động và vẫn còn là Artist.
+        3. Artist chính đang hoạt động và vẫn còn là Artist.
            → Artist chính bị khóa / xóa / thu hồi quyền → bài tự ẩn.
     */
     String PUBLISHED_CONDITION =

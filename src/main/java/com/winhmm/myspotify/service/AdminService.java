@@ -84,6 +84,10 @@ public class AdminService {
             throw new IllegalArgumentException("Only users with role USER can become an artist");
         }
 
+        if(user.getAccountStatus() != AccountStatus.ACTIVE) {
+            throw new IllegalArgumentException("Account is not active");
+        }
+
         user.setArtistRequestStatus(ArtistRequestStatus.APPROVED);
         user.setRole(Role.ARTIST);
         userRepository.save(user);
@@ -116,6 +120,10 @@ public class AdminService {
 
         if(role == null) {
             throw new IllegalArgumentException("Role is required");
+        }
+
+        if(user.getRole() == Role.ADMIN) {
+            throw new IllegalArgumentException("Cannot change role of an admin account");
         }
 
         if(user.getAccountStatus() == AccountStatus.DELETED

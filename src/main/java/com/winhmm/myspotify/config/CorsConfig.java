@@ -32,7 +32,8 @@ public class CorsConfig {
                 "Content-Disposition",
                 "Content-Range",
                 "Accept-Ranges",
-                "Content-Length"
+                "Content-Length",
+                "Retry-After"
         ));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);

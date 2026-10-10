@@ -5,10 +5,12 @@ import com.winhmm.myspotify.entity.User;
 import com.winhmm.myspotify.enums.OtpPurpose;
 import com.winhmm.myspotify.repository.OtpVerificationRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.time.Duration;
 
 @Service
 public class OtpService {
@@ -24,9 +26,15 @@ public class OtpService {
     private static final int OTP_EXPIRE_MINUTES = 5;
     private static final int RESEND_COOLDOWN_SECONDS = 60;
 
-    public OtpService(OtpVerificationRepository otpVerificationRepository, EmailService emailService) {
+    private final StringRedisTemplate redisTemplate;
+    private static final int MAX_FAILED_ATTEMPTS = 5;
+
+    public OtpService(OtpVerificationRepository otpVerificationRepository,
+                      EmailService emailService,
+                      StringRedisTemplate redisTemplate) {
         this.otpVerificationRepository = otpVerificationRepository;
         this.emailService = emailService;
+        this.redisTemplate = redisTemplate;
     }
 
     /*
@@ -112,14 +120,46 @@ public class OtpService {
                 .findFirstByUserAndPurposeAndVerifiedFalseOrderByIdDesc(user, purpose)
                 .orElseThrow(() -> new IllegalArgumentException("Otp code does not exist"));
 
-        if (otp.getExpiredAt().isBefore(LocalDateTime.now())) {
+        if(otp.getExpiredAt().isBefore(LocalDateTime.now())) {
             throw new IllegalArgumentException("Otp code has expired");
         }
 
-        if (!otp.getOtpCode().equals(otpCode)) {
+        /*
+            Đếm số lần nhập sai cho từng mã OTP (key theo id của OTP).
+            Gửi OTP mới → id mới → bộ đếm mới.
+            Lưu ở Redis vì database sẽ bị rollback khi ném lỗi.
+        */
+        String failKey = "otp-fail:" + otp.getId();
+        String failValue = redisTemplate.opsForValue().get(failKey);
+        int failed;
+        if(failValue == null) {
+            failed = 0;
+        } else {
+            failed = Integer.parseInt(failValue);
+        }
+
+        if(failed >= MAX_FAILED_ATTEMPTS) {
+            throw new IllegalArgumentException("Too many wrong attempts, please request a new OTP");
+        }
+
+        if(!otp.getOtpCode().equals(otpCode)) {
+            Long count = redisTemplate.opsForValue().increment(failKey);
+
+            /*
+                Khi người dùng nhập sai OTP lần đầu tiên, Redis bắt đầu bộ đếm
+                với thời hạn 5 phút.
+
+                Sau 5 phút, Redis tự động xóa key đếm số lần nhập sai để
+                tránh lưu trữ dữ liệu tạm thời không cần thiết.
+            */
+            if(count != null && count == 1) {
+                redisTemplate.expire(failKey, Duration.ofMinutes(OTP_EXPIRE_MINUTES));
+            }
+
             throw new IllegalArgumentException("Otp code does not match");
         }
 
+        redisTemplate.delete(failKey);
         otp.setVerified(true);
         return otpVerificationRepository.save(otp);
     }
