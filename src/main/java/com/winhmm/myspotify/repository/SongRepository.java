@@ -1,9 +1,6 @@
 package com.winhmm.myspotify.repository;
 
 import com.winhmm.myspotify.entity.Song;
-import com.winhmm.myspotify.entity.User;
-import com.winhmm.myspotify.enums.AccountStatus;
-import com.winhmm.myspotify.enums.Role;
 import com.winhmm.myspotify.enums.SongStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -121,7 +118,7 @@ public interface SongRepository extends JpaRepository<Song, Long> {
     List<Song> findByArtistIdAndStatusNotOrderByCreatedAtDesc(Long artistId, SongStatus status);
 
     /*
-        Tìm bài theo id VÀ phải thuộc về Artist đó.
+        Tìm bài theo id và phải thuộc về Artist đó.
         → Artist không thể sửa / ẩn / xóa bài của người khác.
     */
     Optional<Song> findByIdAndArtistId(Long id, Long artistId);

@@ -10,6 +10,8 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mail.MailException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -36,16 +38,25 @@ public class GlobalExceptionHandler {
     */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException e) {
-        return ResponseEntity.badRequest().body(body(e.getMessage(), "Invalid request"));
+        return ResponseEntity.badRequest().body(body(e.getMessage(), "Invalid request data"));
     }
 
     /*
-        Lỗi validation từ @Valid (@NotBlank, @Email, ...) → 400, lấy message lỗi đầu tiên.
+        Lỗi validation từ @Valid (@NotBlank, @Email, ...) → 400, lấy lỗi đầu tiên.
+
+        Riêng lỗi đổi kiểu dữ liệu (VD: releaseAt = "abc", featuredArtistIds = "xyz")
+        → message gọn, không lộ chi tiết Java ra ngoài.
     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException e) {
-        String message = e.getBindingResult().getAllErrors().get(0).getDefaultMessage();
-        return ResponseEntity.badRequest().body(body(message, "Invalid request data"));
+        ObjectError error = e.getBindingResult().getAllErrors().get(0);
+
+        if (error instanceof FieldError fieldError && fieldError.isBindingFailure()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Invalid value for " + fieldError.getField()));
+        }
+
+        return ResponseEntity.badRequest().body(body(error.getDefaultMessage(), "Invalid request data"));
     }
 
     /*

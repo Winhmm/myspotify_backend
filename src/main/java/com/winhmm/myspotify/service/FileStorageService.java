@@ -9,10 +9,12 @@ import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 import java.util.UUID;
 
 /*
@@ -57,7 +59,7 @@ public class FileStorageService {
         3. Kiểm tra dung lượng: MP3 ≤ 20MB, WAV ≤ 100MB.
         4. Lưu với tên ngẫu nhiên (UUID) → trả về đường dẫn.
 
-        Lưu ý: method này CHƯA kiểm tra file có phải nhạc thật không.
+        Lưu ý: method này chưa kiểm tra file có phải nhạc thật không.
         → Sau khi lưu, gọi getAudioDuration() để kiểm tra.
     */
     public String saveAudio(MultipartFile file) {
@@ -87,6 +89,11 @@ public class FileStorageService {
     /*
         Lưu ảnh (JPG / PNG / WEBP, tối đa 2MB) vào thư mục folder.
         VD: saveImage(file, "songs/covers") → /uploads/songs/covers/<uuid>.jpg
+
+        Kiểm tra 2 lớp:
+        1. Content-Type client khai báo (lọc nhanh).
+        2. Chữ ký file (vài byte đầu) → chặn file giả mạo,
+           VD: PDF đổi đuôi thành .png.
     */
     public String saveImage(MultipartFile file, String folder) {
         if(file == null || file.isEmpty()) {
@@ -108,6 +115,10 @@ public class FileStorageService {
             extension = ".webp";
         } else {
             throw new IllegalArgumentException("Only JPG, PNG or WEBP images are allowed");
+        }
+
+        if(!isRealImage(file, extension)) {
+            throw new IllegalArgumentException("Invalid or corrupted image file");
         }
 
         return saveFile(file, folder, extension);
@@ -177,8 +188,7 @@ public class FileStorageService {
 
         try {
             Files.deleteIfExists(toPath(url));
-        } catch (IOException ignored) {
-        }
+        } catch (IOException ignored) {}
     }
 
     /* ================= HÀM HỖ TRỢ ================= */
@@ -220,5 +230,40 @@ public class FileStorageService {
         }
 
         return fileName.substring(fileName.lastIndexOf(".")).toLowerCase();
+    }
+
+    /*
+        Kiểm tra file có thật sự là ảnh bằng chữ ký file (vài byte đầu).
+        Không tin Content-Type vì client tự gửi được giá trị bất kỳ.
+        - JPG : FF D8 FF
+        - PNG : 89 50 4E 47 0D 0A 1A 0A
+        - WEBP: "RIFF" + 4 byte kích thước + "WEBP"
+    */
+    private boolean isRealImage(MultipartFile file, String extension) {
+        try (InputStream in = file.getInputStream()) {
+            byte[] head = in.readNBytes(12);
+
+            if(".jpg".equals(extension)) {
+                return head.length >= 3
+                        && (head[0] & 0xFF) == 0xFF
+                        && (head[1] & 0xFF) == 0xD8
+                        && (head[2] & 0xFF) == 0xFF;
+            }
+
+            if(".png".equals(extension)) {
+                byte[] png = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+                return head.length >= 8 && Arrays.equals(Arrays.copyOf(head, 8), png);
+            }
+
+            if(".webp".equals(extension)) {
+                return head.length >= 12
+                        && head[0] == 'R' && head[1] == 'I' && head[2] == 'F' && head[3] == 'F'
+                        && head[8] == 'W' && head[9] == 'E' && head[10] == 'B' && head[11] == 'P';
+            }
+
+            return false;
+        } catch (IOException e) {
+            return false;
+        }
     }
 }

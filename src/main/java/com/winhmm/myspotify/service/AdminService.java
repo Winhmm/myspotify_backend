@@ -110,16 +110,23 @@ public class AdminService {
         Gán role cho User:
 
         1. Không gán cho tài khoản đã xóa hoặc chưa xác thực.
-        2. Không gán trùng role hiện tại.
-        3. Gán ARTIST → artistRequestStatus = APPROVED.
-        4. Gán role khác ARTIST, mà User đang là ARTIST hoặc đang có yêu cầu PENDING
-           → xoá artistName/bio, artistRequestStatus về NONE.
+        2. Không đổi role của Admin, không gán trùng role hiện tại.
+        3. KHÔNG gán ARTIST ở đây: User phải tự gửi yêu cầu kèm nghệ danh (UC14),
+           Admin duyệt qua approveArtistRequest → đảm bảo Artist nào cũng có nghệ danh.
+        4. Hạ một ARTIST (hoặc người đang có yêu cầu PENDING) xuống role khác
+           → xóa artistName/bio, artistRequestStatus về NONE
+           (sau này muốn làm Artist lại thì gửi yêu cầu mới).
     */
     public void assignRole(Long userId, Role role) {
         User user = findUser(userId);
 
         if(role == null) {
             throw new IllegalArgumentException("Role is required");
+        }
+
+        if(role == Role.ARTIST) {
+            throw new IllegalArgumentException(
+                    "ARTIST role can only be granted by approving an artist request");
         }
 
         if(user.getRole() == Role.ADMIN) {
@@ -135,11 +142,9 @@ public class AdminService {
             throw new IllegalArgumentException("User already has this role");
         }
 
-        if(role == Role.ARTIST) {
-            user.setArtistRequestStatus(ArtistRequestStatus.APPROVED);
-        } else if(user.getRole() == Role.ARTIST || user.getArtistRequestStatus() == ArtistRequestStatus.PENDING) {
+        if(user.getRole() == Role.ARTIST || user.getArtistRequestStatus() == ArtistRequestStatus.PENDING) {
             /*
-                Thu hồi quyền/trạng thái Artist.
+                Thu hồi quyền / trạng thái Artist.
             */
             user.setArtistName(null);
             user.setBio(null);

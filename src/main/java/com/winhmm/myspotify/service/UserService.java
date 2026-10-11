@@ -22,23 +22,22 @@ import java.util.UUID;
 
 @Service
 public class UserService {
-    private static final long MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2MB
-    private static final String AVATAR_URL_PREFIX = "/uploads/avatars/";
+    private static final String AVATAR_FOLDER = "avatars";
 
     private final UserRepository userRepository;
     private final OtpService otpService;
     private final PasswordEncoder passwordEncoder;
     private final SessionService sessionService;
-
-    @Value("${app.upload-dir}")
-    private String uploadDir;
+    private final FileStorageService fileStorageService;
 
     public UserService(UserRepository userRepository, OtpService otpService,
-                       PasswordEncoder passwordEncoder, SessionService sessionService) {
+                       PasswordEncoder passwordEncoder, SessionService sessionService,
+                       FileStorageService fileStorageService) {
         this.userRepository = userRepository;
         this.otpService = otpService;
         this.passwordEncoder = passwordEncoder;
         this.sessionService = sessionService;
+        this.fileStorageService = fileStorageService;
     }
 
     public User getProfile(Long userId) {
@@ -106,67 +105,26 @@ public class UserService {
 
     /*
         UC10 - Cập nhật ảnh đại diện.
-        - Chỉ nhận JPG / PNG / WEBP, tối đa 2MB.
-        - Lưu file mới thành công → xóa file avatar cũ (tránh đầy ổ đĩa).
+        - Dùng chung FileStorageService.saveImage():
+          chỉ nhận JPG / PNG / WEBP thật (kiểm tra chữ ký file), tối đa 2MB.
+        - Lưu User thành công → xóa ảnh cũ (tránh đầy ổ đĩa).
+        - Lưu User lỗi → xóa ảnh mới vừa lưu, giữ nguyên ảnh cũ.
     */
     public User updateAvatar(Long userId, MultipartFile file) {
         User user = getProfile(userId);
 
-        if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("File is empty");
-        }
-
-        if (file.getSize() > MAX_AVATAR_SIZE) {
-            throw new IllegalArgumentException("Avatar must not exceed 2MB");
-        }
-
-        String contentType = file.getContentType();
-        String extension;
-
-        if ("image/jpeg".equals(contentType)) {
-            extension = ".jpg";
-        } else if ("image/png".equals(contentType)) {
-            extension = ".png";
-        } else if ("image/webp".equals(contentType)) {
-            extension = ".webp";
-        } else {
-            throw new IllegalArgumentException("Only JPG, PNG or WEBP images are allowed");
-        }
-
-        String fileName = UUID.randomUUID() + extension;
-
-        try {
-            Path avatarDir = Paths.get(uploadDir, "avatars");
-            Files.createDirectories(avatarDir);
-
-            Path target = avatarDir.resolve(fileName);
-            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            throw new RuntimeException("Could not save avatar file", e);
-        }
-
         String oldAvatarUrl = user.getAvatarUrl();
+        String newAvatarUrl = fileStorageService.saveImage(file, AVATAR_FOLDER);
 
-        user.setAvatarUrl(AVATAR_URL_PREFIX + fileName);
-        User saved = userRepository.save(user);
-
-        deleteOldAvatar(oldAvatarUrl);
-        return saved;
-    }
-
-    /*
-        Chỉ xóa file avatar do hệ thống lưu (bắt đầu bằng /uploads/avatars/).
-        Xóa lỗi thì bỏ qua, không ảnh hưởng việc cập nhật avatar.
-    */
-    private void deleteOldAvatar(String avatarUrl) {
-        if (avatarUrl == null || !avatarUrl.startsWith(AVATAR_URL_PREFIX)) {
-            return;
-        }
-
-        String oldFileName = avatarUrl.substring(AVATAR_URL_PREFIX.length());
         try {
-            Files.deleteIfExists(Paths.get(uploadDir, "avatars", oldFileName));
-        } catch (IOException ignored) {
+            user.setAvatarUrl(newAvatarUrl);
+            User saved = userRepository.save(user);
+
+            fileStorageService.delete(oldAvatarUrl);
+            return saved;
+        } catch (RuntimeException e) {
+            fileStorageService.delete(newAvatarUrl);
+            throw e;
         }
     }
 

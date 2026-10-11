@@ -19,6 +19,7 @@ import java.util.Set;
     Các chức năng của ARTIST với bài hát:
     - Đăng bài (UC26).
     - Xem bài của tôi (UC28).
+    - Sửa bài, đổi ảnh bìa, đổi lịch, ẩn / hiện, xóa bài (UC29 - UC33).
     - Tìm nghệ sĩ để feat. (UC37).
 
     Mọi thao tác đều kiểm tra bài hát phải thuộc về Artist đang đăng nhập.
@@ -47,9 +48,12 @@ public class ArtistSongService {
         1. Kiểm tra người đăng là Artist đang hoạt động.
         2. Kiểm tra lịch phát hành (nếu có phải ở tương lai).
         3. Kiểm tra danh sách nghệ sĩ feat.
-        4. Lưu file nhạc → đọc thời lượng (file giả thì xóa file và báo lỗi).
+        4. Lưu file nhạc → đọc thời lượng (file giả thì báo lỗi).
         5. Lưu ảnh bìa (nếu có).
         6. Lưu bài hát vào database với trạng thái PENDING (chờ Admin duyệt).
+
+        Từ bước 4 trở đi, bất kỳ bước nào lỗi (file nhạc giả, ảnh lỗi, database lỗi...)
+        → xóa các file đã lưu, không để lại file rác trên ổ đĩa.
     */
     public Song uploadSong(Long artistId, String title, MultipartFile audioFile,
                            MultipartFile coverFile, List<Long> featuredArtistIds,
@@ -64,39 +68,34 @@ public class ArtistSongService {
             File không phải nhạc thật → xóa file vừa lưu, báo lỗi.
         */
         String audioUrl = fileStorageService.saveAudio(audioFile);
-        int duration;
+        String coverUrl = null;
+
         try {
-            duration = fileStorageService.getAudioDuration(audioUrl);
-        } catch (IllegalArgumentException e) {
+            int duration = fileStorageService.getAudioDuration(audioUrl);
+
+            if(coverFile != null && !coverFile.isEmpty()) {
+                coverUrl = fileStorageService.saveImage(coverFile, COVER_FOLDER);
+            }
+
+            Song song = new Song();
+            song.setArtist(artist);
+            song.setTitle(title.trim());
+            song.setAudioUrl(audioUrl);
+            song.setCoverUrl(coverUrl);
+            song.setDurationSeconds(duration);
+            song.setFeaturedArtists(featuredArtists);
+            song.setReleaseAt(releaseAt);
+            song.setStatus(SongStatus.PENDING);
+
+            return songRepository.save(song);
+        } catch (Exception e) {
+            /*
+                delete(null) đã an toàn sẵn → không cần kiểm tra coverUrl có null không.
+            */
             fileStorageService.delete(audioUrl);
+            fileStorageService.delete(coverUrl);
             throw e;
         }
-
-        /*
-            Lưu ảnh bìa (không bắt buộc).
-            Ảnh lỗi → xóa file nhạc vừa lưu để không để lại file rác.
-        */
-        String coverUrl = null;
-        if (coverFile != null && !coverFile.isEmpty()) {
-            try {
-                coverUrl = fileStorageService.saveImage(coverFile, COVER_FOLDER);
-            } catch (IllegalArgumentException e) {
-                fileStorageService.delete(audioUrl);
-                throw e;
-            }
-        }
-
-        Song song = new Song();
-        song.setArtist(artist);
-        song.setTitle(title.trim());
-        song.setAudioUrl(audioUrl);
-        song.setCoverUrl(coverUrl);
-        song.setDurationSeconds(duration);
-        song.setFeaturedArtists(featuredArtists);
-        song.setReleaseAt(releaseAt);
-        song.setStatus(SongStatus.PENDING);
-
-        return songRepository.save(song);
     }
 
     /* ================= UC28: BÀI HÁT CỦA TÔI ================= */
@@ -122,6 +121,128 @@ public class ArtistSongService {
         return userRepository.findTop10ByRoleAndAccountStatusAndArtistNameContainingIgnoreCaseAndIdNot(
                 Role.ARTIST, AccountStatus.ACTIVE, keyword.trim(), artistId);
     }
+
+    /* ================= UC29: SỬA TÊN BÀI + FEAT. ================= */
+
+    public Song updateSong(Long artistId, Long songId, String title, List<Long> featuredArtistIds) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+
+        song.setTitle(title.trim());
+        song.setFeaturedArtists(loadFeaturedArtists(artistId, featuredArtistIds));
+        resubmitIfRejected(song);
+
+        return songRepository.save(song);
+    }
+
+    /* ================= UC30: ĐỔI ẢNH BÌA ================= */
+
+    /*
+        - Lưu ảnh mới → lưu bài thành công → xóa ảnh cũ (tránh đầy ổ đĩa).
+        - Lưu bài lỗi → xóa ảnh mới vừa lưu, giữ nguyên ảnh cũ.
+    */
+    public Song updateCover(Long artistId, Long songId, MultipartFile coverFile) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+
+        String oldCoverUrl = song.getCoverUrl();
+        String newCoverUrl = fileStorageService.saveImage(coverFile, COVER_FOLDER);
+
+        try {
+            song.setCoverUrl(newCoverUrl);
+            resubmitIfRejected(song);
+
+            Song saved = songRepository.save(song);
+            fileStorageService.delete(oldCoverUrl);
+
+            return saved;
+        } catch (RuntimeException e) {
+            fileStorageService.delete(newCoverUrl);
+            throw e;
+        }
+    }
+
+    /* ================= UC31: ĐỔI LỊCH PHÁT HÀNH ================= */
+
+    /*
+        - Bài đã phát hành (kể cả đang bị ẩn) → không đổi được nữa.
+        - releaseAt = null:
+            + Bài PENDING            → phát hành ngay sau khi Admin duyệt.
+            + Bài APPROVED / HIDDEN  → đã duyệt rồi → gán = bây giờ.
+              (Không để null, vì bài đã duyệt mà releaseAt = null
+               sẽ không bao giờ hiện cho người nghe.)
+    */
+    public Song updateReleaseSchedule(Long artistId, Long songId, LocalDateTime releaseAt) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+
+        if(isReleased(song)) {
+            throw new IllegalArgumentException("Cannot change the schedule of a released song");
+        }
+
+        checkFutureTime(releaseAt);
+
+        if(releaseAt == null && wasApproved(song)) {
+            song.setReleaseAt(LocalDateTime.now());
+        } else {
+            song.setReleaseAt(releaseAt);
+        }
+
+        return songRepository.save(song);
+    }
+
+    /* ================= UC32: ẨN / HIỆN BÀI ================= */
+
+    public Song hideSong(Long artistId, Long songId) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+
+        if(song.getStatus() != SongStatus.APPROVED) {
+            throw new IllegalArgumentException("Only approved songs can be hidden");
+        }
+
+        song.setStatus(SongStatus.HIDDEN);
+        return songRepository.save(song);
+    }
+
+    /*
+        Hiện lại bài đang ẩn.
+        Trả về APPROVED vì bài đã được duyệt từ trước, không cần duyệt lại.
+    */
+    public Song showSong(Long artistId, Long songId) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+
+        if(song.getStatus() != SongStatus.HIDDEN) {
+            throw new IllegalArgumentException("Only hidden songs can be shown again");
+        }
+
+        /*
+            Trả về APPROVED nếu bài đã được duyệt từ trước, không cần duyệt lại.
+        */
+        song.setStatus(SongStatus.APPROVED);
+        return songRepository.save(song);
+    }
+
+    /* ================= UC33: XÓA BÀI ================= */
+
+    /*
+        Xóa mềm: đổi trạng thái DELETED (giữ lại bản ghi trong database),
+        nhưng xóa hẳn file nhạc và ảnh bìa để không chiếm ổ đĩa.
+
+        File chỉ bị xóa sau khi lưu trạng thái DELETED thành công.
+    */
+    public void deleteSong(Long artistId, Long songId) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+
+        song.setStatus(SongStatus.DELETED);
+        songRepository.save(song);
+
+        fileStorageService.delete(song.getAudioUrl());
+        fileStorageService.delete(song.getCoverUrl());
+    }
+
 
     /* ================= HÀM HỖ TRỢ ================= */
 
@@ -191,5 +312,49 @@ public class ArtistSongService {
         }
 
         return result;
+    }
+
+    /*
+        Lấy bài hát của chính Artist đang đăng nhập.
+        - Không tìm thấy, hoặc là bài của người khác → báo "không tồn tại".
+        - Bài đã xóa → coi như không tồn tại.
+    */
+    private Song getMySong(Long artistId, Long songId) {
+        Song song = songRepository.findByIdAndArtistId(songId, artistId)
+                .orElseThrow(() -> new IllegalArgumentException("Song does not exist"));
+
+        if(song.getStatus() == SongStatus.DELETED) {
+            throw new IllegalArgumentException("Song does not exist");
+        }
+
+        return song;
+    }
+
+    /*
+        Bài đã tới tay người nghe chưa?
+    */
+    private boolean isReleased(Song song) {
+        return song.getStatus() == SongStatus.APPROVED
+                && song.getReleaseAt() != null
+                && !song.getReleaseAt().isAfter(LocalDateTime.now());
+    }
+
+    /*
+        Bài bị từ chối mà Artist đã sửa → gửi duyệt lại, xóa lý do từ chối cũ.
+    */
+    private void resubmitIfRejected(Song song) {
+        if(song.getStatus() == SongStatus.REJECTED) {
+            song.setStatus(SongStatus.PENDING);
+            song.setRejectReason(null);
+        }
+    }
+
+    /*
+        Bài đã được Admin duyệt chưa?
+        HIDDEN cũng tính là đã duyệt (chỉ ẩn được bài APPROVED).
+    */
+    private boolean wasApproved(Song song) {
+        return song.getStatus() == SongStatus.APPROVED
+                || song.getStatus() == SongStatus.HIDDEN;
     }
 }
