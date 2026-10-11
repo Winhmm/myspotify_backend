@@ -111,7 +111,7 @@ public class AdminService {
 
         1. Không gán cho tài khoản đã xóa hoặc chưa xác thực.
         2. Không đổi role của Admin, không gán trùng role hiện tại.
-        3. KHÔNG gán ARTIST ở đây: User phải tự gửi yêu cầu kèm nghệ danh (UC14),
+        3. Không gán ARTIST ở đây: User phải tự gửi yêu cầu kèm nghệ danh (UC14),
            Admin duyệt qua approveArtistRequest → đảm bảo Artist nào cũng có nghệ danh.
         4. Hạ một ARTIST (hoặc người đang có yêu cầu PENDING) xuống role khác
            → xóa artistName/bio, artistRequestStatus về NONE

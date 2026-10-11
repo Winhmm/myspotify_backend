@@ -75,8 +75,14 @@ public class Song {
 
     /*
         Lượt nghe, mặc định 0, tăng 1 mỗi lần bài được phát (UC24).
+
+        updatable = false: Hibernate không đưa cột này vào câu UPDATE khi save(song).
+        → Chỉ câu incrementPlayCount (UPDATE play_count = play_count + 1) mới đổi được lượt nghe.
+        → Admin / Artist sửa bài cùng lúc với người nghe cũng không ghi đè mất lượt nghe.
+
+        (Lúc INSERT bài mới vẫn ghi giá trị 0 như bình thường.)
     */
-    @Column(name = "play_count", nullable = false)
+    @Column(name = "play_count", nullable = false, updatable = false)
     private Long playCount = 0L;
 
     /*
@@ -115,6 +121,24 @@ public class Song {
     */
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    /*
+        Optimistic Locking - chống "lost update" khi 2 người sửa cùng 1 bài cùng lúc.
+
+        - Mỗi lần UPDATE thành công, Hibernate tự tăng version lên 1.
+        - Câu UPDATE luôn kèm điều kiện "WHERE version = <version lúc đọc>".
+        - Có người khác ghi trước → version đã đổi → UPDATE không khớp dòng nào
+          → Hibernate ném ObjectOptimisticLockingFailureException.
+
+        VD: Admin duyệt bài đúng lúc Artist xóa bài → 1 trong 2 bị từ chối,
+        không để bài đã xóa "sống lại".
+
+        Dùng kiểu long (không phải Long) → không bao giờ null,
+        Spring Data vẫn nhận biết đúng bài mới / bài cũ dựa vào id.
+    */
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     /*
         @PrePersist: Hibernate tự gọi ngay trước khi INSERT bài hát mới.
@@ -173,4 +197,6 @@ public class Song {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+
+    public long getVersion() { return version; }
 }

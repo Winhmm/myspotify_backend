@@ -125,41 +125,34 @@ public class OtpService {
         }
 
         /*
-            Đếm số lần nhập sai cho từng mã OTP (key theo id của OTP).
-            Gửi OTP mới → id mới → bộ đếm mới.
+            Giới hạn số lần thử cho từng mã OTP (key theo id của OTP).
+
+            Chống race condition: tăng bộ đếm trước, kiểm tra sau.
+            - INCR là lệnh nguyên tử: 20 request cùng lúc → Redis trả về
+              lần lượt 1, 2, 3, ..., 20, không bao giờ trùng nhau.
+            - Chỉ 5 request nhận số 1 → 5 mới được so mã, còn lại bị chặn.
+
+            (Cách cũ "đọc → kiểm tra → mới tăng" bị lỗi: nhiều request cùng
+             đọc được 0 trước khi ai kịp tăng → cùng lọt qua bước kiểm tra.)
+
             Lưu ở Redis vì database sẽ bị rollback khi ném lỗi.
         */
-        String failKey = "otp-fail:" + otp.getId();
-        String failValue = redisTemplate.opsForValue().get(failKey);
-        int failed;
-        if(failValue == null) {
-            failed = 0;
-        } else {
-            failed = Integer.parseInt(failValue);
+        String attemptKey = "otp-attempt:" + otp.getId();
+        Long attempts = redisTemplate.opsForValue().increment(attemptKey);
+
+        if(attempts != null && attempts == 1) {
+            redisTemplate.expire(attemptKey, Duration.ofMinutes(OTP_EXPIRE_MINUTES));
         }
 
-        if(failed >= MAX_FAILED_ATTEMPTS) {
+        if(attempts == null || attempts > MAX_FAILED_ATTEMPTS) {
             throw new IllegalArgumentException("Too many wrong attempts, please request a new OTP");
         }
 
         if(!otp.getOtpCode().equals(otpCode)) {
-            Long count = redisTemplate.opsForValue().increment(failKey);
-
-            /*
-                Khi người dùng nhập sai OTP lần đầu tiên, Redis bắt đầu bộ đếm
-                với thời hạn 5 phút.
-
-                Sau 5 phút, Redis tự động xóa key đếm số lần nhập sai để
-                tránh lưu trữ dữ liệu tạm thời không cần thiết.
-            */
-            if(count != null && count == 1) {
-                redisTemplate.expire(failKey, Duration.ofMinutes(OTP_EXPIRE_MINUTES));
-            }
-
             throw new IllegalArgumentException("Otp code does not match");
         }
 
-        redisTemplate.delete(failKey);
+        redisTemplate.delete(attemptKey);
         otp.setVerified(true);
         return otpVerificationRepository.save(otp);
     }

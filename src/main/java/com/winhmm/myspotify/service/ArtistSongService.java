@@ -88,13 +88,13 @@ public class ArtistSongService {
             song.setStatus(SongStatus.PENDING);
 
             return songRepository.save(song);
-        } catch (Exception e) {
+        } catch (RuntimeException exception) {
             /*
                 delete(null) đã an toàn sẵn → không cần kiểm tra coverUrl có null không.
             */
             fileStorageService.delete(audioUrl);
             fileStorageService.delete(coverUrl);
-            throw e;
+            throw exception;
         }
     }
 
@@ -288,6 +288,15 @@ public class ArtistSongService {
         */
         Set<Long> uniqueIds = new HashSet<>(ids);
 
+        /*
+            Bỏ giá trị rỗng (form gửi ô featuredArtistIds để trống → null).
+        */
+        uniqueIds.remove(null);
+
+        if(uniqueIds.isEmpty()) {
+            return result;
+        }
+
         if (uniqueIds.size() > MAX_FEATURED_ARTISTS) {
             throw new IllegalArgumentException("Maximum " + MAX_FEATURED_ARTISTS + " featured artists");
         }
@@ -331,10 +340,11 @@ public class ArtistSongService {
     }
 
     /*
-        Bài đã tới tay người nghe chưa?
+        Bài đã tới giờ phát hành chưa?
+        Bài đang ẩn vẫn tính theo lịch → ẩn bài không giúp lách luật đổi lịch.
     */
     private boolean isReleased(Song song) {
-        return song.getStatus() == SongStatus.APPROVED
+        return wasApproved(song)
                 && song.getReleaseAt() != null
                 && !song.getReleaseAt().isAfter(LocalDateTime.now());
     }

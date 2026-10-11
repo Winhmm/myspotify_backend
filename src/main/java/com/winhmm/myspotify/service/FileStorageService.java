@@ -18,7 +18,7 @@ import java.util.Arrays;
 import java.util.UUID;
 
 /*
-    Lưu / đọc / xóa file của module Song (file nhạc, ảnh bìa).
+    Lưu / đọc / xóa file của module Song và Avatar (file nhạc, ảnh bìa).
 
     Cấu trúc thư mục:
         {uploadDir}/songs/audio/<uuid>.mp3 | .wav

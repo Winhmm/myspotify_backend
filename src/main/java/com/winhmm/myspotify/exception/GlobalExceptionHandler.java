@@ -3,6 +3,7 @@ package com.winhmm.myspotify.exception;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -147,5 +148,18 @@ public class GlobalExceptionHandler {
         log.error("Lỗi không mong muốn", e);
         return ResponseEntity.internalServerError()
                 .body(Map.of("message", "Internal server error"));
+    }
+
+    /*
+        Optimistic Locking: dữ liệu vừa bị người khác thay đổi
+        giữa lúc mình đọc và lúc mình ghi → 409.
+
+        VD: Admin duyệt bài đúng lúc Artist xóa bài.
+        Frontend nên tải lại dữ liệu mới nhất rồi thử lại.
+    */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, String>> handleOptimisticLock(OptimisticLockingFailureException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("message", "This data was changed by someone else, please reload and try again"));
     }
 }
