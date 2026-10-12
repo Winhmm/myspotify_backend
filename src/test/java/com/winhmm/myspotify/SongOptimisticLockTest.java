@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
     Admin và Artist cùng đọc 1 bài, Artist ghi trước, Admin ghi sau.
 
     Không có @Version → Admin ghi đè mất thay đổi của Artist (lost update).
-    Có @Version      → Admin bị chặn bằng OptimisticLockingFailureException.
+    Có @Version       → Admin bị chặn bằng OptimisticLockingFailureException.
 
     Test chạy trên database local, đổi tên bài tạm thời rồi trả lại tên cũ.
 */
@@ -50,7 +50,7 @@ class SongOptimisticLockTest {
             System.out.println("Artist ghi xong → version trong database = " + versionInDb);
 
             /*
-                Bước 4: Admin ghi bằng bản sao CŨ (vẫn mang version cũ) → phải bị chặn.
+                Bước 4: Admin ghi bằng bản sao cũ (vẫn mang version cũ) → phải bị chặn.
             */
             adminCopy.setTitle(originalTitle + " (Admin sửa)");
 
