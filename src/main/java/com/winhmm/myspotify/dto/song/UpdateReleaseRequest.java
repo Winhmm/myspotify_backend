@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 
 /*
     ===================================================================
-    UpdateReleaseRequest - Artist đổi lịch phát hành (UC31).
+    UpdateReleaseRequest - Artist ĐỔI LỊCH phát hành (UC31).
     ===================================================================
 
     API: PUT /api/artist/songs/{songId}/release   (Content-Type: application/json)
@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 
     ---------- VÌ SAO KHÔNG CẦN @DateTimeFormat NHƯ UploadSongRequest? ----------
 
-    Hai DTO được điền dữ liệu bởi 2 cơ chế khác nhau:
+    Hai DTO được điền dữ liệu bởi 2 cơ chế KHÁC NHAU:
     - UploadSongRequest (form-data, @ModelAttribute): Spring tự đổi chuỗi → LocalDateTime,
       cần @DateTimeFormat để biết định dạng.
     - UpdateReleaseRequest (JSON, @RequestBody): JACKSON đọc JSON, và Jackson trong Spring Boot

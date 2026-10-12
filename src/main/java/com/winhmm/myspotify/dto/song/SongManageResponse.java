@@ -7,7 +7,7 @@ import java.util.List;
 
 /*
     ===================================================================
-    SongManageResponse - Thông tin bài hát đầy đủ cho ARTIST và ADMIN.
+    SongManageResponse - Thông tin bài hát ĐẦY ĐỦ cho ARTIST và ADMIN.
     ===================================================================
 
     DÙNG Ở:
@@ -74,16 +74,51 @@ public class SongManageResponse {
     private String coverUrl;
     private Integer durationSeconds;
     private Long playCount;
+
+    /*
+        Trạng thái hiện tại: PENDING, APPROVED, REJECTED, HIDDEN.
+        (DELETED không bao giờ xuất hiện với Artist vì bài đã xóa bị lọc khỏi danh sách.
+         Admin vẫn xem được khi lọc ?status=DELETED.)
+    */
     private SongStatus status;
+
+    /*
+        true = đã duyệt VÀ đã tới giờ phát hành → người nghe đang thấy bài.
+
+        Dùng kiểu boolean (nguyên thủy, không phải Boolean)
+        → luôn là true / false, không bao giờ null.
+
+        LƯU Ý TÊN GETTER: với boolean, Java quy ước getter là isReleased() (không phải getReleased()).
+        Jackson hiểu quy ước này: bỏ chữ "is" → tên trường JSON là "released".
+    */
     private boolean released;
+
+    /*
+        Lịch phát hành.
+        - Bài PENDING: có thể null (= phát hành ngay sau khi duyệt) hoặc có giá trị (đã hẹn lịch).
+        - Bài APPROVED: luôn có giá trị (backend gán lúc duyệt nếu đang null).
+    */
     private LocalDateTime releaseAt;
+
+    /*
+        Lý do bị từ chối / bị gỡ. Chỉ có giá trị khi status = REJECTED, các trường hợp khác là null.
+    */
     private String rejectReason;
+
     private Long artistId;
     private String artistName;
     private List<ArtistSummary> featuredArtists;
+
+    /*
+        Thời điểm tải lên (không bao giờ đổi) và thời điểm sửa gần nhất.
+        Admin dùng createdAt để biết bài nào chờ duyệt lâu nhất.
+    */
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    /*
+        Constructor private: chỉ tạo được qua Builder (giống SongResponse).
+    */
     private SongManageResponse(Builder builder) {
         this.id = builder.id;
         this.title = builder.title;
@@ -122,6 +157,10 @@ public class SongManageResponse {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 
+    /*
+        Builder: gom từng giá trị, gọi build() để tạo SongManageResponse.
+        Mỗi method trả về chính Builder (return this) → gọi nối tiếp được.
+    */
     public static class Builder {
         private Long id;
         private String title;

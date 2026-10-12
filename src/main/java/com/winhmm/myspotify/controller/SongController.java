@@ -19,10 +19,10 @@ import java.util.Map;
 
     ---------- 1. AI ĐƯỢC GỌI? ----------
 
-    Không có @PreAuthorize → không giới hạn role:
+    KHÔNG có @PreAuthorize → không giới hạn role:
         USER, ARTIST, ADMIN đều dùng được (Artist và Admin cũng là người nghe).
 
-    Nhưng vẫn phải đăng nhập:
+    Nhưng VẪN PHẢI ĐĂNG NHẬP:
         Trong SecurityConfig, /api/songs/** không nằm trong danh sách permitAll(),
         nên rơi vào anyRequest().authenticated()
         → không có token / token sai / phiên hết hạn → 401.
@@ -40,11 +40,11 @@ import java.util.Map;
     → Bài chờ duyệt, bị từ chối, bị ẩn, chưa tới lịch, hoặc của Artist bị khóa:
       người nghe hoàn toàn không thấy.
     → Bài hẹn lịch 20h tự xuất hiện lúc 20h, không cần chạy tác vụ hẹn giờ nào,
-      vì điều kiện so sánh releaseAt với thời gian hiện tại mỗi lần truy vấn.
+      vì điều kiện so sánh releaseAt với thời gian hiện tại MỖI LẦN truy vấn.
 
     ---------- 3. DTO RIÊNG CHO NGƯỜI NGHE ----------
 
-    Trả về SongResponse (bản rút gọn), không có status, rejectReason, createdAt...
+    Trả về SongResponse (bản rút gọn), KHÔNG có status, rejectReason, createdAt...
     vì người nghe không cần và không nên biết thông tin quản lý nội bộ.
     (Artist và Admin dùng SongManageResponse, đầy đủ hơn.)
 
@@ -123,7 +123,7 @@ public class SongController {
         VÍ DỤ GỌI:
             GET /api/songs/search?keyword=may chieu&page=0&size=20
 
-        Tìm keyword (không phân biệt hoa thường, chỉ cần khớp 1 phần) trong:
+        Tìm keyword (KHÔNG phân biệt hoa thường, chỉ cần khớp 1 phần) trong:
             - Tên bài hát.               VD: "chiều" khớp "Chiều Mưa"
             - Nghệ danh Artist chính.    VD: "may"   khớp "Mây Chiều"
             - Nghệ danh Artist feat.     (chỉ tính người đang hoạt động)
@@ -138,7 +138,7 @@ public class SongController {
 
         THỨ TỰ ĐƯỜNG DẪN:
             "/search" là đường dẫn cố định, còn "/{songId}" bên dưới là khuôn có biến.
-            Spring ưu tiên đường dẫn cố định, nên "/search" không bị hiểu nhầm
+            Spring ưu tiên đường dẫn cố định, nên "/search" KHÔNG bị hiểu nhầm
             thành songId = "search".
     */
     @GetMapping("/search")
@@ -161,9 +161,8 @@ public class SongController {
         JSON TRẢ VỀ: 1 SongResponse (cùng cấu trúc với 1 phần tử trong "content" của UC20).
 
         Bài chưa phát hành / bị ẩn / bị gỡ / Artist bị khóa / không tồn tại
-            → đều báo chung: 400 "Song does not exist".
-
-        Cố ý không phân biệt từng trường hợp:
+            → đều báo CHUNG: 400 "Song does not exist".
+        Cố ý KHÔNG phân biệt từng trường hợp:
             nếu báo "bài đang chờ duyệt", người ngoài sẽ biết bài đó tồn tại
             và đoán được kế hoạch phát hành của Artist (lộ thông tin).
     */
@@ -183,7 +182,7 @@ public class SongController {
         Frontend gọi 1 LẦN khi người dùng bắt đầu phát bài, VD:
             audio.addEventListener("play", () => axios.post(`/api/songs/${id}/play`));
 
-        Dùng POST (không phải GET) vì đây là hành động tạo ra thay đổi
+        Dùng POST (không phải GET) vì đây là hành động TẠO RA THAY ĐỔI
         (ghi nhận thêm 1 lượt nghe). Quy ước: GET chỉ đọc, không được làm thay đổi dữ liệu.
 
         CHỐNG TĂNG LƯỢT NGHE ẢO:
@@ -191,7 +190,7 @@ public class SongController {
             (Redis lệnh SET NX, xem SongService.play).
             authentication.getName() (email) dùng để phân biệt từng người nghe.
 
-        Luôn trả 200 { "message": "Play recorded" }, kể cả khi lượt đó bị bỏ qua
+        Luôn trả 200 { "message": "Play recorded" }, KỂ CẢ KHI lượt đó bị bỏ qua
         vì nghe lại quá nhanh. Không báo "bạn nghe quá nhanh" để kẻ gian
         không dò được quy luật chống spam.
 

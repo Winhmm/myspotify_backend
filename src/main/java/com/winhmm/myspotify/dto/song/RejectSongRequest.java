@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Size;
 
 /*
     ===================================================================
-    RejectSongRequest - Admin từ chối (UC35) hoặc gỡ (UC36) bài, bắt buộc nhập lý do.
+    RejectSongRequest - Admin TỪ CHỐI (UC35) hoặc GỠ (UC36) bài, bắt buộc nhập lý do.
     ===================================================================
 
     API:
@@ -33,6 +33,9 @@ public class RejectSongRequest {
     @Size(max = 255, message = "Reason must not exceed 255 characters")
     private String reason;
 
+    /*
+        DTO request → cần setter để Jackson điền dữ liệu từ JSON vào.
+    */
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }
 }

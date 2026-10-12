@@ -40,7 +40,7 @@ import java.util.Map;
         → Áp dụng cho MỌI API bên dưới: chỉ tài khoản role ARTIST mới gọi được.
         → USER / ADMIN gọi vào → 403.
         → Muốn trở thành ARTIST: User gửi yêu cầu kèm nghệ danh (UC14),
-          Admin duyệt (approveArtistRequest). Admin không gán thẳng role ARTIST được,
+          Admin duyệt (approveArtistRequest). Admin KHÔNG gán thẳng role ARTIST được,
           nhờ vậy Artist nào cũng có nghệ danh.
 
     @RequestMapping("/api/artist")
@@ -50,7 +50,7 @@ import java.util.Map;
             /api/songs/artists/...: người nghe XEM trang của 1 Artist (SongController).
 
     @Validated
-        → Bật kiểm tra annotation đặt trực tiếp lên tham số method,
+        → Bật kiểm tra annotation đặt TRỰC TIẾP lên tham số method,
           VD: @RequestParam @NotBlank String keyword.
         → Khác @Valid: @Valid dùng cho DTO (object), @Validated cho tham số đơn lẻ.
         → Hiện tại chưa có tham số nào dùng kiểu đó, nên annotation này chưa có tác dụng.
@@ -59,7 +59,7 @@ import java.util.Map;
     ---------- 3. BẢO MẬT: ARTIST CHỈ ĐỤNG ĐƯỢC BÀI CỦA MÌNH ----------
 
         - Controller lấy id Artist từ TOKEN (hàm me bên dưới),
-          không bao giờ nhận artistId từ frontend gửi lên.
+          KHÔNG BAO GIỜ nhận artistId từ frontend gửi lên.
           (Nếu nhận, kẻ gian chỉ cần sửa artistId trong request là giả làm người khác.)
         - Service tìm bài bằng findByIdAndArtistId(songId, artistId):
           bài của người khác → không tìm thấy → báo "Song does not exist".
@@ -90,7 +90,7 @@ public class ArtistSongController {
         Lấy id của Artist đang đăng nhập.
 
         Authentication authentication:
-        - Spring tự truyền vào bất kỳ method controller nào khai báo tham số kiểu này.
+        - Spring TỰ TRUYỀN vào bất kỳ method controller nào khai báo tham số kiểu này.
         - Đối tượng này được JwtAuthenticationFilter tạo ra sau khi kiểm tra token hợp lệ,
           lưu trong SecurityContextHolder trong suốt request.
         - authentication.getName() = "username" trong UserDetails = EMAIL
@@ -125,11 +125,11 @@ public class ArtistSongController {
             releaseAt          Text    2026-12-24T20:00:00     (không bắt buộc)
 
         consumes = MediaType.MULTIPART_FORM_DATA_VALUE
-            → API này chỉ nhận multipart/form-data.
+            → API này CHỈ nhận multipart/form-data.
             → Gửi JSON vào → 415 Unsupported Media Type.
 
         @ModelAttribute UploadSongRequest request
-            → Spring đọc từng trường của form-data rồi gọi setter tương ứng:
+            → Spring đọc TỪNG trường của form-data rồi gọi setter tương ứng:
               setTitle("Chiều Mưa"), setAudio(file), setCover(file),
               setFeaturedArtistIds([12, 13]), setReleaseAt(...).
             → Giống @RequestBody nhưng dành cho form-data.
@@ -183,8 +183,8 @@ public class ArtistSongController {
         VÍ DỤ GỌI:
             GET /api/artist/songs
 
-        Trả về mọi bài của Artist ở mọi trạng thái (trừ DELETED), mới tải lên trước,
-        không phân trang (1 Artist thường chỉ có vài chục bài).
+        Trả về MỌI bài của Artist ở mọi trạng thái (trừ DELETED), mới tải lên trước,
+        KHÔNG phân trang (1 Artist thường chỉ có vài chục bài).
 
         .stream().map(SongMapper::toManageResponse).toList()
             - stream(): biến List<Song> thành "dòng chảy" để xử lý lần lượt từng phần tử.
@@ -238,7 +238,7 @@ public class ArtistSongController {
         - Không gửi tham số keyword → 400 (Spring báo thiếu tham số bắt buộc,
           vì @RequestParam mặc định required = true).
 
-        JSON TRẢ VỀ: chỉ id + nghệ danh, không có email hay thông tin cá nhân:
+        JSON TRẢ VỀ: chỉ id + nghệ danh, KHÔNG có email hay thông tin cá nhân:
             [ { "id": 12, "artistName": "Mây Chiều" }, { "id": 19, "artistName": "Mây Xanh" } ]
 
         Frontend lấy "id" của người được chọn, gửi vào featuredArtistIds khi đăng / sửa bài.
@@ -266,7 +266,7 @@ public class ArtistSongController {
 
         Dùng @RequestBody (JSON) vì API này không có file.
 
-        featuredArtistIds là danh sách mới hoàn toàn, thay thế danh sách cũ:
+        featuredArtistIds là danh sách MỚI HOÀN TOÀN, thay thế danh sách cũ:
             Đang feat [12, 13], gửi [12]  → còn feat 12.
             Gửi [] hoặc bỏ trống trường này → không còn feat với ai.
 
@@ -366,7 +366,7 @@ public class ArtistSongController {
             PUT /api/artist/songs/15/hide      (không cần body)
 
         Bài ẩn: người nghe không thấy nữa (không có trong danh sách, tìm kiếm,
-        trang Artist), nhưng giữ nguyên lượt nghe, file nhạc, ảnh bìa, lịch phát hành.
+        trang Artist), nhưng GIỮ NGUYÊN lượt nghe, file nhạc, ảnh bìa, lịch phát hành.
         Khác với xóa: ẩn có thể hiện lại, xóa thì mất file vĩnh viễn.
 
         LỖI CÓ THỂ GẶP:
@@ -410,15 +410,15 @@ public class ArtistSongController {
             DELETE /api/artist/songs/15
 
         XÓA MỀM (soft delete):
-            - Bản ghi vẫn còn trong database, chỉ đổi status = DELETED.
-            - File nhạc và ảnh bìa bị xóa hẵn khỏi ổ đĩa (không chiếm dung lượng).
+            - Bản ghi VẪN CÒN trong database, chỉ đổi status = DELETED.
+            - File nhạc và ảnh bìa bị xóa HẲN khỏi ổ đĩa (không chiếm dung lượng).
         Vì sao không xóa hẳn bản ghi?
             - Giữ lịch sử (bài từng tồn tại, từng có bao nhiêu lượt nghe).
             - Tránh lỗi khóa ngoại nếu sau này có bảng khác trỏ tới bài (playlist, lịch sử nghe).
 
         Trả về Map.of("message", "...") → Jackson chuyển thành JSON:
             { "message": "Song has been deleted" }
-        Map.of tạo Map không sửa được, đủ dùng cho 1 thông báo đơn giản.
+        Map.of tạo Map KHÔNG SỬA ĐƯỢC, đủ dùng cho 1 thông báo đơn giản.
         Không trả SongManageResponse vì bài đã xóa, frontend không cần hiển thị nữa.
 
         LỖI CÓ THỂ GẶP:

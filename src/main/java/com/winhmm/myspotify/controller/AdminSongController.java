@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.*;
         2. Gọi Service để xử lý nghiệp vụ.
         3. Chuyển kết quả (entity Song) sang DTO rồi trả về JSON.
 
-    → Controller không chứa if/else nghiệp vụ (VD: "bài phải đang PENDING mới duyệt được").
+    → Controller KHÔNG chứa if/else nghiệp vụ (VD: "bài phải đang PENDING mới duyệt được").
       Logic chỉ nằm 1 chỗ là Service, nên:
         + Sửa luật chỉ cần sửa 1 nơi.
         + Viết test cho Service không cần giả lập HTTP.
@@ -70,7 +70,7 @@ import org.springframework.web.bind.annotation.*;
     ---------- 3. CÁC ANNOTATION Ở ĐẦU CLASS ----------
 
     @PreAuthorize("hasRole('ADMIN')")
-        - Đặt ở đầu class → áp dụng cho tất cả method bên dưới, không cần ghi lại từng method.
+        - Đặt ở đầu class → áp dụng cho TẤT CẢ method bên dưới, không cần ghi lại từng method.
         - "hasRole('ADMIN')" kiểm tra quyền "ROLE_ADMIN".
           Quyền này do CustomUserDetailsService gán: .roles(user.getRole().name())
           (Spring tự thêm tiền tố "ROLE_" vào trước "ADMIN").
@@ -113,7 +113,7 @@ public class AdminSongController {
     /*
         Dependency Injection (tiêm phụ thuộc) qua constructor:
 
-        - Controller cần AdminSongService để làm việc, nhưng không tự "new AdminSongService()".
+        - Controller cần AdminSongService để làm việc, nhưng KHÔNG tự "new AdminSongService()".
         - Khi ứng dụng khởi động, Spring tự tạo 1 đối tượng AdminSongService duy nhất
           (gọi là "bean", phạm vi singleton) rồi truyền vào constructor bên dưới.
         - Lợi ích:
@@ -147,20 +147,20 @@ public class AdminSongController {
         - status (required = false): không bắt buộc.
             + Không gửi → status = null → Service trả mọi bài trừ DELETED.
             + Gửi "PENDING" → Spring tự đổi chuỗi thành enum SongStatus.PENDING.
-            + Phải viết hoa đúng tên enum: PENDING, APPROVED, REJECTED, HIDDEN, DELETED.
+            + Phải viết HOA đúng tên enum: PENDING, APPROVED, REJECTED, HIDDEN, DELETED.
             + Gửi sai (VD status=ABC hoặc status=pending)
               → Spring không đổi được sang enum
               → MethodArgumentTypeMismatchException
               → GlobalExceptionHandler trả 400 "Invalid parameter: status".
 
-        - page (defaultValue = "0"): trang thứ mấy, đếm từ 0.
-            Trang đầu tiên là page = 0, trang thứ hai là page = 1.
+        - page (defaultValue = "0"): trang thứ mấy, ĐẾM TỪ 0.
+            Trang đầu tiên là page=0, trang thứ hai là page=1.
             defaultValue viết dạng chuỗi "0" vì mọi giá trị trên URL đều là chữ,
             Spring tự đổi sang int.
 
         - size (defaultValue = "20"): số bài mỗi trang.
             Service tự chặn trong khoảng 1 - 50:
-            gửi size = 100000 → chỉ lấy 50 (chống kéo cả database trong 1 lần làm nặng server).
+            gửi size=100000 → chỉ lấy 50 (chống kéo cả database trong 1 lần làm nặng server).
 
         LUỒNG XỬ LÝ:
         1. adminSongService.getSongs(...)
@@ -204,7 +204,6 @@ public class AdminSongController {
         - Entity chứa dữ liệu nội bộ không nên lộ ra
           (VD: version, hoặc password đã mã hóa của Artist nằm trong object User).
         - Đổi cấu trúc database sau này sẽ làm vỡ frontend nếu trả thẳng entity.
-
         → Luôn chuyển sang DTO: chỉ chọn đúng những trường frontend cần.
     */
     @GetMapping
@@ -225,7 +224,7 @@ public class AdminSongController {
         VÍ DỤ GỌI:
             PUT /api/admin/songs/15/approve      (không cần body)
 
-        @PathVariable Long songId: lấy giá trị nằm ngay trong đường dẫn.
+        @PathVariable Long songId: lấy giá trị nằm NGAY TRONG đường dẫn.
         - Khuôn "/{songId}/approve" khớp với URL thật "/15/approve" → songId = 15.
         - Gửi "/abc/approve" → "abc" không đổi được sang Long
           → 400 "Invalid parameter: songId".
@@ -269,7 +268,7 @@ public class AdminSongController {
         @RequestBody RejectSongRequest request
             - Jackson đọc JSON trong body → tạo đối tượng RejectSongRequest
               → gọi setReason("Ảnh bìa không phù hợp").
-            - Tên trường trong JSON phải trùng tên thuộc tính trong DTO ("reason").
+            - Tên trường trong JSON phải TRÙNG tên thuộc tính trong DTO ("reason").
               Gửi "reasons" → reason = null → bị @Valid chặn bên dưới.
 
         @Valid
