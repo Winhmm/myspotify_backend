@@ -11,16 +11,58 @@ import java.util.ArrayList;
 import java.util.List;
 
 /*
-    UC26 - Artist tải lên bài hát.
+    ===================================================================
+    UploadSongRequest - Dữ liệu Artist gửi lên khi đăng bài (UC26).
+    ===================================================================
 
-    Frontend gửi multipart/form-data (KHÔNG phải JSON, vì có file):
-    - title             : tên bài hát (bắt buộc)
-    - audio             : file .mp3 / .wav (bắt buộc)
-    - cover             : ảnh bìa (không bắt buộc)
-    - featuredArtistIds : id nghệ sĩ feat. (không bắt buộc, gửi nhiều dòng cùng tên)
-    - releaseAt         : lịch phát hành (không bắt buộc, VD: 2026-12-24T20:00:00)
+    API: POST /api/artist/songs   (Content-Type: multipart/form-data)
 
-    Spring tự đọc từng trường trong form-data rồi gọi setter tương ứng.
+    ---------- VÌ SAO KHÔNG DÙNG JSON? ----------
+
+    JSON chỉ chứa chữ, không chứa được file nhị phân (mp3, jpg).
+    multipart/form-data chia request thành nhiều "phần", mỗi phần là 1 trường chữ hoặc 1 file
+    → gửi được cả tên bài lẫn file nhạc trong cùng 1 request.
+
+    ---------- CÁC TRƯỜNG (Postman: Body → form-data) ----------
+
+        KEY                TYPE   BẮT BUỘC   VÍ DỤ
+        title              Text   Có         Chiều Mưa
+        audio              File   Có         chieu-mua.mp3
+        cover              File   Không      bia.jpg
+        featuredArtistIds  Text   Không      12   (lặp lại key để feat nhiều người:
+        featuredArtistIds  Text   Không      13    Spring gom thành danh sách [12, 13])
+        releaseAt          Text   Không      2026-12-24T20:00:00
+
+    ---------- SPRING ĐIỀN DỮ LIỆU THẾ NÀO? ----------
+
+    Controller khai báo: @Valid @ModelAttribute UploadSongRequest request
+    1. Spring tạo đối tượng bằng constructor rỗng mặc định (Java tự sinh vì class không khai báo constructor nào).
+    2. Với mỗi trường trong form-data, gọi setter trùng tên:
+         key "title" → setTitle("Chiều Mưa")
+         key "audio" → setAudio(file)
+    3. @Valid kiểm tra các annotation bên dưới.
+
+    → DTO REQUEST BẮT BUỘC PHẢI CÓ SETTER (khác DTO response chỉ có getter).
+    → Tên key trong form-data phải trùng tên thuộc tính.
+      Gửi key "Title" (viết hoa) hoặc "song_title" → Spring không tìm thấy setter → title = null
+      → bị @NotBlank chặn → 400 "Title is required".
+
+    ---------- @NotNull / @NotEmpty / @NotBlank KHÁC NHAU THẾ NÀO? ----------
+
+        Giá trị gửi lên   @NotNull   @NotEmpty   @NotBlank
+        null              ✗ chặn     ✗ chặn      ✗ chặn
+        ""                ✓ qua      ✗ chặn      ✗ chặn
+        "   "             ✓ qua      ✓ qua       ✗ chặn
+
+    - @NotBlank: chỉ dùng cho String, chặn cả chuỗi toàn dấu cách → dùng cho title.
+    - @NotNull : dùng cho mọi kiểu object → dùng cho audio (MultipartFile không phải String).
+
+    ---------- KIỂM TRA 2 LỚP ----------
+
+    Lớp 1 (DTO, ở đây)  : kiểm tra hình thức: có gửi không, dài quá không, quá 5 người không.
+    Lớp 2 (Service)     : kiểm tra nghiệp vụ, cần đọc file hoặc database:
+                          file có phải nhạc thật không, dung lượng, id feat có tồn tại không,
+                          lịch có ở tương lai không...
 */
 public class UploadSongRequest {
     @NotBlank(message = "Title is required")
@@ -37,6 +79,13 @@ public class UploadSongRequest {
 
     /*
         @DateTimeFormat: cho Spring biết cách đổi chuỗi "2026-12-24T20:00:00" → LocalDateTime.
+
+        @DateTimeFormat(iso = ISO.DATE_TIME):
+        - Form-data gửi lên chỉ là chuỗi. Annotation này báo cho Spring biết
+          chuỗi có dạng "năm-tháng-ngàyTgiờ:phút:giây" để đổi sang LocalDateTime.
+        - Thiếu annotation này → Spring không biết đổi thế nào → lỗi.
+        - Gửi sai dạng, VD "24/12/2026" → 400 "Invalid value for releaseAt"
+          (GlobalExceptionHandler bắt lỗi binding).
     */
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime releaseAt;

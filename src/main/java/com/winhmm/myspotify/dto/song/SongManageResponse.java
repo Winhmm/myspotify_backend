@@ -6,20 +6,66 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /*
-    Thông tin bài hát ĐẦY ĐỦ, trả về cho ARTIST (UC28) và ADMIN (UC34).
+    ===================================================================
+    SongManageResponse - Thông tin bài hát đầy đủ cho ARTIST và ADMIN.
+    ===================================================================
 
-    Frontend dựa vào status + released để hiển thị:
-    - PENDING                    → "Chờ duyệt"
-    - APPROVED + released = false  → "Đã lên lịch"
-    - APPROVED + released = true   → "Đã phát hành"
-    - REJECTED                   → "Bị từ chối" (kèm rejectReason)
-    - HIDDEN                     → "Đã ẩn"
+    DÙNG Ở:
+    - ArtistSongController: "Bài hát của tôi" (UC28) và kết quả sau mỗi thao tác
+      (đăng, sửa, đổi ảnh, đổi lịch, ẩn, hiện).
+    - AdminSongController : danh sách bài (UC34), kết quả duyệt / từ chối / gỡ.
 
-    Tạo bằng Builder:
+    Có thêm so với SongResponse (bản cho người nghe):
+        status, released, rejectReason, createdAt, updatedAt.
+
+    ---------- FRONTEND HIỂN THỊ NHÃN TRẠNG THÁI ----------
+
+        status     released   → Nhãn hiển thị
+        PENDING    false      → "Chờ duyệt"
+        APPROVED   false      → "Đã lên lịch"   (đã duyệt, chưa tới giờ phát hành)
+        APPROVED   true       → "Đã phát hành"  (người nghe đã thấy)
+        REJECTED   false      → "Bị từ chối"    (kèm rejectReason)
+        HIDDEN     false      → "Đã ẩn"
+
+    Vì sao cần thêm "released" khi đã có "status"?
+    - Bài APPROVED có 2 tình trạng khác nhau: đã tới giờ phát hành hay chưa.
+    - Backend tính sẵn (so releaseAt với giờ server) → frontend không phải tự so thời gian,
+      tránh sai lệch do đồng hồ điện thoại người dùng chạy sai.
+
+    ---------- JSON ----------
+
+    {
+        "id": 15,
+        "title": "Chiều Mưa",
+        "audioUrl": "/uploads/songs/audio/3f2a9c1e.mp3",
+        "coverUrl": "/uploads/songs/covers/9b1c4d7f.jpg",
+        "durationSeconds": 215,
+        "playCount": 0,
+        "status": "REJECTED",
+        "released": false,
+        "releaseAt": null,
+        "rejectReason": "Ảnh bìa không phù hợp",
+        "artistId": 5,
+        "artistName": "Mây Chiều",
+        "featuredArtists": [ { "id": 12, "artistName": "Sóng Nhỏ" } ],
+        "createdAt": "2026-10-12T16:30:00",
+        "updatedAt": "2026-10-12T17:05:00"
+    }
+
+    Enum SongStatus → JSON: Jackson tự chuyển thành chuỗi tên enum, VD "REJECTED".
+
+    ---------- BUILDER ----------
+
+    Class có 15 trường → càng cần Builder hơn SongResponse
+    (giải thích chi tiết Builder Pattern xem trong SongResponse.java).
+
         SongManageResponse response = SongManageResponse.builder()
                 .id(1L)
                 .status(SongStatus.PENDING)
+                .released(false)
                 .build();
+
+    Được dùng duy nhất trong SongMapper.toManageResponse(song).
 */
 public class SongManageResponse {
     private Long id;
