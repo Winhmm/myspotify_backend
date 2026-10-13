@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Collection;
 
 /*
     ===================================================================
@@ -315,4 +316,21 @@ public interface SongRepository extends JpaRepository<Song, Long> {
             → SELECT * FROM songs WHERE status = 'PENDING' (kèm phân trang, sắp xếp)
     */
     Page<Song> findByStatus(SongStatus status, Pageable pageable);
+
+    /*
+        Lịch sử nghe - lấy NHIỀU bài đã phát hành theo danh sách id, trong 1 câu truy vấn.
+
+        VD: songIds = [15, 7, 22] → SELECT ... WHERE id IN (15, 7, 22) AND (đã phát hành)
+
+        Vì sao không gọi findPublishedById 20 lần cho 20 bài?
+        → 20 câu SQL thay vì 1 câu, chậm hơn nhiều.
+
+        Bài nào đã bị ẩn / gỡ / xóa / Artist bị khóa → KHÔNG có trong kết quả
+        → lịch sử tự bỏ qua bài đó, người dùng không thấy bài không còn nghe được.
+
+        Collection<Long>: kiểu chung cho List, Set... truyền loại nào cũng được.
+    */
+    @Query("SELECT s FROM Song s WHERE s.id IN :songIds AND " + PUBLISHED_CONDITION)
+    List<Song> findPublishedByIds(@Param("songIds") Collection<Long> songIds,
+                                  @Param("now") LocalDateTime now);
 }

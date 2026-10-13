@@ -12,122 +12,453 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /*
-    ===================================================================
-    API dành cho ADMIN quản lý bài hát (UC34 - UC36).
-    ===================================================================
+    =====================================================================
+    AdminSongController - API ADMIN QUẢN LÝ BÀI HÁT (UC34 - UC36)
+    =====================================================================
 
-    ---------- 1. KIẾN TRÚC 3 LỚP: MỖI LỚP 1 NHIỆM VỤ ----------
+    Các API trong class:
+        GET  /api/admin/songs                    → danh sách bài, lọc theo trạng thái
+        PUT  /api/admin/songs/{songId}/approve   → duyệt bài
+        PUT  /api/admin/songs/{songId}/reject    → từ chối bài đang chờ duyệt
+        PUT  /api/admin/songs/{songId}/remove    → gỡ bài đã duyệt
 
-        Frontend ──HTTP──► Controller ──► Service ──► Repository ──► Database
+    Chỉ tài khoản role ADMIN gọi được (@PreAuthorize ở đầu class).
 
-        - Controller : nhận request, trả response (file này).
-        - Service    : xử lý nghiệp vụ (kiểm tra trạng thái, quyền, quy tắc).
-        - Repository : đọc / ghi database.
+    Phần bên dưới mô tả hành trình đầy đủ của 1 request, lấy API duyệt bài làm ví dụ.
 
-    Controller chỉ làm 3 việc:
-        1. Nhận request: đọc tham số trên URL, đọc JSON trong body.
-        2. Gọi Service để xử lý nghiệp vụ.
-        3. Chuyển kết quả (entity Song) sang DTO rồi trả về JSON.
+    Mọi API cần đăng nhập trong project (không riêng API Admin) đều đi qua
+    các bước (2) đến (9) giống hệt như vậy, chỉ khác bước (10) kiểm tra role.
 
-    → Controller KHÔNG chứa if/else nghiệp vụ (VD: "bài phải đang PENDING mới duyệt được").
-      Logic chỉ nằm 1 chỗ là Service, nên:
-        + Sửa luật chỉ cần sửa 1 nơi.
-        + Viết test cho Service không cần giả lập HTTP.
+    =====================================================================
+    HÀNH TRÌNH CHI TIẾT CỦA MỘT REQUEST
+    =====================================================================
 
-    ---------- 2. HÀNH TRÌNH CỦA 1 REQUEST ----------
+    Ví dụ:
+    Admin đăng nhập vào MySpotify và nhấn nút "Duyệt" bài hát ID = 15.
 
-    VD: Admin bấm "Duyệt" bài 15 → frontend gửi PUT /api/admin/songs/15/approve
+    API:
+    PUT /api/admin/songs/15/approve
 
-        (1) JwtAuthenticationFilter
-            Đọc header "Authorization: Bearer <token>"
-            → kiểm tra chữ ký, hạn dùng, mã phiên trong Redis
-            → biết request này của tài khoản nào.
+    Mục tiêu:
+    - Xác thực người gửi request là ai.
+    - Kiểm tra phiên đăng nhập còn hợp lệ hay không.
+    - Kiểm tra người dùng có quyền ADMIN hay không.
+    - Nếu hợp lệ, thực hiện nghiệp vụ duyệt bài hát.
+    - Trả kết quả về frontend.
 
-        (2) RateLimitFilter
-            Đếm số request của tài khoản trong 1 phút
-            → vượt giới hạn thì trả 429, không đi tiếp.
+    =====================================================================
+    (1) ADMIN ĐĂNG NHẬP VÀ NHẬN JWT (CHỈ LÀM 1 LẦN, TRƯỚC MỌI REQUEST KHÁC)
+    =====================================================================
 
-        (3) SecurityConfig
-            /api/admin/** không nằm trong permitAll() → bắt buộc đã đăng nhập.
-            Chưa đăng nhập → 401.
+    Bước 1:
+    Frontend gửi email và mật khẩu đến POST /api/auth/login.
 
-        (4) @PreAuthorize("hasRole('ADMIN')") ở đầu class này
-            Đã đăng nhập nhưng không phải ADMIN → 403.
+    Bước 2:
+    AuthService.login kiểm tra:
+    - Email có tồn tại không.
+    - Mật khẩu có đúng không: passwordEncoder.matches(mật khẩu gửi lên, mật khẩu đã hash).
+    - Tài khoản có đang ACTIVE không (chưa xác thực, bị khóa, đã xóa → từ chối).
+    Sai email hoặc sai mật khẩu đều báo chung "Email or password is incorrect",
+    để kẻ gian không dò được email nào có tồn tại trong hệ thống.
 
-        (5) Method approveSong(...) trong file này
-            → gọi adminSongService.approveSong(15)
-            → Service kiểm tra nghiệp vụ, lưu database, trả về Song.
+    Đây là lần duy nhất mật khẩu được kiểm tra. Các request sau chỉ dùng JWT.
 
-        (6) SongMapper.toManageResponse(song)
-            → chuyển entity Song thành DTO SongManageResponse.
+    Bước 3:
+    SessionService.createSession(email):
+    - Sinh mã phiên ngẫu nhiên (UUID), VD "3f2a9c1e-8b7d-...".
+    - Lưu vào Redis: session:admin@gmail.com → 3f2a9c1e-8b7d-...
+      (tự xóa sau đúng thời hạn của token).
+    - Đăng nhập ở thiết bị mới → mã phiên mới ghi đè mã cũ → thiết bị cũ bị đăng xuất.
 
-        (7) ResponseEntity.ok(...)
-            → Jackson chuyển DTO thành JSON, trả HTTP 200 về frontend.
+    Bước 4:
+    JwtUtil.generateToken(user, sessionId) tạo JWT chứa đúng 4 thông tin:
+        sub (subject)    : email
+        jti (JWT ID)     : mã phiên vừa tạo ở bước 3
+        iat (issued at)  : thời điểm tạo
+        exp (expiration) : thời điểm hết hạn
+    rồi ký bằng khóa bí mật app.jwt.secret (chỉ server biết).
 
-        Bất kỳ bước nào ném lỗi → GlobalExceptionHandler bắt và trả JSON lỗi thống nhất:
-            { "message": "Only pending songs can be approved" }
+    Bước 5:
+    Backend trả về frontend:
+    {
+        "token": "<JWT>",
+        "userId": 1,
+        "username": "admin",
+        "role": "ADMIN"
+    }
 
-    ---------- 3. CÁC ANNOTATION Ở ĐẦU CLASS ----------
+    Frontend lưu token lại, gửi kèm trong mọi request sau.
+    role trong JSON chỉ để frontend biết hiện hay ẩn menu Admin.
+    Backend không tin role này, mà đọc lại role từ database ở mỗi request (bước 6).
 
-    @PreAuthorize("hasRole('ADMIN')")
-        - Đặt ở đầu class → áp dụng cho TẤT CẢ method bên dưới, không cần ghi lại từng method.
-        - "hasRole('ADMIN')" kiểm tra quyền "ROLE_ADMIN".
-          Quyền này do CustomUserDetailsService gán: .roles(user.getRole().name())
-          (Spring tự thêm tiền tố "ROLE_" vào trước "ADMIN").
-        - Hoạt động được nhờ @EnableMethodSecurity trong SecurityConfig.
-          Thiếu annotation đó thì @PreAuthorize bị bỏ qua hoàn toàn (rất nguy hiểm).
+    ---------- JWT là gì? ----------
 
-    @RestController
-        - = @Controller + @ResponseBody.
-        - @Controller: báo cho Spring đây là class nhận request HTTP.
-        - @ResponseBody: giá trị return được chuyển thành JSON (nhờ thư viện Jackson),
-          thay vì hiểu là tên 1 trang HTML.
+    JWT gồm 3 phần, nối bằng dấu chấm:  Header.Payload.Signature
 
-    @RequestMapping("/api/admin/songs")
-        - Tiền tố chung cho mọi API trong class.
-        - VD: @PutMapping("/{songId}/approve")
-              → URL đầy đủ: PUT /api/admin/songs/{songId}/approve
+    - Header và Payload chỉ được encode bằng Base64URL, không được mã hóa.
+      → Ai có token cũng giải ra đọc được email bên trong (thử dán token vào jwt.io).
+      → Tuyệt đối không đưa mật khẩu hay dữ liệu bí mật vào JWT.
 
-    ---------- 4. QUY ƯỚC HTTP METHOD ----------
+    - Signature (chữ ký) tạo từ Header + Payload + khóa bí mật.
+      → Kẻ gian sửa email trong payload thành email khác
+        thì chữ ký không còn khớp → server phát hiện ngay ở bước (3).
+      → Chữ ký chống sửa, không chống đọc.
 
-        GET    : chỉ đọc dữ liệu, không thay đổi gì (danh sách bài).
-        POST   : tạo mới (đăng bài, ghi nhận lượt nghe).
-        PUT    : cập nhật thứ đã có (duyệt, từ chối, gỡ bài → đổi trạng thái bài).
-        DELETE : xóa.
+    =====================================================================
+    (2) FRONTEND GỬI REQUEST DUYỆT BÀI HÁT
+    =====================================================================
 
-    ---------- 5. ĐỊNH DẠNG LỖI CHUNG ----------
+    Khi Admin nhấn nút "Duyệt", frontend gửi:
 
-        Mọi lỗi đều trả JSON 1 trường: { "message": "..." }
-        Frontend luôn đọc lỗi bằng: error.response.data.message
+        PUT /api/admin/songs/15/approve
+        Authorization: Bearer <JWT>
 
-        400 : dữ liệu gửi lên sai, hoặc vi phạm quy tắc nghiệp vụ.
-        401 : chưa đăng nhập / token hết hạn / đã đăng nhập ở thiết bị khác.
-        403 : đã đăng nhập nhưng không phải ADMIN.
-        409 : xung đột, dữ liệu vừa bị người khác thay đổi (Optimistic Locking).
-        429 : gửi quá nhiều request trong 1 phút.
+    Trong đó:
+    - PUT: phương thức HTTP dùng cho yêu cầu cập nhật (đổi trạng thái bài).
+    - /api/admin/songs/15/approve: endpoint duyệt bài hát ID = 15.
+    - Authorization: header chứa thông tin xác thực.
+    - Bearer: cho biết giá trị theo sau là access token.
+    - <JWT>: token backend đã cấp khi đăng nhập.
+
+    Frontend không gửi lại mật khẩu trong mỗi request, chỉ gửi JWT.
+
+    =====================================================================
+    (3) JwtAuthenticationFilter NHẬN VÀ KIỂM TRA JWT
+    =====================================================================
+
+    Filter là đoạn code chạy trước Controller ở mỗi request.
+    JwtAuthenticationFilter kế thừa OncePerRequestFilter
+    → được đảm bảo chạy đúng 1 lần cho mỗi request.
+
+    Bước 3.1: Đọc header Authorization.
+
+        String header = request.getHeader("Authorization");
+
+    Header phải bắt đầu bằng "Bearer " → cắt bỏ 7 ký tự đầu, lấy phần token:
+        String token = header.substring(7);
+
+    Không có header, hoặc không bắt đầu bằng "Bearer "
+    → filter không xác thực request này, nhưng vẫn cho request đi tiếp.
+    Filter không tự chặn, việc chặn là của bước (9).
+    (Nhờ vậy các API công khai như /api/auth/login vẫn đi qua filter bình thường.)
+
+    Bước 3.2: Kiểm tra token.
+
+        jwtUtil.validateToken(token)
+
+    Bên trong, thư viện jjwt giải token bằng khóa bí mật và kiểm tra:
+    - Đúng cấu trúc Header.Payload.Signature.
+    - Chữ ký khớp (token không bị sửa).
+    - Chưa hết hạn (exp còn ở tương lai).
+    Sai bất kỳ điều nào → trả false → filter không xác thực, request đi tiếp.
+
+    =====================================================================
+    (4) LẤY EMAIL VÀ SESSION ID TỪ JWT
+    =====================================================================
+
+    Token hợp lệ → đọc 2 thông tin:
+
+        String email = jwtUtil.getEmailFromToken(token);         // từ trường sub
+        String sessionId = jwtUtil.getSessionIdFromToken(token); // từ trường jti
+
+    - email    : tài khoản mà token đại diện, dùng để tìm User trong database.
+    - sessionId: mã phiên của lần đăng nhập đã tạo ra token này,
+                 dùng để đối chiếu với Redis ở bước (5).
+
+    Ví dụ:
+        email     = admin@gmail.com
+        sessionId = 3f2a9c1e-8b7d-...
+
+    Chỉ đọc 2 giá trị này sau khi token đã qua bước kiểm tra chữ ký,
+    nên chắc chắn chúng do chính server tạo ra, không bị ai sửa.
+
+    =====================================================================
+    (5) SessionService KIỂM TRA PHIÊN ĐĂNG NHẬP TRONG REDIS
+    =====================================================================
+
+        sessionService.isValidSession(email, sessionId)
+
+    Lấy mã phiên hiện tại trong Redis (lệnh GET session:admin@gmail.com)
+    rồi so với sessionId trong token.
+
+    Ví dụ:
+        Token: sessionId = 3f2a9c1e...
+        Redis: session:admin@gmail.com → 3f2a9c1e...
+
+    Khớp → phiên hợp lệ → đi tiếp bước (6).
+
+    Không khớp, hoặc Redis không có key, xảy ra khi:
+    - Tài khoản đã đăng nhập ở thiết bị khác (mã phiên bị ghi đè).
+    - Đã đăng xuất, đổi mật khẩu, đặt lại mật khẩu, đổi email (key bị xóa).
+    - Bị Admin khóa tài khoản (key bị xóa).
+    → Filter không xác thực request, và ghi chú vào request:
+        request.setAttribute(SESSION_ERROR,
+            "Your session has ended. Your account may have been logged in on another device");
+      Bước (9) đọc ghi chú này để trả đúng thông báo cho frontend.
+
+    Vì sao JWT hợp lệ vẫn cần kiểm tra Redis?
+    JWT tự nó không thể "thu hồi": token còn hạn thì chữ ký vẫn đúng.
+    Redis giữ "phiên nào đang được phép dùng". Xóa key trong Redis
+    → mọi token cũ của tài khoản đó mất hiệu lực ngay, dù chưa hết hạn.
+    Đây là cách project làm được đăng nhập 1 thiết bị và đăng xuất tức thì.
+
+    Redis lỗi (mất kết nối...) → lỗi bị khối catch trong filter bắt lại
+    → request coi như chưa đăng nhập → trả 401 (không phải 500).
+
+    =====================================================================
+    (6) CustomUserDetailsService TẢI USER TỪ DATABASE
+    =====================================================================
+
+    Phiên hợp lệ → filter gọi:
+
+        userDetailsService.loadUserByUsername(email)
+
+    Bước 6.1:
+    UserRepository.findByEmail(email) tìm User trong MySQL. Ví dụ bảng users:
+
+        id = 1
+        email = admin@gmail.com
+        password = <mật khẩu đã hash bằng BCrypt>
+        role = ADMIN
+        account_status = ACTIVE
+
+    Bước 6.2:
+    Chuyển entity User thành đối tượng UserDetails (dạng mà Spring Security hiểu):
+
+        org.springframework.security.core.userdetails.User
+            .withUsername(user.getEmail())
+            .password(user.getPassword())
+            .roles(user.getRole().name())
+            .disabled(user.getAccountStatus() != AccountStatus.ACTIVE)
+            .build();
+
+    Code ghi tên đầy đủ org.springframework.security.core.userdetails.User
+    vì project có entity com.winhmm.myspotify.entity.User trùng tên.
+    Đây là class User của Spring Security, không phải entity User.
+
+    Ý nghĩa:
+    - withUsername(email): Spring Security gọi là "username", nhưng project dùng email.
+      Vì vậy về sau authentication.getName() trả về email.
+
+    - password(...): bắt buộc khai báo khi tạo UserDetails, nhưng trong luồng JWT
+      không được dùng tới (mật khẩu chỉ kiểm tra 1 lần lúc đăng nhập, bước 1).
+
+    - roles("ADMIN"): Spring tự thêm tiền tố → authority "ROLE_ADMIN".
+      role USER → "ROLE_USER", role ARTIST → "ROLE_ARTIST".
+
+    - disabled(...): accountStatus khác ACTIVE (UNVERIFIED, DISABLED, DELETED)
+      → tài khoản bị đánh dấu không hoạt động.
+
+    Không tìm thấy User (VD tài khoản vừa đổi email) → ném UsernameNotFoundException
+    → khối catch trong filter bắt → request coi như chưa đăng nhập.
+
+    =====================================================================
+    (7) KIỂM TRA TÀI KHOẢN VÀ THIẾT LẬP AUTHENTICATION
+    =====================================================================
+
+        if (userDetails.isEnabled()) { ... }
+
+    Tài khoản bị khóa, chưa xác thực hoặc đã xóa → isEnabled() = false
+    → không xác thực, dù token và phiên đều hợp lệ.
+
+    Tài khoản đang hoạt động → tạo Authentication:
+
+        new UsernamePasswordAuthenticationToken(
+            userDetails,                    // ai: thông tin người dùng
+            null,                           // mật khẩu: không cần, đã xác thực bằng JWT
+            userDetails.getAuthorities()    // quyền: [ROLE_ADMIN]
+        )
+
+    Constructor 3 tham số này tạo Authentication ở trạng thái đã xác thực.
+
+    Rồi lưu vào SecurityContext của request hiện tại:
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+    Từ thời điểm này, mọi phần phía sau đều biết:
+    - Người gửi request là ai (email).
+    - Đã xác thực.
+    - Có những quyền gì (ROLE_ADMIN).
+    Controller lấy lại thông tin này qua tham số Authentication authentication.
+
+    Lưu ý: filter này không kiểm tra có phải ADMIN hay không.
+    Nó chỉ trả lời "người này là ai, có quyền gì". Việc chặn theo quyền ở bước (10).
+
+    =====================================================================
+    (8) RateLimitFilter KIỂM TRA GIỚI HẠN REQUEST
+    =====================================================================
+
+    SecurityConfig đặt RateLimitFilter ngay sau JwtAuthenticationFilter
+    (addFilterAfter), nên lúc này filter đã biết request của tài khoản nào.
+
+    Cách đếm (Redis INCR, cửa sổ 60 giây):
+    - /api/auth/** (đăng nhập, đăng ký, OTP): đếm theo IP, tối đa 10 request mỗi phút.
+    - API khác, đã đăng nhập : đếm theo email, tối đa 100 request mỗi phút.
+    - API khác, chưa đăng nhập: đếm theo IP,    tối đa 100 request mỗi phút.
+
+    Vượt giới hạn → trả ngay 429 Too Many Requests, kèm header Retry-After (số giây phải chờ),
+    request không đi tiếp tới Controller.
+
+    Lưu ý: rate limit đếm trước bước kiểm tra quyền, nên cả request bị 401 hay 403
+    cũng tính vào giới hạn (chống kẻ gian gửi dồn dập để dò quyền).
+
+    Không đếm: request OPTIONS (trình duyệt tự gửi để hỏi CORS), /uploads/** (file nhạc, ảnh).
+
+    =====================================================================
+    (9) SecurityConfig KIỂM TRA QUY TẮC TRUY CẬP
+    =====================================================================
+
+    Cuối chuỗi filter, Spring Security áp dụng quy tắc đã khai báo trong SecurityConfig:
+    - /api/auth/**, /uploads/**, Swagger... nằm trong permitAll() → ai cũng vào được.
+    - Mọi đường dẫn còn lại (anyRequest().authenticated()) → bắt buộc đã xác thực.
+
+    /api/admin/songs/15/approve thuộc nhóm thứ hai.
+
+    Chưa có Authentication (token sai, hết hạn, phiên hết, tài khoản bị khóa...)
+    → authenticationEntryPoint trong SecurityConfig trả 401:
+        - Có ghi chú SESSION_ERROR từ bước (5) → message phiên đã kết thúc.
+        - Không có → "Unauthorized, please login".
+    → Request dừng ở đây, không tới Controller.
+
+    Đã có Authentication → đi tiếp.
+    Đã đăng nhập không có nghĩa được gọi mọi API, còn phải qua bước (10).
+
+    =====================================================================
+    (10) DispatcherServlet CHỌN METHOD, @PreAuthorize KIỂM TRA QUYỀN ADMIN
+    =====================================================================
+
+    Qua hết các filter, request tới DispatcherServlet của Spring MVC.
+    DispatcherServlet so URL và HTTP method với các @RequestMapping, @PutMapping
+    → tìm ra method approveSong(...) của class này.
+
+    Ngay trước khi method chạy, Spring kiểm tra @PreAuthorize("hasRole('ADMIN')")
+    đặt ở đầu class (áp dụng cho mọi method trong class).
+    hasRole('ADMIN') kiểm tra Authentication có authority "ROLE_ADMIN" không.
+
+    Có ROLE_ADMIN → cho phép chạy approveSong().
+
+    Không có (VD chỉ có ROLE_USER hoặc ROLE_ARTIST)
+    → ném AccessDeniedException ngay trong lúc gọi method controller
+    → GlobalExceptionHandler.handleAccessDenied bắt lại → trả 403:
+        { "message": "You do not have permission to access this resource" }
+
+    Request chưa đăng nhập không bao giờ tới được bước này,
+    vì đã bị chặn 401 ở bước (9).
+
+    @PreAuthorize hoạt động được nhờ @EnableMethodSecurity trong SecurityConfig.
+    Thiếu annotation đó thì @PreAuthorize bị bỏ qua hoàn toàn (ai cũng gọi được API Admin).
+
+    Role luôn mới nhất:
+    Role được đọc lại từ database ở mỗi request (bước 6), không lấy từ JWT,
+    và project không có bộ nhớ đệm (cache) nào giữ role cũ.
+    → Admin bị hạ xuống USER → ngay request kế tiếp đã nhận ROLE_USER → bị 403.
+
+    =====================================================================
+    (11) CONTROLLER GỌI SERVICE
+    =====================================================================
+
+    Method approveSong(@PathVariable Long songId) chạy:
+    - @PathVariable lấy số 15 từ đường dẫn "/{songId}/approve" và đổi sang Long.
+      Gửi "/abc/approve" → không đổi được → 400 "Invalid parameter: songId".
+    - Gọi adminSongService.approveSong(15).
+
+    Controller chỉ tiếp nhận request và chuyển cho Service,
+    không chứa if/else nghiệp vụ.
+
+    =====================================================================
+    (12) SERVICE XỬ LÝ NGHIỆP VỤ VÀ DATABASE
+    =====================================================================
+
+    AdminSongService.approveSong(15):
+    1. songRepository.findById(15): không có bài, hoặc bài đã DELETED
+       → lỗi "Song does not exist".
+    2. Bài phải đang PENDING → nếu không: "Only pending songs can be approved".
+    3. Artist chính phải ACTIVE và còn role ARTIST → nếu không: "Artist account is not active".
+    4. releaseAt đang null (Artist muốn phát hành ngay) → gán bằng thời điểm duyệt.
+       releaseAt có giá trị (Artist đã hẹn lịch) → giữ nguyên.
+    5. Xóa lý do từ chối cũ (rejectReason = null).
+    6. Đổi trạng thái → APPROVED.
+    7. songRepository.save(song) → Hibernate chạy câu:
+           UPDATE songs SET ..., version = version + 1 WHERE id = 15 AND version = <version lúc đọc>
+       Artist sửa hoặc xóa bài đúng lúc Admin duyệt → version đã đổi → không khớp dòng nào
+       → ObjectOptimisticLockingFailureException → 409 (Optimistic Locking, xem Song.version).
+
+    Lỗi nghiệp vụ (bước 1 đến 3) được ném dạng IllegalArgumentException
+    → GlobalExceptionHandler trả 400 { "message": "..." }.
+
+    =====================================================================
+    (13) SongMapper CHUYỂN ENTITY THÀNH DTO
+    =====================================================================
+
+        SongMapper.toManageResponse(song)
+
+    Chuyển entity Song → SongManageResponse, gồm:
+        id, title, audioUrl, coverUrl, durationSeconds, playCount,
+        status, released, releaseAt, rejectReason,
+        artistId, artistName, featuredArtists, createdAt, updatedAt.
+
+    released được tính sẵn: APPROVED và releaseAt <= bây giờ
+    → frontend biết bài "Đã phát hành" hay "Đã lên lịch" mà không cần tự so thời gian.
+
+    Vì sao không trả thẳng entity Song?
+    - Song có quan hệ LAZY tới User (artist, featuredArtists): trả thẳng có thể kéo theo
+      cả object User (kèm mật khẩu đã hash), hoặc lỗi khi chuyển JSON.
+    - DTO chỉ chứa đúng những gì frontend cần, đổi database không làm vỡ frontend.
+
+    =====================================================================
+    (14) ResponseEntity VÀ JACKSON TRẢ JSON
+    =====================================================================
+
+        ResponseEntity.ok(dto) → HTTP 200 OK.
+
+    Jackson đọc các getter của DTO (getTitle() → "title", isReleased() → "released")
+    và tạo JSON:
+
+    {
+        "id": 15,
+        "title": "Chiều Mưa",
+        "status": "APPROVED",
+        "released": true,
+        "releaseAt": "2026-10-14T00:05:00",
+        "rejectReason": null,
+        "artistId": 5,
+        "artistName": "Mây Chiều",
+        "featuredArtists": [ { "id": 12, "artistName": "Sóng Nhỏ" } ],
+        ...
+    }
+
+    Frontend nhận HTTP 200 và JSON, cập nhật giao diện (VD đổi nhãn bài thành "Đã phát hành").
+
+    =====================================================================
+    (15) TÓM TẮT LUỒNG XỬ LÝ
+    =====================================================================
+
+    Frontend gửi JWT
+        -> JwtAuthenticationFilter kiểm tra chữ ký, hạn dùng của JWT
+        -> Lấy email và sessionId từ JWT
+        -> SessionService đối chiếu sessionId với Redis
+        -> CustomUserDetailsService tải User (kèm role mới nhất) từ MySQL
+        -> Tài khoản ACTIVE → lưu Authentication vào SecurityContext
+        -> RateLimitFilter đếm request (vượt → 429)
+        -> SecurityConfig: chưa xác thực → 401
+        -> DispatcherServlet chọn method approveSong
+        -> @PreAuthorize: không phải ADMIN → 403
+        -> Controller gọi Service
+        -> Service kiểm tra nghiệp vụ, lưu MySQL (lỗi nghiệp vụ → 400, xung đột → 409)
+        -> SongMapper chuyển entity thành DTO
+        -> ResponseEntity.ok → HTTP 200
+        -> Jackson chuyển DTO thành JSON
+        -> Frontend nhận kết quả
+
+    Mọi lỗi đều trả về cùng 1 dạng JSON: { "message": "..." }
+    → frontend luôn đọc lỗi bằng error.response.data.message.
 */
 @PreAuthorize("hasRole('ADMIN')")
 @RestController
 @RequestMapping("/api/admin/songs")
 public class AdminSongController {
-    /*
-        Dependency Injection (tiêm phụ thuộc) qua constructor:
-
-        - Controller cần AdminSongService để làm việc, nhưng KHÔNG tự "new AdminSongService()".
-        - Khi ứng dụng khởi động, Spring tự tạo 1 đối tượng AdminSongService duy nhất
-          (gọi là "bean", phạm vi singleton) rồi truyền vào constructor bên dưới.
-        - Lợi ích:
-            + Mọi controller dùng chung 1 đối tượng service, tiết kiệm bộ nhớ.
-            + Khi viết test, có thể truyền vào 1 service giả (mock) thay cho service thật.
-
-        final: chỉ gán 1 lần trong constructor, không ai đổi được về sau → an toàn.
-    */
     private final AdminSongService adminSongService;
 
-    /*
-        Class chỉ có 1 constructor → Spring tự dùng nó để tiêm phụ thuộc,
-        không cần ghi @Autowired.
-    */
     public AdminSongController(AdminSongService adminSongService) {
         this.adminSongService = adminSongService;
     }
@@ -137,81 +468,45 @@ public class AdminSongController {
         UC34 - Danh sách bài hát (có phân trang, lọc theo trạng thái).
         ---------------------------------------------------------------
 
-        VÍ DỤ GỌI:
-            GET /api/admin/songs                          → mọi bài (trừ đã xóa), trang đầu
-            GET /api/admin/songs?status=PENDING           → chỉ bài đang chờ duyệt
-            GET /api/admin/songs?status=APPROVED&page=1   → bài đã duyệt, trang thứ 2
+        Ví dụ gọi:
+        GET /api/admin/songs                          → mọi bài (trừ đã xóa), trang đầu
+        GET /api/admin/songs?status=PENDING           → chỉ bài đang chờ duyệt
+        GET /api/admin/songs?status=APPROVED&page=1   → bài đã duyệt, trang thứ 2
 
-        THAM SỐ (@RequestParam: đọc tham số sau dấu "?" trên URL):
-
-        - status (required = false): không bắt buộc.
-            + Không gửi → status = null → Service trả mọi bài trừ DELETED.
-            + Gửi "PENDING" → Spring tự đổi chuỗi thành enum SongStatus.PENDING.
-            + Phải viết HOA đúng tên enum: PENDING, APPROVED, REJECTED, HIDDEN, DELETED.
-            + Gửi sai (VD status=ABC hoặc status=pending)
-              → Spring không đổi được sang enum
-              → MethodArgumentTypeMismatchException
-              → GlobalExceptionHandler trả 400 "Invalid parameter: status".
-
-        - page (defaultValue = "0"): trang thứ mấy, ĐẾM TỪ 0.
-            Trang đầu tiên là page=0, trang thứ hai là page=1.
-            defaultValue viết dạng chuỗi "0" vì mọi giá trị trên URL đều là chữ,
-            Spring tự đổi sang int.
-
-        - size (defaultValue = "20"): số bài mỗi trang.
-            Service tự chặn trong khoảng 1 - 50:
-            gửi size=100000 → chỉ lấy 50 (chống kéo cả database trong 1 lần làm nặng server).
-
-        LUỒNG XỬ LÝ:
+        Luồng xử lý:
         1. adminSongService.getSongs(...)
-           → trả về Page<Song>: danh sách bài của trang này + tổng số bài, tổng số trang.
+           → Page<Song>: bài của trang này + tổng số bài, tổng số trang.
            Sắp xếp mới tải lên trước (createdAt giảm dần) để bài chờ duyệt mới nhất nằm trên.
 
         2. SongMapper.toPageResponse(page, SongMapper::toManageResponse)
-           → chuyển từng Song trong trang thành SongManageResponse.
+           → chuyển từng Song trong trang thành SongManageResponse,
+             đóng gói cùng thông tin phân trang vào PageResponse.
 
-           "SongMapper::toManageResponse" là METHOD REFERENCE:
-           truyền "cách chuyển 1 bài" vào hàm như truyền 1 tham số.
-           Tương đương lambda:  song -> SongMapper.toManageResponse(song)
-
-        3. ResponseEntity.ok(...) → HTTP 200 kèm JSON.
-
-        JSON TRẢ VỀ (rút gọn):
-            {
-                "content": [
-                    {
-                        "id": 15,
-                        "title": "Chiều Mưa",
-                        "status": "PENDING",
-                        "released": false,
-                        "releaseAt": null,
-                        "rejectReason": null,
-                        "artistId": 5,
-                        "artistName": "Mây Chiều",
-                        "featuredArtists": [ { "id": 12, "artistName": "Sóng Nhỏ" } ],
-                        ...
-                    }
-                ],
-                "page": 0,
-                "size": 20,
-                "totalElements": 35,
-                "totalPages": 2
-            }
-
-        VÌ SAO KHÔNG TRẢ THẲNG ENTITY Song?
-        - Song có quan hệ LAZY (artist, featuredArtists): Jackson đọc vào có thể
-          kéo theo cả object User, rồi User lại có... → JSON khổng lồ hoặc lỗi.
-        - Entity chứa dữ liệu nội bộ không nên lộ ra
-          (VD: version, hoặc password đã mã hóa của Artist nằm trong object User).
-        - Đổi cấu trúc database sau này sẽ làm vỡ frontend nếu trả thẳng entity.
-        → Luôn chuyển sang DTO: chỉ chọn đúng những trường frontend cần.
+        3. ResponseEntity.ok(...) → HTTP 200 kèm JSON:
+           { "content": [...], "page": 0, "size": 20, "totalElements": 35, "totalPages": 2 }
     */
     @GetMapping
     public ResponseEntity<PageResponse<SongManageResponse>> getSongs(
             @RequestParam(required = false) SongStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+
+        /*
+            Nhận kết quả phân trang từ Service và phương thức chuyển đổi DTO.
+
+            Chuyển từng Song thành SongManageResponse.
+
+            Đóng gói danh sách DTO cùng thông tin phân trang vào PageResponse.
+        */
         return ResponseEntity.ok(SongMapper.toPageResponse(
+                /*
+                    Gọi Service để lấy danh sách bài hát theo trạng thái status,
+                    kết quả là một đối tượng Page<Song> chứa danh sách
+                    bài hát và thông tin phân trang.
+
+                    SongMapper::toManageResponse chuyển từng đối tượng Song thành SongManageResponse (DTO)
+                    để trả dữ liệu phù hợp cho frontend.
+                */
                 adminSongService.getSongs(status, page, size),
                 SongMapper::toManageResponse));
     }
@@ -221,34 +516,25 @@ public class AdminSongController {
         UC35 - Duyệt bài.
         ---------------------------------------------------------------
 
-        VÍ DỤ GỌI:
-            PUT /api/admin/songs/15/approve      (không cần body)
+        Ví dụ gọi:
+        PUT /api/admin/songs/15/approve (không cần body).
 
-        @PathVariable Long songId: lấy giá trị nằm NGAY TRONG đường dẫn.
-        - Khuôn "/{songId}/approve" khớp với URL thật "/15/approve" → songId = 15.
-        - Gửi "/abc/approve" → "abc" không đổi được sang Long
-          → 400 "Invalid parameter: songId".
-        - Dùng Long (không phải long) cho khớp kiểu id trong entity Song.
-
-        SERVICE LÀM GÌ KHI DUYỆT:
+        Luồng xử lý:
         - Bài phải đang PENDING.
+
         - Artist chính phải còn ACTIVE và còn role ARTIST.
+
         - releaseAt đang null (Artist muốn phát hành ngay) → gán = thời điểm duyệt.
-          releaseAt có giá trị (Artist đã hẹn lịch) → giữ nguyên lịch đó.
+
+        - releaseAt có giá trị (Artist đã hẹn lịch) → giữ nguyên lịch đó.
+
         - Xóa lý do từ chối cũ (nếu bài từng bị từ chối rồi gửi lại).
+
         - Đổi trạng thái sang APPROVED.
 
-        JSON TRẢ VỀ: 1 SongManageResponse với "status": "APPROVED".
-            "released": true  → đã tới giờ, người nghe thấy ngay.
-            "released": false → đang chờ tới lịch phát hành.
-
-        LỖI CÓ THỂ GẶP:
-            400 "Song does not exist"                → sai id, hoặc Artist đã xóa bài
-            400 "Only pending songs can be approved" → bài đã duyệt / bị từ chối từ trước
-            400 "Artist account is not active"       → Artist bị khóa hoặc mất quyền Artist
-            409 "This data was changed by someone else, please reload and try again"
-                → Artist sửa / xóa bài đúng lúc Admin bấm duyệt (xem Song.version).
-                  Frontend nên tải lại danh sách rồi cho Admin thao tác lại.
+        JSON trả về: 1 SongManageResponse với "status": "APPROVED".
+        "released": true  → đã tới giờ, người nghe thấy ngay.
+        "released": false → đang chờ tới lịch phát hành.
     */
     @PutMapping("/{songId}/approve")
     public ResponseEntity<SongManageResponse> approveSong(@PathVariable Long songId) {
@@ -259,38 +545,6 @@ public class AdminSongController {
         ---------------------------------------------------------------
         UC35 - Từ chối bài đang chờ duyệt.
         ---------------------------------------------------------------
-
-        VÍ DỤ GỌI:
-            PUT /api/admin/songs/15/reject
-            Content-Type: application/json
-            Body: { "reason": "Ảnh bìa không phù hợp" }
-
-        @RequestBody RejectSongRequest request
-            - Jackson đọc JSON trong body → tạo đối tượng RejectSongRequest
-              → gọi setReason("Ảnh bìa không phù hợp").
-            - Tên trường trong JSON phải TRÙNG tên thuộc tính trong DTO ("reason").
-              Gửi "reasons" → reason = null → bị @Valid chặn bên dưới.
-
-        @Valid
-            - Sau khi tạo xong DTO, kiểm tra các annotation khai báo trong RejectSongRequest:
-                @NotBlank       : không được null, rỗng "", hay toàn dấu cách "   ".
-                @Size(max = 255): tối đa 255 ký tự (khớp độ dài cột reject_reason trong database).
-            - Vi phạm → MethodArgumentNotValidException → 400 kèm message khai báo trong DTO,
-              VD: { "message": "Reason is required" }.
-            → Nhờ @Valid, Service không phải tự kiểm tra reason rỗng.
-
-        Body sai cú pháp JSON (thiếu dấu ngoặc, thiếu dấu phẩy...)
-            → HttpMessageNotReadableException → 400 "Invalid request data".
-
-        KẾT QUẢ: bài chuyển sang REJECTED, lưu lý do.
-            Artist thấy lý do trong "Bài hát của tôi", sửa bài → tự gửi duyệt lại.
-
-        LỖI CÓ THỂ GẶP:
-            400 "Reason is required"
-            400 "Reason must not exceed 255 characters"
-            400 "Song does not exist"
-            400 "Only pending songs can be rejected"
-            409 (xung đột, như phần duyệt bài)
     */
     @PutMapping("/{songId}/reject")
     public ResponseEntity<SongManageResponse> rejectSong(@PathVariable Long songId,
@@ -304,28 +558,8 @@ public class AdminSongController {
         UC36 - Gỡ bài đã duyệt (kể cả bài Artist đang ẩn).
         ---------------------------------------------------------------
 
-        VÍ DỤ GỌI:
-            PUT /api/admin/songs/15/remove
-            Body: { "reason": "Vi phạm bản quyền" }
-
         Dùng lại RejectSongRequest vì cấu trúc giống hệt (chỉ cần 1 trường reason),
         không cần tạo thêm DTO mới.
-
-        KHÁC NHAU GIỮA "TỪ CHỐI" VÀ "GỠ BÀI":
-            reject : chỉ áp dụng bài PENDING (chưa từng phát hành, chưa ai nghe).
-            remove : chỉ áp dụng bài APPROVED / HIDDEN (đã duyệt, có thể đã có người nghe).
-                     VD: sau khi phát hành mới phát hiện vi phạm bản quyền.
-
-        Cả hai đều chuyển bài sang REJECTED + lưu lý do.
-        → Người nghe không thấy bài nữa ngay lập tức.
-        → Artist thấy lý do, sửa bài thì tự gửi duyệt lại
-          (xem resubmitIfRejected trong ArtistSongService).
-        → Lượt nghe cũ vẫn được giữ, không bị xóa.
-
-        LỖI CÓ THỂ GẶP:
-            400 "Only approved songs can be removed" → bài đang PENDING (hãy dùng reject)
-            400 "Song does not exist"
-            409 (xung đột)
     */
     @PutMapping("/{songId}/remove")
     public ResponseEntity<SongManageResponse> removeSong(@PathVariable Long songId,
