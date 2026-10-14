@@ -22,9 +22,10 @@ import java.util.Map;
     ListeningHistoryService - LỊCH SỬ NGHE NHẠC (MONGODB)
     =====================================================================
 
-    2 chức năng:
-    1. record(...)         : ghi 1 lượt nghe (gọi từ SongService.play).
-    2. getRecentSongs(...) : 10 bài khác nhau được nghe gần nhất của 1 người.
+    Các chức năng:
+        record(...)         → ghi 1 lượt nghe (gọi từ SongService.play)
+        getRecentSongs(...) → 10 bài khác nhau được nghe gần nhất của 1 người
+                              (gọi từ ListeningHistoryController)
 
     =====================================================================
     LÀM VIỆC VỚI 2 DATABASE
@@ -37,7 +38,7 @@ import java.util.Map;
         │   5    │    7   │ 22:40    │ ────► │  7 │ Phố Đêm   │
         └────────┴────────┴──────────┘       └────┴───────────┘
 
-    MongoDB và MySQL không JOIN với nhau được.
+    MongoDB và MySQL là 2 hệ thống riêng, không JOIN với nhau được.
     → Java tự ghép: đọc MongoDB lấy songId, đọc MySQL lấy thông tin bài, rồi ghép lại.
     Gọi là "application-side join" (ghép dữ liệu ở tầng ứng dụng).
 */
@@ -56,6 +57,11 @@ public class ListeningHistoryService {
         this.songRepository = songRepository;
     }
 
+    /*
+        ---------------------------------------------------------------
+        Ghi 1 lượt nghe vào MongoDB
+        ---------------------------------------------------------------
+    */
     public void record(Long userId, Long songId) {
         try {
             historyRepository.save(new ListeningHistory(userId, songId, LocalDateTime.now()));
@@ -65,9 +71,24 @@ public class ListeningHistoryService {
         }
     }
 
+    /*
+        ---------------------------------------------------------------
+        10 bài khác nhau được nghe gần nhất
+        ---------------------------------------------------------------
+
+        Giới hạn: chỉ xét 100 lượt nghe gần nhất. Nếu 100 lượt đó chỉ gồm 6 bài khác nhau
+        (nghe đi nghe lại rất nhiều), kết quả có 6 bài dù trước đó từng nghe bài khác.
+        Với mục "Nghe gần đây", như vậy là hợp lý.
+    */
     public List<ListeningHistoryResponse> getRecentSongs(Long userId) {
+        /*
+            Bước 1: 100 lượt nghe gần nhất (MongoDB).
+        */
         List<ListeningHistory> recentPlays = historyRepository.findTop100ByUserIdOrderByPlayedAtDesc(userId);
 
+        /*
+            Bước 2: lọc trùng, giữ lần nghe gần nhất của mỗi bài, giữ thứ tự.
+        */
         Map<Long, LocalDateTime> lastPlayedAt = new LinkedHashMap<>();
 
         for(ListeningHistory play : recentPlays) {
@@ -79,13 +100,20 @@ public class ListeningHistoryService {
         }
 
         /*
-            Chọc vào bảng song trong MySQL để lấy thêm thông tin bài hát
+            Bước 3: hỏi MySQL 1 lần, lấy thông tin các bài còn đang phát hành,
+            rồi đưa vào Map<id, Song> để tra nhanh theo id.
+
+            lastPlayedAt.keySet(): tập các songId đã lọc trùng ở bước 2.
         */
         Map<Long, Song> songsById = new HashMap<>();
         for(Song song : songRepository.findPublishedByIds(lastPlayedAt.keySet(), LocalDateTime.now())) {
             songsById.put(song.getId(), song);
         }
 
+        /*
+            Bước 4: lấy theo đúng thứ tự, bỏ bài không còn phát hành, đủ 10 thì dừng.
+            Map.Entry: 1 cặp (key, value) trong Map, ở đây là (songId, playedAt).
+        */
         List<ListeningHistoryResponse> result = new ArrayList<>();
 
         for(Map.Entry<Long, LocalDateTime> entry : lastPlayedAt.entrySet()) {
