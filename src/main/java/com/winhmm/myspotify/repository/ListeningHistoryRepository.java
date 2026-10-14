@@ -11,5 +11,5 @@ public interface ListeningHistoryRepository extends MongoRepository<ListeningHis
 
         Lấy 100 lượt gần như chắc chắn đủ 10 bài khác nhau, mà vẫn rất nhẹ (100 document nhỏ, có index).
     */
-    List<ListeningHistory> findTop100ByUserIdOrderByPlayedAtDesc(long userId);
+    List<ListeningHistory> findTop100ByUserIdOrderByPlayedAtDesc(Long userId);
 }
