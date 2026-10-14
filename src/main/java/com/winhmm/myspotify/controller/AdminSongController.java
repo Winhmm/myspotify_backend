@@ -146,7 +146,7 @@ import org.springframework.web.bind.annotation.*;
 
         jwtUtil.validateToken(token)
 
-    Bên trong, thư viện jjwt giải token bằng khóa bí mật và kiểm tra:
+    Bên trong, thư viện jjwt đọc token và dùng khóa bí mật để kiểm tra:
     - Đúng cấu trúc Header.Payload.Signature.
     - Chữ ký khớp (token không bị sửa).
     - Chưa hết hạn (exp còn ở tương lai).
@@ -249,8 +249,11 @@ import org.springframework.web.bind.annotation.*;
     - disabled(...): accountStatus khác ACTIVE (UNVERIFIED, DISABLED, DELETED)
       → tài khoản bị đánh dấu không hoạt động.
 
-    Không tìm thấy User (VD tài khoản vừa đổi email) → ném UsernameNotFoundException
-    → khối catch trong filter bắt → request coi như chưa đăng nhập.
+    Không tìm thấy User (VD có người xóa thẳng dòng đó khỏi MySQL trong lúc phiên Redis vẫn còn)
+    → ném UsernameNotFoundException → khối catch trong filter bắt
+    → request coi như chưa đăng nhập.
+    Trường hợp đổi email không tới được bước này: phiên của email cũ đã bị xóa,
+    request bị chặn từ bước (5).
 
     =====================================================================
     (7) KIỂM TRA TÀI KHOẢN VÀ THIẾT LẬP AUTHENTICATION
@@ -401,8 +404,11 @@ import org.springframework.web.bind.annotation.*;
     → frontend biết bài "Đã phát hành" hay "Đã lên lịch" mà không cần tự so thời gian.
 
     Vì sao không trả thẳng entity Song?
-    - Song có quan hệ LAZY tới User (artist, featuredArtists): trả thẳng có thể kéo theo
-      cả object User (kèm mật khẩu đã hash), hoặc lỗi khi chuyển JSON.
+    - Song có quan hệ LAZY tới User (artist, featuredArtists). Trả thẳng entity:
+      + Jackson gặp đối tượng "proxy" của Hibernate (User chưa được tải thật)
+        → dễ báo lỗi khi chuyển sang JSON.
+      + Nếu chuyển được, JSON sẽ kèm cả object User: email, họ tên, trạng thái tài khoản...
+        (mật khẩu thì không, vì trường password trong User đã có @JsonIgnore chặn lại).
     - DTO chỉ chứa đúng những gì frontend cần, đổi database không làm vỡ frontend.
 
     =====================================================================
