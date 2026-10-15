@@ -1,15 +1,15 @@
 package com.winhmm.myspotify.dto.song;
 
 /*
-    ===================================================================
-    ArtistSongsResponse - Dữ liệu cho TRANG CỦA 1 NGHỆ SĨ (UC25).
-    ===================================================================
+    =====================================================================
+    ArtistSongsResponse - DỮ LIỆU CHO TRANG CỦA 1 NGHỆ SĨ (UC25)
+    =====================================================================
 
     API: GET /api/songs/artists/{artistId}?page=0&size=20
 
     Gộp 2 phần vào 1 response, để frontend chỉ gọi 1 API là vẽ được cả trang:
     1. Thông tin nghệ sĩ (phần đầu trang): nghệ danh, giới thiệu, ảnh đại diện.
-    2. Danh sách bài hát (phần dưới, CÓ PHÂN TRANG): bài mà nghệ sĩ là Artist chính
+    2. Danh sách bài hát (phần dưới, có phân trang): bài mà nghệ sĩ là Artist chính
        hoặc được feat, chỉ tính bài đã phát hành.
 
     JSON:
@@ -27,7 +27,11 @@ package com.winhmm.myspotify.dto.song;
         }
     }
 
-    LỒNG DTO: trường songs có kiểu PageResponse<SongResponse>
+    =====================================================================
+    DTO LỒNG NHAU
+    =====================================================================
+
+    Trường songs có kiểu PageResponse<SongResponse>
     → Jackson tự chuyển lồng nhiều tầng: ArtistSongsResponse → PageResponse → SongResponse
       → ArtistSummary. Không cần viết code chuyển JSON nào.
 
@@ -36,33 +40,14 @@ package com.winhmm.myspotify.dto.song;
 
     Tạo bằng constructor trong SongController.getArtistPage(...)
     (5 trường, không cần Builder).
+
+    DTO response → chỉ có getter, không có setter (tạo xong không sửa được).
 */
 public class ArtistSongsResponse {
-    /*
-        id nghệ sĩ (= users.id).
-    */
     private Long artistId;
-
-    /*
-        Nghệ danh hiển thị.
-    */
     private String artistName;
-
-    /*
-        Giới thiệu ngắn về nghệ sĩ (tối đa 255 ký tự), có thể null nếu chưa nhập.
-    */
     private String bio;
-
-    /*
-        Đường dẫn ảnh đại diện, VD "/uploads/avatars/7c2e.jpg".
-        null → chưa có ảnh → frontend hiển thị ảnh mặc định.
-        Frontend ghép với địa chỉ server: http://<server>/uploads/avatars/7c2e.jpg
-    */
     private String avatarUrl;
-
-    /*
-        1 trang bài hát của nghệ sĩ.
-    */
     private PageResponse<SongResponse> songs;
 
     public ArtistSongsResponse(Long artistId, String artistName, String bio,

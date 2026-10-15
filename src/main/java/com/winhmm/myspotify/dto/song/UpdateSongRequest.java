@@ -7,31 +7,40 @@ import java.util.ArrayList;
 import java.util.List;
 
 /*
-    ===================================================================
-    UpdateSongRequest - Artist SỬA tên bài và danh sách feat (UC29).
-    ===================================================================
+    =====================================================================
+    UpdateSongRequest - ARTIST SỬA TÊN BÀI VÀ DANH SÁCH FEAT (UC29)
+    =====================================================================
 
     API: PUT /api/artist/songs/{songId}   (Content-Type: application/json)
 
     Dùng JSON (không phải form-data) vì API này không có file.
 
-    JSON FRONTEND GỬI LÊN:
+    JSON frontend gửi lên:
     {
         "title": "Chiều Mưa (Acoustic)",
         "featuredArtistIds": [12, 13]
     }
 
+    =====================================================================
     SPRING ĐIỀN DỮ LIỆU THẾ NÀO?
+    =====================================================================
+
     Controller khai báo: @Valid @RequestBody UpdateSongRequest request
     1. Jackson tạo đối tượng bằng constructor rỗng mặc định.
     2. Với mỗi trường trong JSON, gọi setter trùng tên:
          "title"             → setTitle("Chiều Mưa (Acoustic)")
          "featuredArtistIds" → setFeaturedArtistIds([12, 13])
     3. @Valid kiểm tra annotation.
+
     Trường lạ trong JSON (VD "artistId": 99) → Jackson bỏ qua, không lỗi
+    (Spring Boot tắt sẵn chế độ báo lỗi khi gặp trường lạ)
     → kẻ gian không thể đổi chủ bài bằng cách gửi thêm artistId.
 
-    featuredArtistIds là danh sách MỚI HOÀN TOÀN, THAY THẾ danh sách cũ:
+    =====================================================================
+    QUY TẮC CỦA featuredArtistIds
+    =====================================================================
+
+    Là danh sách mới hoàn toàn, thay thế danh sách cũ:
         Đang feat [12, 13], gửi [12] → còn feat 12.
         Không feat với ai → gửi [] hoặc bỏ trống trường featuredArtistIds.
 
@@ -46,11 +55,6 @@ public class UpdateSongRequest {
     @Size(max = 150, message = "Title must not exceed 150 characters")
     private String title;
 
-    /*
-        = new ArrayList<>(): JSON không có trường này → giữ danh sách rỗng [].
-        JSON gửi rõ "featuredArtistIds": null → setter gán null → Service vẫn xử lý được
-        (loadFeaturedArtists kiểm tra ids == null).
-    */
     @Size(max = 5, message = "Maximum 5 featured artists")
     private List<Long> featuredArtistIds = new ArrayList<>();
 
