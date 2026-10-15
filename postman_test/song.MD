@@ -1,5 +1,8 @@
 # HƯỚNG DẪN TEST MODULE SONG BẰNG POSTMAN — MYSPOTIFY
 
+> Tài liệu dành cho 2 bạn tester. Đọc hết **Phần 0 → Phần 3** trước khi bấm Send request đầu tiên.
+> Mỗi test case có **mã riêng** (VD `AR-UP-05`). Khi báo lỗi, chỉ cần ghi mã, không cần mô tả lại.
+
 ---
 
 ## MỤC LỤC
@@ -78,9 +81,11 @@ Hầu hết lỗi trả về JSON 1 trường:
 { "message": "Song does not exist" }
 ```
 
-Riêng lỗi 401/403 do lớp bảo mật chặn từ sớm có thể có dạng:
+Lỗi 401/403 do lớp bảo mật trả về:
 ```json
-{ "status": 401, "error": "Unauthorized", "message": "Bạn chưa đăng nhập hoặc token không hợp lệ" }
+{ "message": "Unauthorized, please login" }
+{ "message": "Your session has ended. Your account may have been logged in on another device" }
+{ "message": "You do not have permission to access this resource" }
 ```
 
 Khi test, **so sánh đúng từng chữ** của `message` với tài liệu. Sai 1 chữ cũng ghi lại (frontend có thể đang dựa vào message để hiển thị).
@@ -368,21 +373,21 @@ Trong API của Artist/Admin, trường `released: true/false` cho biết bài �
 **JSON trả về khi thành công (SongManageResponse):**
 ```json
 {
-  "id": 15,
-  "title": "Bài Test 1",
-  "audioUrl": "/uploads/songs/audio/3f2a9c1e-....mp3",
-  "coverUrl": "/uploads/songs/covers/9b1c4d7f-....jpg",
-  "durationSeconds": 215,
-  "playCount": 0,
-  "status": "PENDING",
-  "released": false,
-  "releaseAt": null,
-  "rejectReason": null,
-  "artistId": 23,
-  "artistName": "TA Artist",
-  "featuredArtists": [],
-  "createdAt": "2026-10-15T17:30:00",
-  "updatedAt": "2026-10-15T17:30:00"
+    "id": 15,
+    "title": "Bài Test 1",
+    "audioUrl": "/uploads/songs/audio/3f2a9c1e-....mp3",
+    "coverUrl": "/uploads/songs/covers/9b1c4d7f-....jpg",
+    "durationSeconds": 215,
+    "playCount": 0,
+    "status": "PENDING",
+    "released": false,
+    "releaseAt": null,
+    "rejectReason": null,
+    "artistId": 23,
+    "artistName": "TA Artist",
+    "featuredArtists": [],
+    "createdAt": "2026-10-15T17:30:00",
+    "updatedAt": "2026-10-15T17:30:00"
 }
 ```
 
@@ -629,8 +634,8 @@ Gỡ bài = chuyển bài đang `APPROVED` hoặc `HIDDEN` sang **`REJECTED`** k
 **Body:** raw → JSON
 ```json
 {
-  "title": "Tên mới",
-  "featuredArtistIds": [30, 31]
+    "title": "Tên mới",
+    "featuredArtistIds": [30, 31]
 }
 ```
 
@@ -794,16 +799,16 @@ Biến thể: **AR-SCH-05** — upload với lịch +2 phút, **không duyệt**
 **Cấu trúc 1 bài hát (SongResponse) — bản rút gọn cho người nghe:**
 ```json
 {
-  "id": 5,
-  "title": "Mind game",
-  "audioUrl": "/uploads/songs/audio/b3106cb4-....mp3",
-  "coverUrl": "/uploads/songs/covers/4552685a-....jpg",
-  "durationSeconds": 212,
-  "playCount": 0,
-  "releaseAt": "2026-10-12T00:26:13.14861",
-  "artistId": 23,
-  "artistName": "AMIEU",
-  "featuredArtists": []
+    "id": 5,
+    "title": "Mind game",
+    "audioUrl": "/uploads/songs/audio/b3106cb4-....mp3",
+    "coverUrl": "/uploads/songs/covers/4552685a-....jpg",
+    "durationSeconds": 212,
+    "playCount": 0,
+    "releaseAt": "2026-10-12T00:26:13.14861",
+    "artistId": 23,
+    "artistName": "AMIEU",
+    "featuredArtists": []
 }
 ```
 **Không được** có `status`, `rejectReason`, `version`, `createdAt`, `updatedAt` — nếu thấy là **bug lộ dữ liệu**.
@@ -918,11 +923,11 @@ Quy tắc: **1 tài khoản + 1 bài** chỉ được tính **1 lượt trong 30
 Trả về:
 ```json
 {
-  "artistId": 23,
-  "artistName": "TA Artist",
-  "bio": "Tài khoản test của Tester A",
-  "avatarUrl": null,
-  "songs": { "content": [...], "page": 0, "size": 20, "totalElements": 4, "totalPages": 1 }
+    "artistId": 23,
+    "artistName": "TA Artist",
+    "bio": "Tài khoản test của Tester A",
+    "avatarUrl": null,
+    "songs": { "content": [...], "page": 0, "size": 20, "totalElements": 4, "totalPages": 1 }
 }
 ```
 
@@ -949,10 +954,10 @@ Trả về:
 Trả về **mảng** tối đa **10 bài khác nhau** nghe gần nhất, mới nhất ở đầu:
 ```json
 [
-  {
-    "song": { ...SongResponse giống Phần 10... },
-    "playedAt": "2026-10-15T17:40:12"
-  }
+    {
+        "song": { ...SongResponse giống Phần 10... },
+        "playedAt": "2026-10-15T17:40:12"
+    }
 ]
 ```
 
@@ -1061,7 +1066,7 @@ Mã test: **SEC-MX-01** đến **SEC-MX-20** theo thứ tự dòng.
 
 | Mã | Mô tả | Kết quả mong đợi |
 |---|---|---|
-| **SEC-LK-01** | Khóa Artist 1 → Artist 1 gọi `GET /api/artist/songs` | 401 hoặc 403 |
+| **SEC-LK-01** | Khóa Artist 1 → Artist 1 gọi `GET /api/artist/songs` | 401 `"Your session has ended. Your account may have been logged in on another device"` (khóa tài khoản xóa luôn phiên đăng nhập) |
 | **SEC-LK-02** | Bài của Artist 1 với người nghe | Biến mất khỏi `/api/songs`, tìm kiếm, chi tiết, trang Artist, lịch sử |
 | **SEC-LK-03** | Mở khóa Artist 1 | Bài xuất hiện lại đầy đủ, `playCount` không đổi |
 | **SEC-LK-04** | Bài **feat** Artist bị khóa | Khóa Artist 2 → bài của Artist 1 feat Artist 2 **vẫn hiện** (Artist chính vẫn hoạt động) |
@@ -1299,3 +1304,4 @@ Tạo Google Sheets (hoặc Excel) với các cột:
 3. Các test **thành công** (AR-UP-01..18, AD-AP-01..03, LS-01..06, HS-01..08)
 4. Các test lỗi còn lại
 
+Chúc 2 bạn test vui! 🎧

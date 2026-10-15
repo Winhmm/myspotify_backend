@@ -452,10 +452,10 @@ Ví dụ: bài 15 feat nghệ sĩ 12 và 13 → 2 dòng `(15, 12)` và `(15, 13)
 Mỗi **lượt nghe được tính** = 1 document:
 ```json
 {
-    "_id": "6710b2f9c1e4a52d8f3a9b01",
-    "userId": 6,
-    "songId": 15,
-    "playedAt": "2026-10-15T10:40:12.000Z"
+  "_id": "6710b2f9c1e4a52d8f3a9b01",
+  "userId": 6,
+  "songId": 15,
+  "playedAt": "2026-10-15T10:40:12.000Z"
 }
 ```
 
@@ -679,15 +679,15 @@ Kết quả: tập 2 nghệ sĩ 12, 13
 **Kết quả thành công:**
 ```json
 {
-    "id": 15, "title": "Chiều Mưa",
-    "audioUrl": "/uploads/songs/audio/3f2a9c1e-....mp3",
-    "coverUrl": "/uploads/songs/covers/9b1c4d7f-....jpg",
-    "durationSeconds": 215, "playCount": 0,
-    "status": "PENDING", "released": false,
-    "releaseAt": "2026-12-24T20:00:00", "rejectReason": null,
-    "artistId": 5, "artistName": "Mây Chiều",
-    "featuredArtists": [ { "id": 12, "artistName": "Sóng Nhỏ" } ],
-    "createdAt": "2026-10-15T16:30:00", "updatedAt": "2026-10-15T16:30:00"
+  "id": 15, "title": "Chiều Mưa",
+  "audioUrl": "/uploads/songs/audio/3f2a9c1e-....mp3",
+  "coverUrl": "/uploads/songs/covers/9b1c4d7f-....jpg",
+  "durationSeconds": 215, "playCount": 0,
+  "status": "PENDING", "released": false,
+  "releaseAt": "2026-12-24T20:00:00", "rejectReason": null,
+  "artistId": 5, "artistName": "Mây Chiều",
+  "featuredArtists": [ { "id": 12, "artistName": "Sóng Nhỏ" } ],
+  "createdAt": "2026-10-15T16:30:00", "updatedAt": "2026-10-15T16:30:00"
 }
 ```
 
@@ -937,16 +937,16 @@ Mọi API ở phần này:
 `SongResponse`:
 ```json
 {
-    "id": 15,
-    "title": "Chiều Mưa",
-    "audioUrl": "/uploads/songs/audio/3f2a9c1e-....mp3",
-    "coverUrl": "/uploads/songs/covers/9b1c4d7f-....jpg",
-    "durationSeconds": 215,
-    "playCount": 1024,
-    "releaseAt": "2026-12-24T20:00:00",
-    "artistId": 5,
-    "artistName": "Mây Chiều",
-    "featuredArtists": [ { "id": 12, "artistName": "Sóng Nhỏ" } ]
+  "id": 15,
+  "title": "Chiều Mưa",
+  "audioUrl": "/uploads/songs/audio/3f2a9c1e-....mp3",
+  "coverUrl": "/uploads/songs/covers/9b1c4d7f-....jpg",
+  "durationSeconds": 215,
+  "playCount": 1024,
+  "releaseAt": "2026-12-24T20:00:00",
+  "artistId": 5,
+  "artistName": "Mây Chiều",
+  "featuredArtists": [ { "id": 12, "artistName": "Sóng Nhỏ" } ]
 }
 ```
 
@@ -977,8 +977,8 @@ Câu truy vấn (rút gọn, JPQL):
 SELECT DISTINCT s FROM Song s LEFT JOIN s.featuredArtists f
 WHERE <đã phát hành>
   AND (   LOWER(s.title)             LIKE %keyword%
-       OR LOWER(s.artist.artistName) LIKE %keyword%
-       OR (LOWER(f.artistName)       LIKE %keyword% AND f đang hoạt động))
+   OR LOWER(s.artist.artistName) LIKE %keyword%
+   OR (LOWER(f.artistName)       LIKE %keyword% AND f đang hoạt động))
 ```
 Dùng `LEFT JOIN` (không phải `JOIN`) để bài **không có feat** vẫn được tìm theo tên.
 
@@ -1045,11 +1045,11 @@ Các bước (`SongService.play`):
 Kết quả (`ArtistSongsResponse`):
 ```json
 {
-    "artistId": 5,
-    "artistName": "Mây Chiều",
-    "bio": "Ballad nhẹ nhàng cho buổi chiều.",
-    "avatarUrl": "/uploads/avatars/7c2e.jpg",
-    "songs": { "content": [ ...SongResponse... ], "page": 0, "size": 20, "totalElements": 12, "totalPages": 1 }
+  "artistId": 5,
+  "artistName": "Mây Chiều",
+  "bio": "Ballad nhẹ nhàng cho buổi chiều.",
+  "avatarUrl": "/uploads/avatars/7c2e.jpg",
+  "songs": { "content": [ ...SongResponse... ], "page": 0, "size": 20, "totalElements": 12, "totalPages": 1 }
 }
 ```
 
@@ -1069,8 +1069,8 @@ Kết quả (`ArtistSongsResponse`):
 Trả **mảng tối đa 10 bài khác nhau** người dùng nghe gần nhất, mới nhất ở đầu:
 ```json
 [
-    { "song": { ...SongResponse... }, "playedAt": "2026-10-15T17:40:12" },
-    { "song": { ...SongResponse... }, "playedAt": "2026-10-15T17:35:03" }
+  { "song": { ...SongResponse... }, "playedAt": "2026-10-15T17:40:12" },
+  { "song": { ...SongResponse... }, "playedAt": "2026-10-15T17:35:03" }
 ]
 ```
 
@@ -1347,11 +1347,11 @@ Các API danh sách lớn (`/api/songs`, `/api/songs/search`, `/api/songs/artist
 
 ```json
 {
-    "content": [ ... các phần tử của trang hiện tại ... ],
-    "page": 0,
-    "size": 20,
-    "totalElements": 135,
-    "totalPages": 7
+  "content": [ ... các phần tử của trang hiện tại ... ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 135,
+  "totalPages": 7
 }
 ```
 
@@ -1395,8 +1395,9 @@ Frontend:
 | `HttpMessageNotReadableException` | 400 | `Invalid request data` | JSON sai cú pháp, sai kiểu, thiếu body |
 | `MissingServletRequestPartException` | 400 | `File is required` | Thiếu hẳn key file trong form-data |
 | `MethodArgumentTypeMismatchException` | 400 | `Invalid parameter: <tên>` | `/api/songs/abc`, `?status=pending`, `?page=abc` |
-| Chưa đăng nhập / token sai | 401 | `Bạn chưa đăng nhập hoặc token không hợp lệ` hoặc thông báo hết phiên | |
-| `AccessDeniedException` | 403 | Không đủ quyền | Sai role |
+| Chưa đăng nhập / token sai / hết hạn | 401 | `Unauthorized, please login` | |
+| Bị đăng nhập nơi khác / đã đăng xuất / bị khóa / vừa đổi mật khẩu | 401 | `Your session has ended. Your account may have been logged in on another device` | |
+| `AccessDeniedException` | 403 | `You do not have permission to access this resource` | Sai role |
 | `DataIntegrityViolationException` | 409 | `Data already exists` | Vi phạm ràng buộc database |
 | `MaxUploadSizeExceededException` | 413 | `File is too large` | Vượt giới hạn upload tổng |
 | Rate limit | 429 | `Too many requests. Please try again in X seconds` | Kèm header `Retry-After` |
