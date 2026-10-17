@@ -8,9 +8,15 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import java.nio.file.Paths;
 
 /*
-    Cho phép truy cập file đã upload qua đường dẫn /uploads/**.
-    VD: file lưu tại {uploadDir}/avatars/a.jpg → GET /uploads/avatars/a.jpg
-    Spring tự hỗ trợ Range request (HTTP 206) → frontend tua nhạc được.
+    =====================================================
+    WEBMVCCONFIG - PHỤC VỤ FILE ĐÃ UPLOAD QUA URL
+    =====================================================
+
+    -----------------------------------------------------
+    Class này làm gì?
+    -----------------------------------------------------
+
+    Biến 1 thư mục trên ổ đĩa thành 1 đường dẫn URL, để frontend mở được file nhạc và ảnh.
 */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {

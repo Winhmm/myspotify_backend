@@ -8,12 +8,42 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-@Service
 /*
-    CustomUserDetailsService implements UserDetailsService để cung cấp thông tin người dùng cho Spring Security.
+    =====================================================
+    CUSTOMUSERDETAILSSERVICE - CUNG CẤP THÔNG TIN NGƯỜI DÙNG CHO SPRING SECURITY
+    =====================================================
 
-    Nó tìm kiếm người dùng trong cơ sở dữ liệu dựa trên email và tạo UserDetails từ thực thể User.
+    -----------------------------------------------------
+    Vì sao cần class này?
+    -----------------------------------------------------
+    Spring Security không biết entity User của project có những field gì
+    (email, password, role, accountStatus...).
+    Nó chỉ làm việc với 1 interface chuẩn tên là UserDetails, gồm các thông tin:
+    - username: định danh người dùng (project dùng email).
+    - password: mật khẩu đã băm bằng BCrypt.
+    - authorities: danh sách quyền, ví dụ ROLE_ADMIN.
+    - enabled: tài khoản có được phép sử dụng hay không.
+
+    Class này làm nhiệm vụ "phiên dịch":
+        email → tìm User trong MySQL → chuyển sang UserDetails mà Spring hiểu.
+
+    implements UserDetailsService: cam kết với Spring rằng class này có hàm
+    loadUserByUsername(), để Spring và filter của mình gọi khi cần.
+
+    -----------------------------------------------------
+    Được gọi ở đâu và khi nào?
+    -----------------------------------------------------
+    - JwtAuthenticationFilter gọi loadUserByUsername(email) ở mỗi request có token hợp lệ.
+    - Nghĩa là mỗi request đã đăng nhập tốn thêm 1 câu SELECT vào bảng users.
+    - Đổi lại, role và trạng thái tài khoản luôn là dữ liệu mới nhất trong database:
+        + Admin khóa tài khoản → request tiếp theo của người đó bị chặn ngay.
+        + Admin đổi role USER thành ADMIN → request tiếp theo đã có quyền Admin,
+          không cần đăng nhập lại.
+
+    Lưu ý: khi đăng nhập, việc so mật khẩu do AuthService tự làm
+    bằng passwordEncoder.matches(), không đi qua class này.
 */
+@Service
 public class CustomUserDetailsService implements UserDetailsService {
     private final UserRepository userRepository;
 
@@ -21,17 +51,73 @@ public class CustomUserDetailsService implements UserDetailsService {
         this.userRepository = userRepository;
     }
 
+    /*
+        =====================================================
+        TẢI THÔNG TIN NGƯỜI DÙNG THEO EMAIL
+        =====================================================
+        Tên hàm là loadUserByUsername vì đó là tên Spring đặt sẵn trong interface.
+        Project dùng email làm "username", nên tham số được đặt tên là email cho dễ hiểu.
+
+        @Override: đánh dấu đây là hàm ghi đè từ interface UserDetailsService.
+        Nếu gõ sai tên hàm, trình biên dịch sẽ báo lỗi ngay.
+    */
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        /*
+            -----------------------------------------------------
+            Bước 1: Tìm User trong MySQL
+            -----------------------------------------------------
+        */
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        /*
-            Tạo UserDetails từ User entity vì Spring Security cần UserDetails để xác thực và ủy quyền.
-            - username là email của user.
-            - password là password của user.
-            - roles là role của user.
-            - Nếu accountStatus không phải ACTIVE thì disable tài khoản.
+/*
+            -----------------------------------------------------
+            Bước 2: Chuyển User (entity) sang UserDetails (của Spring)
+            -----------------------------------------------------
+            Dùng tên đầy đủ org.springframework.security.core.userdetails.User
+            vì trùng tên với entity User của project (đã import ở trên).
+
+            Từng dòng trong builder:
+
+            - withUsername(user.getEmail()):
+              Định danh người dùng là email.
+              Sau này trong Controller, authentication.getName() sẽ trả về chính email này.
+
+            - password(user.getPassword()):
+              Mật khẩu đã băm. JwtAuthenticationFilter không dùng tới
+              (token đã chứng minh danh tính rồi), nhưng UserDetails bắt buộc phải có.
+
+            - roles(user.getRole().name()):
+              user.getRole() trả về enum Role, ví dụ Role.ADMIN.
+              .name() chuyển enum thành chuỗi "ADMIN".
+              .roles("ADMIN") tự thêm tiền tố "ROLE_" → quyền thật được lưu là "ROLE_ADMIN".
+
+              Khi Controller ghi @PreAuthorize("hasRole('ADMIN')"),
+              Spring cũng tự thêm "ROLE_" → so "ROLE_ADMIN" với "ROLE_ADMIN" → khớp.
+
+              Bảng đối chiếu:
+                Role trong DB    Quyền trong Spring    Khớp với
+                USER             ROLE_USER             hasRole('USER')
+                ARTIST           ROLE_ARTIST           hasRole('ARTIST')
+                ADMIN            ROLE_ADMIN            hasRole('ADMIN')
+
+              Lưu ý:
+              + Không được truyền "ROLE_ADMIN" vào .roles(), Spring sẽ ném IllegalArgumentException
+                vì nó tự thêm tiền tố rồi.
+              + Nếu dùng hasAuthority thay vì hasRole thì phải ghi đầy đủ: hasAuthority('ROLE_ADMIN').
+
+            - disabled(user.getAccountStatus() != AccountStatus.ACTIVE):
+              Tài khoản không ở trạng thái ACTIVE → disabled = true → isEnabled() = false.
+
+              Bảng đối chiếu:
+                accountStatus    isEnabled()    Kết quả khi gọi API cần đăng nhập
+                ACTIVE           true           Được xác thực bình thường
+                UNVERIFIED       false          401 (chưa xác thực OTP)
+                DISABLED         false          401 (bị Admin khóa)
+                DELETED          false          401 (đã xóa mềm)
+
+            - build(): tạo ra đối tượng UserDetails hoàn chỉnh.
         */
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.getEmail())
