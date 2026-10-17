@@ -8,6 +8,7 @@ import com.winhmm.myspotify.repository.ListeningHistoryRepository;
 import com.winhmm.myspotify.repository.SongRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -59,9 +60,13 @@ public class ListeningHistoryService {
 
     /*
         ---------------------------------------------------------------
-        Ghi 1 lượt nghe vào MongoDB
+        Ghi 1 lượt nghe vào MongoDB (bất đồng bộ)
         ---------------------------------------------------------------
+        @Async: ghi lịch sử ở thread riêng, API /play trả response ngay
+        mà không chờ MongoDB Atlas phản hồi.
+        Ghi lỗi thì chỉ log cảnh báo, không ảnh hưởng tới việc nghe nhạc.
     */
+    @Async
     public void record(Long userId, Long songId) {
         try {
             historyRepository.save(new ListeningHistory(userId, songId, LocalDateTime.now()));

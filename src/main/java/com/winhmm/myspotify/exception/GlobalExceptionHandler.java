@@ -162,4 +162,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("message", "This data was changed by someone else, please reload and try again"));
     }
+
+    @ExceptionHandler(EmailSendException.class)
+    public ResponseEntity<Map<String, String>> handleEmailSend(EmailSendException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("message", e.getMessage()));
+    }
 }

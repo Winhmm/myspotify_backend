@@ -6,6 +6,7 @@ import com.winhmm.myspotify.enums.OtpPurpose;
 import com.winhmm.myspotify.repository.OtpVerificationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -42,6 +43,7 @@ public class OtpService {
 
         Dùng cho: đăng ký, quên mật khẩu, đổi mật khẩu.
     */
+    @Transactional
     public void generateAndSend(User user, OtpPurpose purpose) {
         createAndSend(user, purpose, null, user.getEmail());
     }
@@ -59,6 +61,7 @@ public class OtpService {
         generateAndSend() = quyết định gọi như thế nào.
         createAndSend() = thực hiện việc tạo và gửi OTP.
     */
+    @Transactional
     public void generateAndSend(User user, OtpPurpose purpose, String newEmail) {
         createAndSend(user, purpose, newEmail, newEmail);
     }
