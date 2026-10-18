@@ -2,12 +2,12 @@ package com.winhmm.myspotify.controller;
 
 import com.winhmm.myspotify.dto.user.AssignRoleRequest;
 import com.winhmm.myspotify.dto.user.UserProfileResponse;
-import com.winhmm.myspotify.entity.User;
+import com.winhmm.myspotify.mapper.UserMapper;
 import com.winhmm.myspotify.service.AdminService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
@@ -65,6 +65,12 @@ import java.util.stream.Collectors;
     Admin đầu tiên được tạo bằng SQL sau khi đăng ký và xác thực tài khoản bình thường:
         UPDATE users SET role = 'ADMIN' WHERE email = 'admin@gmail.com';
     Các Admin sau: Admin hiện tại gán qua PUT /api/admin/users/{userId}/role.
+
+    -----------------------------------------------------
+    Chuyển entity sang DTO
+    -----------------------------------------------------
+    Dùng UserMapper.toUserProfileResponse() (dùng chung với UserController),
+    để không trả trường password ra ngoài.
 */
 @PreAuthorize("hasRole('ADMIN')")
 @RestController
@@ -90,12 +96,13 @@ public class AdminController {
         -----------------------------------------------------
         Cách chuyển danh sách
         -----------------------------------------------------
-        adminService.getAllUsers()         → List<User> (entity, có password)
-            .stream()                      → biến danh sách thành "dòng chảy" để xử lý từng phần tử
-            .map(this::toResponse)         → đổi từng User thành UserProfileResponse (bỏ password)
-            .collect(Collectors.toList())  → gom kết quả lại thành List
+        adminService.getAllUsers()                      → List<User> (entity, có password)
+            .stream()                                   → biến danh sách thành "dòng chảy" để xử lý từng phần tử
+            .map(UserMapper::toUserProfileResponse)     → đổi từng User thành UserProfileResponse (bỏ password)
+            .collect(Collectors.toList())               → gom kết quả lại thành List
 
-        this::toResponse là cách viết gọn của: user -> toResponse(user)
+        UserMapper::toUserProfileResponse là cách viết gọn của:
+            user -> UserMapper.toUserProfileResponse(user)
 
         Kết quả: 200, mảng các UserProfileResponse
             [
@@ -110,7 +117,7 @@ public class AdminController {
     public ResponseEntity<List<UserProfileResponse>> getAllUsers() {
         List<UserProfileResponse> result = adminService.getAllUsers()
                 .stream()
-                .map(this::toResponse)
+                .map(UserMapper::toUserProfileResponse)
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(result);
@@ -185,6 +192,8 @@ public class AdminController {
         Chỉ trả về tài khoản có artistRequestStatus = PENDING.
         Admin xem artistName và bio trong từng phần tử để quyết định duyệt hay từ chối.
 
+        Cách chuyển danh sách: giống UC15.
+
         Kết quả: 200, mảng các UserProfileResponse (cùng cấu trúc với UC15).
         Không có yêu cầu nào → mảng rỗng [].
     */
@@ -192,7 +201,7 @@ public class AdminController {
     public ResponseEntity<List<UserProfileResponse>> getPendingArtistRequests() {
         List<UserProfileResponse> result = adminService.getPendingArtistRequests()
                 .stream()
-                .map(this::toResponse)
+                .map(UserMapper::toUserProfileResponse)
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(result);
@@ -290,27 +299,5 @@ public class AdminController {
                                                           @Valid @RequestBody AssignRoleRequest request) {
         adminService.assignRole(userId, request.getRole());
         return ResponseEntity.ok(Map.of("message", "Role has been assigned successfully"));
-    }
-
-    /*
-        -----------------------------------------------------
-        Chuyển User (entity) sang UserProfileResponse (DTO)
-        -----------------------------------------------------
-        Bỏ trường password, chỉ giữ những trường Admin cần xem.
-        Hàm này giống hệt hàm cùng tên trong UserController.
-    */
-    private UserProfileResponse toResponse(User user) {
-        return new UserProfileResponse(
-                user.getId(),
-                user.getUsername(),
-                user.getEmail(),
-                user.getFullName(),
-                user.getAvatarUrl(),
-                user.getAccountStatus(),
-                user.getRole(),
-                user.getArtistRequestStatus(),
-                user.getArtistName(),
-                user.getBio()
-        );
     }
 }

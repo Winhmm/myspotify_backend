@@ -2,12 +2,13 @@ package com.winhmm.myspotify.controller;
 
 import com.winhmm.myspotify.dto.user.*;
 import com.winhmm.myspotify.entity.User;
+import com.winhmm.myspotify.mapper.UserMapper;
 import com.winhmm.myspotify.service.SessionService;
 import com.winhmm.myspotify.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -61,6 +62,12 @@ import java.util.Map;
     Spring tự truyền vào thông tin người đang đăng nhập.
     Thông tin này do JwtAuthenticationFilter đặt vào SecurityContext khi kiểm tra token.
     authentication.getName() trả về email của người đang đăng nhập.
+
+    -----------------------------------------------------
+    Chuyển entity sang DTO
+    -----------------------------------------------------
+    Các API trả thông tin cá nhân dùng UserMapper.toUserProfileResponse()
+    (dùng chung với AdminController), để không trả trường password ra ngoài.
 */
 @RestController
 @RequestMapping("/api/users")
@@ -77,6 +84,11 @@ public class UserController {
         -----------------------------------------------------
         Lấy id của người đang đăng nhập
         -----------------------------------------------------
+        authentication.getName() = email trong token
+        → tìm User theo email → lấy id.
+
+        Hàm private, dùng chung cho mọi API bên dưới.
+        Email không còn trong database (rất hiếm) → 400 "User does not exist".
     */
     private Long me(Authentication authentication) {
         return userService.getByEmail(authentication.getName()).getId();
@@ -135,7 +147,8 @@ public class UserController {
     */
     @GetMapping("/me/profile")
     public ResponseEntity<UserProfileResponse> getProfile(Authentication authentication) {
-        return ResponseEntity.ok(toResponse(userService.getProfile(me(authentication))));
+        User user = userService.getProfile(me(authentication));
+        return ResponseEntity.ok(UserMapper.toUserProfileResponse(user));
     }
 
     /*
@@ -165,7 +178,7 @@ public class UserController {
     public ResponseEntity<UserProfileResponse> updateProfile(Authentication authentication,
                                                              @Valid @RequestBody UpdateProfileRequest request) {
         User user = userService.updateProfile(me(authentication), request.getFullName());
-        return ResponseEntity.ok(toResponse(user));
+        return ResponseEntity.ok(UserMapper.toUserProfileResponse(user));
     }
 
     /*
@@ -286,7 +299,7 @@ public class UserController {
     public ResponseEntity<UserProfileResponse> updateAvatar(Authentication authentication,
                                                             @RequestParam("file") MultipartFile file) {
         User user = userService.updateAvatar(me(authentication), file);
-        return ResponseEntity.ok(toResponse(user));
+        return ResponseEntity.ok(UserMapper.toUserProfileResponse(user));
     }
 
     /*
@@ -411,43 +424,43 @@ public class UserController {
     }
 
     /*
-         =====================================================
-         UC12 - XÓA TÀI KHOẢN (XÓA MỀM)
-         =====================================================
+        =====================================================
+        UC12 - XÓA TÀI KHOẢN (XÓA MỀM)
+        =====================================================
 
-         Ví dụ gọi:
-             PUT /api/users/me/delete
-             {
-                 "password": "matkhau123"
-             }
+        Ví dụ gọi:
+            PUT /api/users/me/delete
+            {
+                "password": "matkhau123"
+            }
 
-         -----------------------------------------------------
-         Xóa mềm (soft delete) là gì?
-         -----------------------------------------------------
-         Không xóa dòng dữ liệu khỏi bảng users,
-         mà chỉ đổi accountStatus sang DELETED.
+        -----------------------------------------------------
+        Xóa mềm (soft delete) là gì?
+        -----------------------------------------------------
+        Không xóa dòng dữ liệu khỏi bảng users,
+        mà chỉ đổi accountStatus sang DELETED.
 
-         Vì sao không xóa hẳn?
-         - Bài hát, lượt nghe, OTP... đều liên kết với user_id.
-           Xóa hẳn User sẽ làm lỗi khóa ngoại hoặc mất dữ liệu liên quan.
-         - Giữ lại để tra cứu khi cần (khiếu nại, thống kê).
+        Vì sao không xóa hẳn?
+        - Bài hát, lượt nghe, OTP... đều liên kết với user_id.
+          Xóa hẳn User sẽ làm lỗi khóa ngoại hoặc mất dữ liệu liên quan.
+        - Giữ lại để tra cứu khi cần (khiếu nại, thống kê).
 
-         Dùng PUT thay vì DELETE vì đây thực chất là cập nhật trạng thái,
-         và cần gửi body chứa mật khẩu (DELETE thường không gửi body).
+        Dùng PUT thay vì DELETE vì đây thực chất là cập nhật trạng thái,
+        và cần gửi body chứa mật khẩu (DELETE thường không gửi body).
 
-         Luồng xử lý giống UC11, chỉ khác trạng thái là DELETED.
+        Luồng xử lý giống UC11, chỉ khác trạng thái là DELETED.
 
-         Sau khi xóa:
-         - Không đăng nhập được: 400 "Account has been deleted".
-         - Admin không mở khóa được (chỉ mở khóa tài khoản DISABLED).
-         - Email và username vẫn bị giữ, không dùng để đăng ký tài khoản mới được.
+        Sau khi xóa:
+        - Không đăng nhập được: 400 "Account has been deleted".
+        - Admin không mở khóa được (chỉ mở khóa tài khoản DISABLED).
+        - Email và username vẫn bị giữ, không dùng để đăng ký tài khoản mới được.
 
-         Kết quả: 200 { "message": "Account has been deleted" }
+        Kết quả: 200 { "message": "Account has been deleted" }
 
-         Lỗi có thể gặp:
-             400 "Password is required"
-             400 "Password does not match"
-     */
+        Lỗi có thể gặp:
+            400 "Password is required"
+            400 "Password does not match"
+    */
     @PutMapping("/me/delete")
     public ResponseEntity<Map<String, String>> deleteAccount(Authentication authentication,
                                                              @Valid @RequestBody AccountActionRequest request) {
@@ -525,22 +538,6 @@ public class UserController {
     public ResponseEntity<UserProfileResponse> updateArtistProfile(Authentication authentication,
                                                                    @Valid @RequestBody ArtistRequest request) {
         User user = userService.updateArtistProfile(me(authentication), request.getArtistName(), request.getBio());
-        return ResponseEntity.ok(toResponse(user));
-    }
-
-    /*
-        -----------------------------------------------------
-        Chuyển User (entity) sang UserProfileResponse (DTO)
-        -----------------------------------------------------
-        Không trả thẳng entity User ra ngoài vì entity có trường password (đã băm).
-        Dù đã băm, lộ chuỗi băm vẫn giúp kẻ gian thử dò mật khẩu ngoại tuyến.
-        DTO chỉ chứa những trường frontend được phép thấy.
-    */
-    private UserProfileResponse toResponse(User user) {
-        return new UserProfileResponse(
-                user.getId(), user.getUsername(), user.getEmail(), user.getFullName(),
-                user.getAvatarUrl(), user.getAccountStatus(), user.getRole(),
-                user.getArtistRequestStatus(), user.getArtistName(), user.getBio()
-        );
+        return ResponseEntity.ok(UserMapper.toUserProfileResponse(user));
     }
 }
