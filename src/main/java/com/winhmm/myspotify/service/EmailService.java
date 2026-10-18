@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
     - Đổi mật khẩu (CHANGE_PASSWORD).
     - Đổi email (CHANGE_EMAIL), mã được gửi tới email mới.
 
-    Được gọi từ OtpService.createAndSendOtp(), sau khi đã lưu mã OTP vào database.
+    Được gọi từ OtpService.createAndSend(), sau khi đã lưu mã OTP vào database.
 
     -----------------------------------------------------
     Vì sao gửi đồng bộ?

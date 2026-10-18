@@ -55,6 +55,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         =====================================================
         TẢI THÔNG TIN NGƯỜI DÙNG THEO EMAIL
         =====================================================
+
         Tên hàm là loadUserByUsername vì đó là tên Spring đặt sẵn trong interface.
         Project dùng email làm "username", nên tham số được đặt tên là email cho dễ hiểu.
 
@@ -75,6 +76,7 @@ public class CustomUserDetailsService implements UserDetailsService {
             -----------------------------------------------------
             Bước 2: Chuyển User (entity) sang UserDetails (của Spring)
             -----------------------------------------------------
+
             Dùng tên đầy đủ org.springframework.security.core.userdetails.User
             vì trùng tên với entity User của project (đã import ở trên).
 

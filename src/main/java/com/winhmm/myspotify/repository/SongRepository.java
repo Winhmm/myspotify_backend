@@ -17,7 +17,7 @@ import java.util.Collection;
 
 /*
     =====================================================================
-    SongRepository - TRUY CẬP BẢNG songs (MYSQL)
+        SONGREPOSITORY - TRUY CẬP BẢNG SONGS (MYSQL)
     =====================================================================
 
     Các truy vấn:

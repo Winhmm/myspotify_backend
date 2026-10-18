@@ -82,6 +82,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         =====================================================
         XỬ LÝ MỖI REQUEST
         =====================================================
+
         Hàm này được Spring gọi tự động mỗi khi có request.
 
         Tham số:
@@ -185,6 +186,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             -----------------------------------------------------
                             Bước 7: Dán nhãn vào SecurityContext
                             -----------------------------------------------------
+
                             Chỉ dán nhãn khi tài khoản còn ACTIVE (isEnabled() = true).
                             Tài khoản UNVERIFIED, DISABLED, DELETED → không dán nhãn → là "khách".
 

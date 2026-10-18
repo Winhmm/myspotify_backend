@@ -13,6 +13,50 @@ import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
+/*
+    =====================================================
+    AUTHSERVICE - NGHIỆP VỤ XÁC THỰC TÀI KHOẢN (UC01 - UC05)
+    =====================================================
+
+    Các chức năng:
+        register(...)        → đăng ký, gửi OTP (UC01)
+        verifyOtp(...)       → xác thực OTP, kích hoạt tài khoản (UC02)
+        login(...)           → đăng nhập, tạo phiên và token (UC03)
+        forgotPassword(...)  → quên mật khẩu, gửi OTP (UC04)
+        resetPassword(...)   → đặt lại mật khẩu bằng OTP (UC05)
+
+    Được gọi từ AuthController. Người chưa đăng nhập cũng gọi được.
+
+    -----------------------------------------------------
+    Các thành phần được sử dụng
+    -----------------------------------------------------
+    - UserRepository : đọc và ghi bảng users.
+    - OtpService     : tạo, gửi và kiểm tra mã OTP.
+    - PasswordEncoder: băm mật khẩu và so mật khẩu bằng BCrypt (bean trong SecurityConfig).
+    - JwtUtil        : tạo token.
+    - SessionService : tạo và xóa phiên đăng nhập trong Redis.
+    Tất cả được Spring tự truyền vào qua constructor.
+
+    -----------------------------------------------------
+    @Transactional là gì?
+    -----------------------------------------------------
+    Gom mọi thao tác database trong 1 hàm thành 1 khối:
+    - Chạy hết không lỗi → lưu tất cả (commit).
+    - Có lỗi RuntimeException giữa chừng → hủy tất cả (rollback), database như chưa có gì xảy ra.
+
+    Ví dụ trong register(): đã lưu User, nhưng gửi email OTP thất bại
+    → EmailSendException → rollback → User vừa tạo cũng bị hủy
+    → người dùng đăng ký lại được ngay với cùng email.
+
+    Lưu ý: rollback chỉ áp dụng cho MySQL. Thay đổi trong Redis (xóa phiên, bộ đếm OTP)
+    không bị hủy theo.
+
+    -----------------------------------------------------
+    Cách báo lỗi
+    -----------------------------------------------------
+    Ném IllegalArgumentException kèm message
+    → GlobalExceptionHandler trả 400 { "message": "..." } cho frontend.
+*/
 @Service
 public class AuthService {
     private final UserRepository userRepository;
@@ -32,14 +76,52 @@ public class AuthService {
     }
 
     /*
-        UC01 - Đăng ký.
+        =====================================================
+        UC01 - ĐĂNG KÝ
+        =====================================================
 
-        - Email chưa tồn tại → tạo User UNVERIFIED → gửi OTP.
+        Có 3 trường hợp, tùy email đã tồn tại hay chưa.
 
-        - Email đã tồn tại nhưng UNVERIFIED (đăng ký lại vì OTP hết hạn)
-          → cập nhật username/password mới → gửi lại OTP.
+        -----------------------------------------------------
+        Trường hợp 1: email đã tồn tại và đã xác thực (ACTIVE, DISABLED, DELETED)
+        -----------------------------------------------------
+        → 400 "Email already exists".
+        Tài khoản DELETED vẫn giữ email, nên không đăng ký lại được bằng email đó.
 
-        - Email đã tồn tại và đã xác thực → báo lỗi.
+        -----------------------------------------------------
+        Trường hợp 2: email đã tồn tại nhưng chưa xác thực (UNVERIFIED)
+        -----------------------------------------------------
+        Ví dụ: hôm qua đăng ký nhưng không nhập OTP, mã đã hết hạn.
+        Cho phép "đăng ký lại": cập nhật username, mật khẩu mới, rồi gửi OTP mới.
+        Đây cũng là cách frontend làm chức năng "gửi lại mã".
+
+        Kiểm tra username:
+        - Giữ nguyên username cũ (không phân biệt hoa thường) → không cần kiểm tra trùng.
+        - Đổi sang username khác → username đó phải chưa ai dùng.
+
+        Có an toàn không khi người khác đăng ký lại bằng email của mình?
+        Có. Kẻ gian đổi được mật khẩu của tài khoản chưa xác thực,
+        nhưng mã OTP gửi về email của chủ thật, kẻ gian không kích hoạt được.
+
+        -----------------------------------------------------
+        Trường hợp 3: email chưa tồn tại
+        -----------------------------------------------------
+        1. Username phải chưa ai dùng.
+        2. Tạo User mới: UNVERIFIED, role USER, mật khẩu đã băm.
+        3. Lưu vào database.
+        4. Tạo và gửi OTP mục đích REGISTER.
+
+        -----------------------------------------------------
+        Khi có lỗi ở bước gửi OTP
+        -----------------------------------------------------
+        - Chưa đủ 60 giây kể từ mã trước → "Please wait 60 seconds..." → rollback.
+        - Gửi email thất bại → EmailSendException (503) → rollback.
+        Cả 2 trường hợp, username và mật khẩu vừa cập nhật (trường hợp 2)
+        hoặc User vừa tạo (trường hợp 3) đều bị hủy.
+
+        2 người đăng ký cùng username đúng cùng lúc: cả 2 đều qua bước existsByUsername,
+        nhưng ràng buộc UNIQUE trong database chặn người thứ hai
+        → DataIntegrityViolationException → 409 "Data already exists".
     */
     @Transactional
     public void register(String username, String email, String password) {
@@ -82,7 +164,17 @@ public class AuthService {
     }
 
     /*
-        UC02 - Xác thực Email / OTP: chỉ dành cho tài khoản UNVERIFIED.
+        =====================================================
+        UC02 - XÁC THỰC OTP ĐĂNG KÝ
+        =====================================================
+
+        1. Tìm User theo email. Không có → "Email does not exist".
+        2. Chỉ tài khoản UNVERIFIED mới cần xác thực → khác thì "Account is already verified".
+        3. OtpService.verifyAndConsume kiểm tra mã:
+           hết hạn, sai quá 5 lần, không khớp → ném lỗi, dừng tại đây.
+        4. Mã đúng → chuyển tài khoản sang ACTIVE.
+
+        Không tự đăng nhập sau khi xác thực: người dùng đăng nhập ở bước tiếp theo.
     */
     @Transactional
     public void verifyOtp(String email, String otpCode) {
@@ -100,9 +192,36 @@ public class AuthService {
     }
 
     /*
-        UC03 - Đăng nhập.
+        =====================================================
+        UC03 - ĐĂNG NHẬP
+        =====================================================
 
-        Dùng chung 1 message cho cả sai email và sai mật khẩu.
+        -----------------------------------------------------
+        Thứ tự kiểm tra (thứ tự này có chủ đích)
+        -----------------------------------------------------
+        1. Tìm User theo email.
+        2. So mật khẩu bằng BCrypt.
+           passwordEncoder.matches(mậtKhẩuGốc, chuỗiĐãBăm): BCrypt lấy "muối" có sẵn
+           trong chuỗi đã băm, băm lại mật khẩu vừa nhập rồi so 2 kết quả.
+        3. Kiểm tra trạng thái tài khoản.
+
+        Sai email hoặc sai mật khẩu → cùng 1 message "Email or password is incorrect"
+        → người ngoài không đoán được email nào đã đăng ký.
+
+        Trạng thái được kiểm tra sau mật khẩu → chỉ người biết mật khẩu
+        mới biết tài khoản đang bị khóa hay chưa xác thực.
+
+        -----------------------------------------------------
+        Tạo phiên và token
+        -----------------------------------------------------
+        4. sessionService.createSession(email):
+           sinh 1 UUID mới, ghi vào Redis (key session:{email}), sống 24 giờ.
+           Ghi đè phiên cũ → thiết bị đăng nhập trước đó bị đăng xuất.
+        5. jwtUtil.generateToken(user, sessionId):
+           tạo JWT chứa email (sub) và UUID vừa sinh (jti).
+        6. Trả token, userId, username, role cho frontend.
+
+        Không cần @Transactional vì hàm này không ghi gì vào MySQL.
     */
     public LoginResponse login(String email, String password) {
         User user = userRepository.findByEmail(email)
@@ -135,7 +254,17 @@ public class AuthService {
     }
 
     /*
-        UC04 - Quên mật khẩu (bước 1): nhập email → gửi OTP.
+        =====================================================
+        UC04 - QUÊN MẬT KHẨU (BƯỚC 1: GỬI OTP)
+        =====================================================
+
+        1. Tìm User theo email. Không có → "Email does not exist".
+        2. Chỉ tài khoản ACTIVE được đặt lại mật khẩu → khác thì "Account is not active".
+           Tài khoản bị khóa không dùng được chức năng này để lấy lại quyền truy cập.
+        3. Tạo và gửi OTP mục đích RESET_PASSWORD tới email của tài khoản.
+
+        Gửi email thất bại → 503 và mã OTP vừa tạo bị hủy (rollback),
+        các mã cũ được khôi phục như trước.
     */
     @Transactional
     public void forgotPassword(String email) {
@@ -150,7 +279,21 @@ public class AuthService {
     }
 
     /*
-        UC05 - Đặt lại mật khẩu (bước 2): email (frontend tự gửi lại) + OTP + mật khẩu mới.
+        =====================================================
+        UC05 - ĐẶT LẠI MẬT KHẨU (BƯỚC 2: OTP VÀ MẬT KHẨU MỚI)
+        =====================================================
+
+        Frontend tự gửi lại email đã nhập ở bước 1 (người dùng chưa đăng nhập, không có token).
+
+        1. Tìm User theo email.
+        2. Kiểm tra OTP mục đích RESET_PASSWORD.
+        3. Băm mật khẩu mới rồi lưu.
+        4. Xóa phiên trong Redis → đăng xuất khỏi mọi thiết bị.
+           Lý do: người dùng thường đặt lại mật khẩu vì nghi bị lộ.
+           Nếu kẻ gian đang dùng tài khoản thì bị đá ra ngay.
+
+        Không kiểm tra lại trạng thái ACTIVE ở bước này, vì OTP RESET_PASSWORD
+        chỉ được tạo cho tài khoản ACTIVE (bước 1).
     */
     @Transactional
     public void resetPassword(String email, String otpCode, String newPassword) {

@@ -3,43 +3,53 @@ package com.winhmm.myspotify.dto.auth;
 import com.winhmm.myspotify.enums.Role;
 
 /*
-    LoginResponse là DTO dùng để chứa các thông tin Backend trả về cho Frontend
-    sau khi người dùng đăng nhập thành công.
+    =====================================================
+    LOGINRESPONSE - KẾT QUẢ TRẢ VỀ KHI ĐĂNG NHẬP THÀNH CÔNG
+    =====================================================
+    Dùng cho: POST /api/auth/login (UC03)
 
-    Response này gồm 4 thông tin chính:
+    JSON backend trả về:
+        {
+            "token": "eyJhbGciOiJIUzI1NiJ9...",
+            "userId": 6,
+            "username": "maychieu",
+            "role": "ARTIST"
+        }
+
+    -----------------------------------------------------
+    Ý nghĩa từng trường
+    -----------------------------------------------------
     1. token:
-    - Là JWT được Backend tạo sau khi đăng nhập thành công.
-
-    - Frontend cần lưu token này và gửi kèm trong các request tiếp theo
-    để Backend biết người gửi request đã đăng nhập và xác thực được User.
+       - JWT do backend tạo khi đăng nhập thành công, sống 24 giờ.
+       - Chứa email (sub) và mã phiên (jti), không chứa mật khẩu hay role.
+       - Frontend lưu lại và gửi kèm ở mọi request sau:
+             Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+       - Token mất hiệu lực sớm hơn 24 giờ khi: đăng xuất, đăng nhập ở thiết bị khác,
+         đổi mật khẩu, đổi email, bị Admin khóa.
 
     2. userId:
-    - Là ID của User trong Database.
-
-    - Frontend cần userId để biết chính xác tài khoản nào đang đăng nhập
-    và có thể sử dụng ID này khi cần tham chiếu đến User.
+       - Id của người dùng trong database.
+       - Frontend dùng để so sánh, ví dụ: bài hát có artistId bằng userId
+         thì hiện nút "Sửa" cho chính Artist đó.
 
     3. username:
-    - Là tên của User.
-
-    - Trả về username để Frontend có thể sử dụng ngay sau khi đăng nhập,
-    ví dụ hiển thị tên người dùng trên giao diện.
+       - Tên đăng nhập, để hiển thị ngay trên giao diện (VD "Xin chào, maychieu")
+         mà không cần gọi thêm API.
 
     4. role:
-    - Là quyền của User trong hệ thống.
+       - Quyền hiện tại: USER, ARTIST hoặc ADMIN.
+       - Frontend dựa vào đây để hiện hoặc ẩn menu tương ứng.
+       - Chỉ đúng tại thời điểm đăng nhập. Admin đổi role sau đó thì giá trị này cũ đi,
+         gọi GET /api/users/me/profile để lấy role mới nhất.
+       - Ẩn menu ở frontend chỉ để giao diện gọn. Bảo mật thật nằm ở backend:
+         dù frontend hiện nhầm nút, backend vẫn trả 403 nếu không đủ quyền.
 
-    - Ví dụ: USER, ARTIST, ADMIN.
+    -----------------------------------------------------
+    Enum Role chuyển thành JSON thế nào?
+    -----------------------------------------------------
+    Jackson tự chuyển enum thành chuỗi theo tên: Role.ARTIST → "ARTIST".
 
-    - Frontend có thể dựa vào role để hiển thị hoặc ẩn những chức năng
-    tương ứng với quyền của người dùng.
-
-    Ví dụ sau khi đăng nhập thành công, Backend có thể trả về:
-    {
-        "token": "eyJhbGciOiJIUzI1NiJ9...",
-        "userId": 1,
-        "username": "phong123",
-        "role": "USER"
-    }
+    Jackson đọc các getter để tạo JSON: getToken() → "token", getUserId() → "userId"...
 */
 public class LoginResponse {
     private String token;
