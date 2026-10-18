@@ -473,7 +473,6 @@ public class AdminSongController {
         ---------------------------------------------------------------
         UC34 - Danh sách bài hát (có phân trang, lọc theo trạng thái).
         ---------------------------------------------------------------
-
         Ví dụ gọi:
         GET /api/admin/songs                          → mọi bài (trừ đã xóa), trang đầu
         GET /api/admin/songs?status=PENDING           → chỉ bài đang chờ duyệt
@@ -521,7 +520,6 @@ public class AdminSongController {
         ---------------------------------------------------------------
         UC35 - Duyệt bài.
         ---------------------------------------------------------------
-
         Ví dụ gọi:
         PUT /api/admin/songs/15/approve (không cần body).
 
@@ -563,7 +561,6 @@ public class AdminSongController {
         ---------------------------------------------------------------
         UC36 - Gỡ bài đã duyệt (kể cả bài Artist đang ẩn).
         ---------------------------------------------------------------
-
         Dùng lại RejectSongRequest vì cấu trúc giống hệt (chỉ cần 1 trường reason),
         không cần tạo thêm DTO mới.
     */

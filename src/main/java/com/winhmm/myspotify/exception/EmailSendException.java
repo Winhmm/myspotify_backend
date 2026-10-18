@@ -4,6 +4,7 @@ package com.winhmm.myspotify.exception;
     =====================================================
     EMAILSENDEXCEPTION - LỖI GỬI EMAIL
     =====================================================
+
     Được ném ra khi EmailService không gửi được email OTP
     (Gmail lỗi, sai mật khẩu ứng dụng, mất kết nối, quá thời gian chờ...).
 

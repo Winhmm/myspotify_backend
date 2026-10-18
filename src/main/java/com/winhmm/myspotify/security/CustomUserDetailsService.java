@@ -76,7 +76,6 @@ public class CustomUserDetailsService implements UserDetailsService {
             -----------------------------------------------------
             Bước 2: Chuyển User (entity) sang UserDetails (của Spring)
             -----------------------------------------------------
-
             Dùng tên đầy đủ org.springframework.security.core.userdetails.User
             vì trùng tên với entity User của project (đã import ở trên).
 

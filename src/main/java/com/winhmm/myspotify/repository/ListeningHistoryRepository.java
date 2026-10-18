@@ -9,6 +9,7 @@ import java.util.List;
     =====================================================
     LISTENINGHISTORYREPOSITORY - TRUY CẬP COLLECTION LISTENING_HISTORY (MONGODB)
     =====================================================
+
     Lưu và đọc lịch sử nghe nhạc trong MongoDB.
     Chỉ được dùng trong ListeningHistoryService.
 
@@ -26,6 +27,7 @@ public interface ListeningHistoryRepository extends MongoRepository<ListeningHis
         =====================================================
         100 LƯỢT NGHE GẦN NHẤT CỦA 1 NGƯỜI
         =====================================================
+
         Tên method được Spring tách thành từng phần:
             findTop100           → giới hạn 100 document
             ByUserId             → điều kiện userId = ?

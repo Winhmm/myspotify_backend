@@ -11,6 +11,7 @@ import java.util.Optional;
     =====================================================
     OTPVERIFICATIONREPOSITORY - TRUY CẬP BẢNG OTP_VERIFICATIONS (MYSQL)
     =====================================================
+
     Chỉ được dùng trong OtpService.
     Ngoài method tự khai báo bên dưới, còn có sẵn save() từ JpaRepository
     để lưu mã mới và đánh dấu mã đã dùng.
@@ -20,6 +21,7 @@ public interface OtpVerificationRepository extends JpaRepository<OtpVerification
         =====================================================
         LẤY MÃ OTP MỚI NHẤT CÒN DÙNG ĐƯỢC
         =====================================================
+
         Tên method được Spring tách thành từng phần:
             findFirst         → LIMIT 1 (chỉ lấy 1 kết quả)
             ByUser            → WHERE user_id = ?

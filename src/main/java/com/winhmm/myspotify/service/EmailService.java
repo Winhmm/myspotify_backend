@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
     =====================================================
     EMAILSERVICE - GỬI EMAIL OTP
     =====================================================
+
     Gửi mã OTP tới email người dùng cho các chức năng:
     - Đăng ký tài khoản (REGISTER).
     - Quên mật khẩu (RESET_PASSWORD).

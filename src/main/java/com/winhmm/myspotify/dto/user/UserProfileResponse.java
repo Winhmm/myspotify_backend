@@ -8,6 +8,7 @@ import com.winhmm.myspotify.enums.Role;
     =====================================================
     USERPROFILERESPONSE - THÔNG TIN TÀI KHOẢN TRẢ VỀ CHO FRONTEND
     =====================================================
+
     Dùng cho:
     - UserController: xem và sửa thông tin cá nhân, đổi avatar, sửa hồ sơ Artist.
     - AdminController: danh sách tài khoản, danh sách yêu cầu làm Artist.

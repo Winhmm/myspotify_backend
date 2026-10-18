@@ -131,7 +131,6 @@ public class OtpService {
             -----------------------------------------------------
             Bước 1: Chống spam, chờ 60 giây giữa 2 lần gửi
             -----------------------------------------------------
-
             Lấy mã mới nhất chưa dùng (cùng User, cùng mục đích).
             Bảng không có cột created_at, nên tính thời điểm tạo:
                 createdAt = expiredAt - 5 phút
@@ -222,7 +221,6 @@ public class OtpService {
             -----------------------------------------------------
             Bước 1: Lấy mã mới nhất chưa dùng
             -----------------------------------------------------
-
             Không có → chưa yêu cầu mã, hoặc mã đã dùng rồi → "Otp code does not exist".
         */
         OtpVerification otp = otpVerificationRepository
@@ -233,7 +231,6 @@ public class OtpService {
             -----------------------------------------------------
             Bước 2: Kiểm tra hạn dùng
             -----------------------------------------------------
-
             expiredAt trước thời điểm hiện tại → đã hết hạn.
         */
         if(otp.getExpiredAt().isBefore(LocalDateTime.now())) {
@@ -244,7 +241,6 @@ public class OtpService {
             -----------------------------------------------------
             Bước 3: Giới hạn số lần nhập (tối đa 5 lần cho mỗi mã)
             -----------------------------------------------------
-
             Key Redis theo id của mã, VD otp-attempt:13 → mỗi mã có bộ đếm riêng.
 
             Vì sao tăng bộ đếm trước rồi mới kiểm tra (chống race condition)?

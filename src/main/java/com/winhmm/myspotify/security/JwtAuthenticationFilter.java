@@ -135,7 +135,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         -----------------------------------------------------
                         Bước 4: Đọc email và mã phiên trong token
                         -----------------------------------------------------
-
                         - email: token này của ai (claim "sub").
                         - sessionId: mã phiên được tạo lúc đăng nhập (claim "jti").
                     */
@@ -146,7 +145,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         -----------------------------------------------------
                         Bước 5: So mã phiên với Redis
                         -----------------------------------------------------
-
                         sessionService.isValidSession(email, sessionId) đọc key session:{email}
                         trong Redis và so với sessionId trong token.
 
@@ -186,7 +184,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             -----------------------------------------------------
                             Bước 7: Dán nhãn vào SecurityContext
                             -----------------------------------------------------
-
                             Chỉ dán nhãn khi tài khoản còn ACTIVE (isEnabled() = true).
                             Tài khoản UNVERIFIED, DISABLED, DELETED → không dán nhãn → là "khách".
 

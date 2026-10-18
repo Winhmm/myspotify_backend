@@ -130,7 +130,6 @@ public class GlobalExceptionHandler {
         -----------------------------------------------------
         JSON không đọc được → 400
         -----------------------------------------------------
-
         Ví dụ:
         - JSON sai cú pháp: thiếu dấu ngoặc, thiếu dấu phẩy.
         - Giá trị enum không tồn tại: "role": "SUPERADMIN".
@@ -145,7 +144,6 @@ public class GlobalExceptionHandler {
         -----------------------------------------------------
         Upload thiếu file → 400
         -----------------------------------------------------
-
         Gọi API upload (avatar, bài hát) nhưng form-data không có key "file".
     */
     @ExceptionHandler(MissingServletRequestPartException.class)
@@ -157,7 +155,6 @@ public class GlobalExceptionHandler {
         -----------------------------------------------------
         Tham số trên URL sai kiểu → 400
         -----------------------------------------------------
-
         Ví dụ: /api/admin/users/abc/lock, trong khi userId phải là số.
         e.getName() trả về tên tham số bị sai, VD "userId".
     */
@@ -170,7 +167,6 @@ public class GlobalExceptionHandler {
         -----------------------------------------------------
         Chưa đăng nhập → 401
         -----------------------------------------------------
-
         Phần lớn lỗi 401 đã được SecurityConfig xử lý trong filter.
         Hàm này bắt những trường hợp hiếm khi lỗi xác thực xảy ra bên trong Controller.
     */
@@ -184,7 +180,6 @@ public class GlobalExceptionHandler {
         -----------------------------------------------------
         Không đủ quyền → 403
         -----------------------------------------------------
-
         @PreAuthorize từ chối ném ra AuthorizationDeniedException (con của AccessDeniedException)
         bên trong Controller. Nếu không có hàm này, lỗi sẽ rơi vào handleOther và thành 500.
     */
@@ -198,7 +193,6 @@ public class GlobalExceptionHandler {
         -----------------------------------------------------
         Vi phạm ràng buộc trong database → 409
         -----------------------------------------------------
-
         Ví dụ: 2 người đăng ký cùng username đúng cùng lúc.
         Cả 2 đều qua bước kiểm tra existsByUsername trong Service,
         nhưng ràng buộc UNIQUE trong database chặn người thứ hai.
@@ -214,7 +208,6 @@ public class GlobalExceptionHandler {
         -----------------------------------------------------
         File quá lớn → 413
         -----------------------------------------------------
-
         File vượt giới hạn upload của server (spring.servlet.multipart.max-file-size).
         Lỗi xảy ra trước khi tới Controller, ngay khi Spring đọc request.
     */
@@ -228,7 +221,6 @@ public class GlobalExceptionHandler {
         -----------------------------------------------------
         Lỗi gửi email từ JavaMail → 503 (dự phòng)
         -----------------------------------------------------
-
         Hiện tại EmailService đã bắt mọi lỗi và đổi thành EmailSendException,
         nên hàm này không được gọi tới.
         Giữ lại phòng trường hợp sau này có chỗ gọi mailSender trực tiếp
@@ -245,7 +237,6 @@ public class GlobalExceptionHandler {
         -----------------------------------------------------
         Mọi lỗi còn lại
         -----------------------------------------------------
-
         1. Lỗi chuẩn của Spring (ErrorResponse), ví dụ:
            - Sai URL → 404.
            - Sai method (gọi GET cho API chỉ nhận POST) → 405.
@@ -273,7 +264,6 @@ public class GlobalExceptionHandler {
         -----------------------------------------------------
         Dữ liệu vừa bị người khác thay đổi → 409
         -----------------------------------------------------
-
         Optimistic locking: entity Song có cột version.
         Mỗi lần lưu, Hibernate kiểm tra version có còn như lúc đọc không.
         Khác → có người vừa sửa xen vào → ném lỗi thay vì ghi đè mất thay đổi của họ.
@@ -291,7 +281,6 @@ public class GlobalExceptionHandler {
         -----------------------------------------------------
         Gửi email OTP thất bại → 503
         -----------------------------------------------------
-
         503 Service Unavailable: không phải lỗi do người dùng nhập sai (400),
         cũng không phải lỗi code backend (500), mà do dịch vụ bên ngoài (Gmail) đang không dùng được.
         Lỗi đã được ghi log trong EmailService, ở đây chỉ trả message cho frontend.

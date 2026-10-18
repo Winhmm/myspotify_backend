@@ -196,7 +196,6 @@ public class ArtistSongController {
         ---------------------------------------------------------------
         UC28 - Bài hát của tôi
         ---------------------------------------------------------------
-
         Ví dụ gọi:
             GET /api/artist/songs
 
@@ -241,7 +240,6 @@ public class ArtistSongController {
         ---------------------------------------------------------------
         UC37 - Tìm nghệ sĩ để feat
         ---------------------------------------------------------------
-
         Ví dụ gọi:
             GET /api/artist/search-artists?keyword=may
 
@@ -280,7 +278,6 @@ public class ArtistSongController {
         ---------------------------------------------------------------
         UC29 - Sửa tên bài hát và danh sách feat
         ---------------------------------------------------------------
-
         Ví dụ gọi:
             PUT /api/artist/songs/15
             Content-Type: application/json
@@ -311,7 +308,6 @@ public class ArtistSongController {
         ---------------------------------------------------------------
         UC30 - Đổi ảnh bìa
         ---------------------------------------------------------------
-
         Ví dụ gọi (Postman: Body → form-data):
             PUT /api/artist/songs/15/cover
             KEY: cover   TYPE: File   VALUE: bia-moi.jpg
@@ -343,7 +339,6 @@ public class ArtistSongController {
         ---------------------------------------------------------------
         UC31 - Đổi lịch phát hành
         ---------------------------------------------------------------
-
         Ví dụ gọi:
             PUT /api/artist/songs/15/release
             Body: { "releaseAt": "2026-12-24T20:00:00" }   → lên lịch 20h ngày 24/12
@@ -375,7 +370,6 @@ public class ArtistSongController {
         ---------------------------------------------------------------
         UC32 - Ẩn bài (APPROVED → HIDDEN)
         ---------------------------------------------------------------
-
         Ví dụ gọi:
             PUT /api/artist/songs/15/hide      (không cần body)
 
@@ -395,7 +389,6 @@ public class ArtistSongController {
         ---------------------------------------------------------------
         UC32 - Hiện lại bài đã ẩn (HIDDEN → APPROVED)
         ---------------------------------------------------------------
-
         Ví dụ gọi:
             PUT /api/artist/songs/15/show      (không cần body)
 
@@ -413,7 +406,6 @@ public class ArtistSongController {
         ---------------------------------------------------------------
         UC33 - Xóa bài
         ---------------------------------------------------------------
-
         Ví dụ gọi:
             DELETE /api/artist/songs/15
 

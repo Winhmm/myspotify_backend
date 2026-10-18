@@ -80,7 +80,6 @@ public class ListeningHistoryService {
         ---------------------------------------------------------------
         10 bài khác nhau được nghe gần nhất
         ---------------------------------------------------------------
-
         Giới hạn: chỉ xét 100 lượt nghe gần nhất. Nếu 100 lượt đó chỉ gồm 6 bài khác nhau
         (nghe đi nghe lại rất nhiều), kết quả có 6 bài dù trước đó từng nghe bài khác.
         Với mục "Nghe gần đây", như vậy là hợp lý.

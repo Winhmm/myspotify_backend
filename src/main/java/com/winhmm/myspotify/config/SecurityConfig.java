@@ -87,6 +87,7 @@ public class SecurityConfig {
         =====================================================
         CẤU HÌNH CHUỖI FILTER BẢO MẬT
         =====================================================
+
         @Bean: Spring gọi hàm này 1 lần khi khởi động và dùng kết quả
         (SecurityFilterChain) để xử lý mọi request.
 

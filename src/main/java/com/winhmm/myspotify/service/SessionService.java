@@ -11,6 +11,7 @@ import java.util.UUID;
     =====================================================
     SESSIONSERVICE - QUẢN LÝ PHIÊN ĐĂNG NHẬP TRONG REDIS
     =====================================================
+
     Mục đích:
     1. Mỗi tài khoản chỉ đăng nhập được trên 1 thiết bị tại 1 thời điểm.
     2. Thu hồi token ngay lập tức khi cần (JWT thông thường không làm được việc này).

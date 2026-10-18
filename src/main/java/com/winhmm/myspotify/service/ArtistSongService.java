@@ -83,7 +83,6 @@ public class ArtistSongService {
         ---------------------------------------------------------------
         UC26 - Tải lên bài hát
         ---------------------------------------------------------------
-
         Các bước:
         1. Kiểm tra người đăng là Artist đang hoạt động.
         2. Kiểm tra lịch phát hành (nếu có phải ở tương lai).
@@ -135,7 +134,6 @@ public class ArtistSongService {
         ---------------------------------------------------------------
         UC28 - Bài hát của tôi
         ---------------------------------------------------------------
-
         Mọi trạng thái trừ DELETED, mới tải lên trước.
     */
     public List<Song> getMySongs(Long artistId) {
@@ -160,7 +158,6 @@ public class ArtistSongService {
         ---------------------------------------------------------------
         UC29 - Sửa tên bài và thay thế danh sách feat
         ---------------------------------------------------------------
-
         - Không giới hạn trạng thái: sửa được bài PENDING, APPROVED, HIDDEN, REJECTED.
           (Bài đã phát hành vẫn sửa tên được, VD sửa lỗi chính tả).
 
@@ -238,7 +235,6 @@ public class ArtistSongService {
         ---------------------------------------------------------------
         UC32 - Ẩn bài (APPROVED → HIDDEN)
         ---------------------------------------------------------------
-
         Người nghe không thấy nữa, nhưng giữ nguyên lượt nghe, file, lịch phát hành.
 
         Bài chưa tới lịch cũng ẩn được (VD Artist đổi ý, tạm hoãn phát hành).
@@ -259,7 +255,6 @@ public class ArtistSongService {
         ---------------------------------------------------------------
         UC32 - Hiện lại bài đang ẩn (HIDDEN → APPROVED)
         ---------------------------------------------------------------
-
         Không cần Admin duyệt lại, vì bài đã được duyệt trước khi bị ẩn.
 
         Lịch phát hành giữ nguyên: bài ẩn khi chưa tới lịch → hiện lại vẫn chờ đúng lịch đó.
@@ -280,7 +275,6 @@ public class ArtistSongService {
         ---------------------------------------------------------------
         UC33 - Xóa bài (xóa mềm)
         ---------------------------------------------------------------
-
         Đổi trạng thái DELETED, giữ bản ghi trong database (lịch sử, lượt nghe cũ).
 
         Xóa hẳn file nhạc và ảnh bìa khỏi ổ đĩa (không chiếm dung lượng).
@@ -327,7 +321,6 @@ public class ArtistSongService {
         ---------------------------------------------------------------
         Hàm hỗ trợ: kiểm tra và tải danh sách nghệ sĩ feat
         ---------------------------------------------------------------
-
         Quy tắc:
         - Tối đa 5 người, không trùng nhau.
         - Không chứa chính Artist chính.

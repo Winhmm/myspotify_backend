@@ -82,6 +82,7 @@ public class AuthController {
         =====================================================
         UC01 - ĐĂNG KÝ TÀI KHOẢN
         =====================================================
+
         Ví dụ gọi:
             POST /api/auth/register
             {
@@ -137,6 +138,7 @@ public class AuthController {
         =====================================================
         UC02 - XÁC THỰC OTP ĐĂNG KÝ
         =====================================================
+
         Ví dụ gọi:
             POST /api/auth/verify-otp
             {
@@ -184,6 +186,7 @@ public class AuthController {
         =====================================================
         UC03 - ĐĂNG NHẬP
         =====================================================
+
         Ví dụ gọi:
             POST /api/auth/login
             {
@@ -252,6 +255,7 @@ public class AuthController {
         =====================================================
         UC04 - QUÊN MẬT KHẨU (BƯỚC 1: GỬI OTP)
         =====================================================
+
         Ví dụ gọi:
             POST /api/auth/forgot-password
             {
@@ -294,6 +298,7 @@ public class AuthController {
         =====================================================
         UC05 - ĐẶT LẠI MẬT KHẨU (BƯỚC 2: NHẬP OTP VÀ MẬT KHẨU MỚI)
         =====================================================
+
         Ví dụ gọi:
             POST /api/auth/reset-password
             {

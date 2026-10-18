@@ -15,7 +15,6 @@ import java.nio.file.Paths;
     -----------------------------------------------------
     Class này làm gì?
     -----------------------------------------------------
-
     Biến 1 thư mục trên ổ đĩa thành 1 đường dẫn URL, để frontend mở được file nhạc và ảnh.
 */
 @Configuration

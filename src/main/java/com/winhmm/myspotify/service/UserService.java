@@ -86,7 +86,6 @@ public class UserService {
         -----------------------------------------------------
         UC07 - Lấy User theo id
         -----------------------------------------------------
-
         Dùng cho xem thông tin cá nhân, và là bước đầu tiên của mọi chức năng bên dưới.
         Không có → "User does not exist".
     */
@@ -99,7 +98,6 @@ public class UserService {
         -----------------------------------------------------
         Lấy User đang đăng nhập từ email trong token
         -----------------------------------------------------
-
         UserController gọi hàm này với authentication.getName() (email trong token)
         để lấy id, rồi truyền id vào các hàm khác.
 
@@ -115,7 +113,6 @@ public class UserService {
         -----------------------------------------------------
         Kiểm tra mật khẩu hiện tại
         -----------------------------------------------------
-
         Dùng trước các thao tác quan trọng: đổi mật khẩu, vô hiệu hóa, xóa tài khoản.
         → Người mượn máy lúc tài khoản đang đăng nhập sẵn không làm được các việc này.
 
@@ -132,7 +129,6 @@ public class UserService {
         -----------------------------------------------------
         Kiểm tra tài khoản đang ACTIVE
         -----------------------------------------------------
-
         Thực tế tài khoản không ACTIVE đã bị JwtAuthenticationFilter chặn từ trước (401).
         Đây là lớp kiểm tra dự phòng, để Service tự đúng
         dù sau này được gọi từ chỗ khác không đi qua filter.
@@ -217,7 +213,6 @@ public class UserService {
         -----------------------------------------------------
         Luồng xử lý
         -----------------------------------------------------
-
         1. Ghi nhớ đường dẫn ảnh cũ (có thể null nếu chưa từng đổi ảnh).
         2. FileStorageService.saveImage() kiểm tra và lưu ảnh mới:
            - Chỉ nhận JPG, PNG, WEBP thật (kiểm tra chữ ký file), tối đa 2MB.

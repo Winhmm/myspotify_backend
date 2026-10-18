@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
     =====================================================
     OTPVERIFICATION - BẢNG OTP_VERIFICATIONS (MÃ XÁC THỰC)
     =====================================================
+
     Mỗi dòng là 1 mã OTP đã gửi cho người dùng.
 
     Ví dụ dữ liệu:

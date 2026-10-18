@@ -80,6 +80,7 @@ public class AdminController {
         =====================================================
         UC15 - XEM DANH SÁCH TẤT CẢ TÀI KHOẢN
         =====================================================
+
         Ví dụ gọi:
             GET /api/admin/users
 
@@ -119,6 +120,7 @@ public class AdminController {
         =====================================================
         UC16 - KHÓA TÀI KHOẢN
         =====================================================
+
         Ví dụ gọi:
             PUT /api/admin/users/6/lock      (không cần body)
 
@@ -149,6 +151,7 @@ public class AdminController {
         =====================================================
         UC16 - MỞ KHÓA TÀI KHOẢN
         =====================================================
+
         Ví dụ gọi:
             PUT /api/admin/users/6/unlock    (không cần body)
 
@@ -175,6 +178,7 @@ public class AdminController {
         =====================================================
         UC17 - XEM DANH SÁCH YÊU CẦU LÀM ARTIST ĐANG CHỜ DUYỆT
         =====================================================
+
         Ví dụ gọi:
             GET /api/admin/artist-requests
 
@@ -198,6 +202,7 @@ public class AdminController {
         =====================================================
         UC17 - DUYỆT YÊU CẦU LÀM ARTIST
         =====================================================
+
         Ví dụ gọi:
             PUT /api/admin/artist-requests/6/approve    (không cần body)
 
@@ -225,6 +230,7 @@ public class AdminController {
         =====================================================
         UC17 - TỪ CHỐI YÊU CẦU LÀM ARTIST
         =====================================================
+
         Ví dụ gọi:
             PUT /api/admin/artist-requests/6/reject     (không cần body)
 
@@ -246,6 +252,7 @@ public class AdminController {
         =====================================================
         UC18 - GÁN ROLE CHO TÀI KHOẢN
         =====================================================
+
         Ví dụ gọi:
             PUT /api/admin/users/7/role
             {

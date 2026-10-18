@@ -102,7 +102,6 @@ public class Song {
         ---------------------------------------------------------------
         Artist chính (người đăng bài)
         ---------------------------------------------------------------
-
         Quan hệ nhiều - một (@ManyToOne):
         - Nhiều bài hát thuộc về 1 Artist.
         - Trong database: bảng songs có cột artist_id trỏ tới users.id (khóa ngoại).
@@ -133,7 +132,6 @@ public class Song {
         ---------------------------------------------------------------
         Các Artist feat
         ---------------------------------------------------------------
-
         Quan hệ nhiều - nhiều (@ManyToMany):
         - 1 bài hát có thể có nhiều Artist feat (tối đa 5, kiểm tra trong Service).
         - 1 Artist có thể được feat trong nhiều bài hát.
@@ -184,7 +182,6 @@ public class Song {
         ---------------------------------------------------------------
         Đường dẫn ảnh bìa
         ---------------------------------------------------------------
-
         Không bắt buộc (không có nullable = false → cho phép NULL).
         JPG, PNG, WEBP, tối đa 2MB.
     */

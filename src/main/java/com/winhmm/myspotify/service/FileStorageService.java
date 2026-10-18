@@ -89,7 +89,6 @@ public class FileStorageService {
         ---------------------------------------------------------------
         Lưu file nhạc (MP3 hoặc WAV)
         ---------------------------------------------------------------
-
         1. Kiểm tra file không rỗng.
         2. Kiểm tra đuôi file: chỉ nhận .mp3 hoặc .wav.
         3. Kiểm tra dung lượng: MP3 ≤ 20MB, WAV ≤ 100MB.
@@ -125,7 +124,6 @@ public class FileStorageService {
         ---------------------------------------------------------------
         Lưu ảnh (JPG, PNG, WEBP, tối đa 2MB)
         ---------------------------------------------------------------
-
         VD: saveImage(file, "songs/covers") → /uploads/songs/covers/<uuid>.jpg
             saveImage(file, "avatars")      → /uploads/avatars/<uuid>.png
 
@@ -168,7 +166,6 @@ public class FileStorageService {
         ---------------------------------------------------------------
         Đọc thời lượng bài hát (giây) từ đường dẫn đã lưu
         ---------------------------------------------------------------
-
         - MP3 → thư viện mp3agic (khai báo trong pom.xml).
         - WAV → thư viện có sẵn của Java (javax.sound.sampled).
         - Không đọc được (file hỏng hoặc đổi đuôi giả mạo) → báo lỗi.

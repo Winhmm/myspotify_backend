@@ -77,7 +77,6 @@ public class SongService {
         ---------------------------------------------------------------
         UC20 - Danh sách bài đã phát hành
         ---------------------------------------------------------------
-
         1 trang bài đã phát hành, mới phát hành trước.
     */
     public Page<Song> getPublishedSongs(int page, int size) {
@@ -88,7 +87,6 @@ public class SongService {
         ---------------------------------------------------------------
         UC21 - Tìm kiếm
         ---------------------------------------------------------------
-
         Tìm theo tên bài, nghệ danh Artist chính, nghệ danh Artist feat.
 
         Từ khóa rỗng hoặc toàn dấu cách → trả danh sách bình thường (như UC20),
@@ -108,7 +106,6 @@ public class SongService {
         ---------------------------------------------------------------
         UC22 - Chi tiết 1 bài đã phát hành
         ---------------------------------------------------------------
-
         Bài chưa phát hành, bị ẩn, bị gỡ, Artist bị khóa, hoặc không tồn tại
         → đều báo chung "Song does not exist" (không lộ trạng thái bài cho người ngoài).
 
@@ -147,7 +144,6 @@ public class SongService {
         ---------------------------------------------------------------
         UC25 - Lấy thông tin Artist cho trang nghệ sĩ
         ---------------------------------------------------------------
-
         Không phải Artist, đã bị khóa, hoặc không tồn tại → báo "Artist does not exist".
         Ẩn trang của Artist bị khóa: khớp với việc mọi bài của họ cũng tự ẩn
         (điều kiện Artist ACTIVE trong PUBLISHED_CONDITION).
@@ -167,7 +163,6 @@ public class SongService {
         ---------------------------------------------------------------
         UC25 - Bài của 1 Artist cho trang nghệ sĩ
         ---------------------------------------------------------------
-
         Bài đã phát hành mà Artist này là Artist chính hoặc được feat.
     */
     public Page<Song> getArtistSongs(Long artistId, int page, int size) {
@@ -178,7 +173,6 @@ public class SongService {
         ---------------------------------------------------------------
         Hàm hỗ trợ: phân trang an toàn, mới phát hành lên đầu
         ---------------------------------------------------------------
-
         - page < 0 → 0.
         - size ngoài khoảng 1 - 50 → tự chỉnh lại.
 

@@ -86,6 +86,7 @@ public class UserController {
         =====================================================
         UC06 - ĐĂNG XUẤT
         =====================================================
+
         Ví dụ gọi:
             POST /api/users/logout      (không cần body, chỉ cần header Authorization)
 
@@ -108,6 +109,7 @@ public class UserController {
         =====================================================
         UC07 - XEM THÔNG TIN CÁ NHÂN
         =====================================================
+
         Ví dụ gọi:
             GET /api/users/me/profile
 
@@ -140,6 +142,7 @@ public class UserController {
         =====================================================
         UC08 - CẬP NHẬT THÔNG TIN CÁ NHÂN
         =====================================================
+
         Ví dụ gọi:
             PUT /api/users/me/profile
             {
@@ -169,6 +172,7 @@ public class UserController {
         =====================================================
         UC09 - ĐỔI MẬT KHẨU (BƯỚC 1: XÁC NHẬN MẬT KHẨU HIỆN TẠI)
         =====================================================
+
         Ví dụ gọi:
             POST /api/users/me/change-password/request-otp
             {
@@ -205,6 +209,7 @@ public class UserController {
         =====================================================
         UC09 - ĐỔI MẬT KHẨU (BƯỚC 2: NHẬP OTP VÀ MẬT KHẨU MỚI)
         =====================================================
+
         Ví dụ gọi:
             PUT /api/users/me/change-password
             {
@@ -239,6 +244,7 @@ public class UserController {
         =====================================================
         UC10 - CẬP NHẬT ẢNH ĐẠI DIỆN
         =====================================================
+
         Ví dụ gọi (Postman: Body → form-data):
             POST /api/users/me/avatar
             Key: file    Type: File    Value: chọn ảnh từ máy
@@ -287,6 +293,7 @@ public class UserController {
         =====================================================
         UC13 - CẬP NHẬT EMAIL (BƯỚC 1: GỬI OTP TỚI EMAIL MỚI)
         =====================================================
+
         Ví dụ gọi:
             POST /api/users/me/email/request-otp
             {
@@ -327,6 +334,7 @@ public class UserController {
         =====================================================
         UC13 - CẬP NHẬT EMAIL (BƯỚC 2: NHẬP OTP)
         =====================================================
+
         Ví dụ gọi:
             PUT /api/users/me/email
             {
@@ -367,6 +375,7 @@ public class UserController {
         =====================================================
         UC11 - VÔ HIỆU HÓA TÀI KHOẢN
         =====================================================
+
         Ví dụ gọi:
             PUT /api/users/me/disable
             {
@@ -405,6 +414,7 @@ public class UserController {
          =====================================================
          UC12 - XÓA TÀI KHOẢN (XÓA MỀM)
          =====================================================
+
          Ví dụ gọi:
              PUT /api/users/me/delete
              {
@@ -449,6 +459,7 @@ public class UserController {
         =====================================================
         UC14 - GỬI YÊU CẦU TRỞ THÀNH ARTIST
         =====================================================
+
         Ví dụ gọi:
             POST /api/users/me/artist-request
             {
@@ -490,6 +501,7 @@ public class UserController {
         =====================================================
         UC19 - CẬP NHẬT HỒ SƠ ARTIST
         =====================================================
+
         Ví dụ gọi:
             PUT /api/users/me/artist-profile
             {

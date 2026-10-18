@@ -104,7 +104,6 @@ public class SongController {
         ---------------------------------------------------------------
         UC20 - Danh sách bài đã phát hành
         ---------------------------------------------------------------
-
         Ví dụ gọi:
             GET /api/songs                    → trang đầu, 20 bài
             GET /api/songs?page=1&size=10     → trang thứ hai, 10 bài mỗi trang
@@ -153,7 +152,6 @@ public class SongController {
         ---------------------------------------------------------------
         UC21 - Tìm kiếm
         ---------------------------------------------------------------
-
         Ví dụ gọi:
             GET /api/songs/search?keyword=may chieu&page=0&size=20
 
@@ -198,7 +196,6 @@ public class SongController {
         ---------------------------------------------------------------
         UC22 - Chi tiết 1 bài hát
         ---------------------------------------------------------------
-
         Ví dụ gọi:
             GET /api/songs/15
 
@@ -223,7 +220,6 @@ public class SongController {
         ---------------------------------------------------------------
         UC24 - Ghi nhận 1 lượt nghe (tăng lượt nghe và lưu lịch sử nghe)
         ---------------------------------------------------------------
-
         Ví dụ gọi:
             POST /api/songs/15/play      (không cần body)
 
@@ -264,7 +260,6 @@ public class SongController {
         ---------------------------------------------------------------
         UC25 - Trang của 1 Artist: thông tin và bài đã phát hành
         ---------------------------------------------------------------
-
         Ví dụ gọi:
             GET /api/songs/artists/5?page=0&size=20
 
