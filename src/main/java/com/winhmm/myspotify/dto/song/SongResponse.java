@@ -24,6 +24,7 @@ import java.util.List;
         "title": "Chiều Mưa",
         "audioUrl": "/uploads/songs/audio/3f2a9c1e.mp3",
         "coverUrl": "/uploads/songs/covers/9b1c4d7f.jpg",
+        "canvasUrl": "/uploads/songs/canvas/8d1f2a7c.mp4",
         "durationSeconds": 215,
         "playCount": 1024,
         "releaseAt": "2026-10-12T16:30:00",
@@ -32,6 +33,9 @@ import java.util.List;
         "featuredArtists": [ { "id": 12, "artistName": "Sóng Nhỏ" } ]
     }
 
+    canvasUrl: video lặp (Canvas) của bài, null nếu Artist chưa đăng
+    → frontend hiện ảnh bìa (coverUrl) thay thế.
+
     LocalDateTime → JSON: Spring Boot tự chuyển sang chuỗi chuẩn ISO "2026-10-12T16:30:00"
     (không phải dạng số như 1760261400000), frontend dùng new Date(...) đọc được ngay.
 
@@ -39,7 +43,7 @@ import java.util.List;
     BUILDER PATTERN - VÌ SAO DÙNG?
     =====================================================================
 
-    Vấn đề: class có 10 trường. Nếu dùng constructor thường:
+    Vấn đề: class có 11 trường. Nếu dùng constructor thường:
         new SongResponse(15L, "Chiều Mưa", "/uploads/...", "/uploads/...", 215, 1024L,
                          time, 5L, "Mây Chiều", list);
     → Đọc vào không biết số 215 là gì, 1024L là gì.
@@ -69,6 +73,7 @@ public class SongResponse {
     private String title;
     private String audioUrl;
     private String coverUrl;
+    private String canvasUrl;
     private Integer durationSeconds;
     private Long playCount;
     private LocalDateTime releaseAt;
@@ -81,6 +86,7 @@ public class SongResponse {
         this.title = builder.title;
         this.audioUrl = builder.audioUrl;
         this.coverUrl = builder.coverUrl;
+        this.canvasUrl = builder.canvasUrl;
         this.durationSeconds = builder.durationSeconds;
         this.playCount = builder.playCount;
         this.releaseAt = builder.releaseAt;
@@ -97,6 +103,7 @@ public class SongResponse {
     public String getTitle() { return title; }
     public String getAudioUrl() { return audioUrl; }
     public String getCoverUrl() { return coverUrl; }
+    public String getCanvasUrl() { return canvasUrl; }
     public Integer getDurationSeconds() { return durationSeconds; }
     public Long getPlayCount() { return playCount; }
     public LocalDateTime getReleaseAt() { return releaseAt; }
@@ -109,6 +116,7 @@ public class SongResponse {
         private String title;
         private String audioUrl;
         private String coverUrl;
+        private String canvasUrl;
         private Integer durationSeconds;
         private Long playCount;
         private LocalDateTime releaseAt;
@@ -120,6 +128,7 @@ public class SongResponse {
         public Builder title(String title) { this.title = title; return this; }
         public Builder audioUrl(String audioUrl) { this.audioUrl = audioUrl; return this; }
         public Builder coverUrl(String coverUrl) { this.coverUrl = coverUrl; return this; }
+        public Builder canvasUrl(String canvasUrl) { this.canvasUrl = canvasUrl; return this; }
         public Builder durationSeconds(Integer durationSeconds) { this.durationSeconds = durationSeconds; return this; }
         public Builder playCount(Long playCount) { this.playCount = playCount; return this; }
         public Builder releaseAt(LocalDateTime releaseAt) { this.releaseAt = releaseAt; return this; }

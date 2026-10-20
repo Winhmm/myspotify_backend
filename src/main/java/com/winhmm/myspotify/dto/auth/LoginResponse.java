@@ -20,11 +20,11 @@ import com.winhmm.myspotify.enums.Role;
     Ý nghĩa từng trường
     -----------------------------------------------------
     1. token:
-       - JWT do backend tạo khi đăng nhập thành công, sống 24 giờ.
+       - JWT do backend tạo khi đăng nhập thành công, sống 7 ngày.
        - Chứa email (sub) và mã phiên (jti), không chứa mật khẩu hay role.
        - Frontend lưu lại và gửi kèm ở mọi request sau:
              Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
-       - Token mất hiệu lực sớm hơn 24 giờ khi: đăng xuất, đăng nhập ở thiết bị khác,
+       - Token mất hiệu lực sớm hơn 7 ngày khi: đăng xuất, đăng nhập ở thiết bị khác,
          đổi mật khẩu, đổi email, bị Admin khóa.
 
     2. userId:

@@ -13,7 +13,7 @@ import java.util.Set;
     =====================================================================
 
     Các cột chính:
-        id, artist_id, title, audio_url, cover_url, duration_seconds, play_count,
+        id, artist_id, title, audio_url, cover_url, canvas_url, duration_seconds, play_count,
         status, release_at, reject_reason, created_at, updated_at, version
 
     Bảng phụ: song_featured_artists (danh sách Artist feat của mỗi bài).
@@ -190,6 +190,23 @@ public class Song {
 
     /*
         ---------------------------------------------------------------
+        Đường dẫn video lặp (Canvas)
+        ---------------------------------------------------------------
+        Giống Spotify Canvas: video ngắn chạy lặp liên tục, không tiếng,
+        hiện ở khung "Đang phát" thay cho ảnh bìa.
+
+        Không bắt buộc (không có nullable = false → cho phép NULL).
+        Không có Canvas → frontend hiện ảnh bìa như cũ.
+
+        Quy định: MP4, dài 7 đến 10 giây, tối đa 50MB.
+        - Định dạng và dung lượng: kiểm tra trong FileStorageService.saveVideo.
+        - Thời lượng: kiểm tra trong ArtistSongService.checkCanvasDuration.
+    */
+    @Column(name = "canvas_url", length = 255)
+    private String canvasUrl;
+
+    /*
+        ---------------------------------------------------------------
         Thời lượng bài hát (giây)
         ---------------------------------------------------------------
     */
@@ -338,6 +355,9 @@ public class Song {
 
     public String getCoverUrl() { return coverUrl; }
     public void setCoverUrl(String coverUrl) { this.coverUrl = coverUrl; }
+
+    public String getCanvasUrl() { return canvasUrl; }
+    public void setCanvasUrl(String canvasUrl) { this.canvasUrl = canvasUrl; }
 
     public Integer getDurationSeconds() { return durationSeconds; }
     public void setDurationSeconds(Integer durationSeconds) { this.durationSeconds = durationSeconds; }

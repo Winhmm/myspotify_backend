@@ -56,10 +56,10 @@ import java.util.Date;
     -----------------------------------------------------
     Vì sao không bỏ role vào token?
     -----------------------------------------------------
-    - Token sống 24 giờ và không sửa được sau khi đã gửi cho client.
+    - Token sống 7 ngày và không sửa được sau khi đã gửi cho client.
     - Nếu role nằm trong token: Admin hạ 1 người từ ADMIN xuống USER,
       nhưng token cũ của người đó vẫn ghi ADMIN
-      → họ vẫn dùng được quyền Admin thêm tối đa 24 giờ.
+      → họ vẫn dùng được quyền Admin cho tới khi token hết hạn.
     - Project này chỉ để email trong token. Role được đọc lại từ MySQL ở mỗi request
       (xem CustomUserDetailsService) → đổi role là có hiệu lực ngay ở request tiếp theo.
 

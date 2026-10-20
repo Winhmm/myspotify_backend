@@ -10,6 +10,8 @@ import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -23,13 +25,15 @@ import java.util.UUID;
     =====================================================================
 
     Các chức năng:
-        saveAudio(...)        → lưu file nhạc (MP3, WAV)
-        saveImage(...)        → lưu ảnh (JPG, PNG, WEBP)
-        getAudioDuration(...) → đọc thời lượng, đồng thời kiểm tra file có phải nhạc thật
-        delete(...)           → xóa file
+        saveAudio(...)          → lưu file nhạc (MP3, WAV)
+        saveImage(...)          → lưu ảnh (JPG, PNG, WEBP)
+        saveVideo(...)          → lưu video MP4 (video lặp Canvas)
+        getAudioDuration(...)   → đọc thời lượng nhạc, đồng thời kiểm tra file có phải nhạc thật
+        getVideoDurationMs(...) → đọc thời lượng video MP4, đồng thời kiểm tra có phải video thật
+        delete(...)             → xóa file
 
     Dùng chung cho:
-    - Module Song: file nhạc, ảnh bìa (ArtistSongService).
+    - Module Song: file nhạc, ảnh bìa, video lặp Canvas (ArtistSongService).
     - Module User: ảnh đại diện (UserService.updateAvatar).
 
     =====================================================================
@@ -38,6 +42,7 @@ import java.util.UUID;
 
         {uploadDir}/songs/audio/<uuid>.mp3 | .wav
         {uploadDir}/songs/covers/<uuid>.jpg | .png | .webp
+        {uploadDir}/songs/canvas/<uuid>.mp4
         {uploadDir}/avatars/<uuid>.jpg | .png | .webp
 
     {uploadDir} lấy từ app.upload-dir trong application.properties
@@ -68,13 +73,15 @@ import java.util.UUID;
 
     Ảnh : Content-Type → dung lượng → chữ ký file (vài byte đầu) mới tin là ảnh thật.
     Nhạc: đuôi file → dung lượng → đọc thời lượng bằng thư viện nhạc mới tin là nhạc thật.
-    → Đổi đuôi file .exe thành .mp3, .pdf thành .png đều bị chặn.
+    Video: dung lượng → Content-Type → chữ ký file "ftyp" → đọc thời lượng trong file MP4.
+    → Đổi đuôi file .exe thành .mp3, .pdf thành .png, .txt thành .mp4 đều bị chặn.
 */
 @Service
 public class FileStorageService {
     private static final long MAX_MP3_SIZE = 20L * 1024 * 1024;
     private static final long MAX_WAV_SIZE = 100L * 1024 * 1024;
     private static final long MAX_IMAGE_SIZE = 2L * 1024 * 1024;
+    private static final long MAX_VIDEO_SIZE = 50L * 1024 * 1024;
 
     /*
         Tiền tố của mọi đường dẫn lưu trong database.
@@ -206,6 +213,129 @@ public class FileStorageService {
 
     /*
         ---------------------------------------------------------------
+        Lưu video MP4 (tối đa 50MB)
+        ---------------------------------------------------------------
+        VD: saveVideo(file, "songs/canvas") → /uploads/songs/canvas/<uuid>.mp4
+
+        Kiểm tra 3 lớp, theo thứ tự từ nhanh đến chậm:
+        1. Dung lượng tối đa 50MB.
+        2. Content-Type client khai báo phải là "video/mp4" (lọc nhanh).
+           Postman và trình duyệt tự đặt Content-Type theo đuôi file:
+           .mp4 → "video/mp4", .mov → "video/quicktime", .jpg → "image/jpeg"...
+        3. Chữ ký file: byte thứ 4 đến thứ 7 phải là chữ "ftyp"
+           → chặn file giả mạo, VD file .txt hoặc .exe đổi đuôi thành .mp4
+             (đổi đuôi thì Content-Type vẫn là "video/mp4", nhưng chữ ký file thì không đổi được).
+
+        Tên file lưu luôn là <uuid>.mp4, không dùng tên gốc (lý do: xem phần UUID ở đầu file).
+
+        Method này chưa kiểm tra thời lượng.
+        → Sau khi lưu, ArtistSongService gọi getVideoDurationMs() để kiểm tra,
+          vì cần file nằm trên ổ đĩa mới đọc được (giống cách làm với file nhạc).
+    */
+    public String saveVideo(MultipartFile file, String folder) {
+        if(file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Video file is required");
+        }
+
+        if(file.getSize() > MAX_VIDEO_SIZE) {
+            throw new IllegalArgumentException("Video must not exceed 50MB");
+        }
+
+        if(!"video/mp4".equals(file.getContentType())) {
+            throw new IllegalArgumentException("Only MP4 videos are allowed");
+        }
+
+        if(!isRealMp4(file)) {
+            throw new IllegalArgumentException("Invalid or corrupted video file");
+        }
+
+        return saveFile(file, folder, ".mp4");
+    }
+
+    /*
+        ---------------------------------------------------------------
+        Đọc thời lượng video MP4 từ đường dẫn đã lưu (đơn vị mili giây)
+        ---------------------------------------------------------------
+    */
+    public long getVideoDurationMs(String videoUrl) {
+        try(RandomAccessFile file = new RandomAccessFile(toPath(videoUrl).toFile(), "r")) {
+            long[] moov = findBox(file, 0, file.length(), "moov");
+            if(moov == null) {
+                throw new IllegalArgumentException("Invalid or corrupted video file");
+            }
+
+            long[] mvhd = findBox(file, moov[0], moov[1], "mvhd");
+            if(mvhd == null) {
+                throw new IllegalArgumentException("Invalid or corrupted video file");
+            }
+
+            file.seek(mvhd[0]);
+            int version = file.readUnsignedByte();
+            file.skipBytes(3);
+
+            long timescale;
+            long duration;
+
+            if(version == 1) {
+                file.skipBytes(16);
+                timescale = file.readInt() & 0xFFFFFFFFL;
+                duration = file.readLong();
+            } else {
+                file.skipBytes(8);
+                timescale = file.readInt() & 0xFFFFFFFFL;
+                duration = file.readInt() & 0xFFFFFFFFL;
+            }
+
+            if(timescale == 0 || duration <= 0) {
+                throw new IllegalArgumentException("Invalid or corrupted video file");
+            }
+
+            return duration * 1000 / timescale;
+        } catch(IOException e) {
+            throw new IllegalArgumentException("Invalid or corrupted video file");
+        }
+    }
+
+    /*
+        ---------------------------------------------------------------
+        Hàm hỗ trợ: tìm 1 hộp theo tên trong đoạn [start, end) của file MP4
+        ---------------------------------------------------------------
+    */
+    private long[] findBox(RandomAccessFile file, long start, long end, String wantedType) throws IOException {
+        long position = start;
+
+        while(position + 8 <= end) {
+            file.seek(position);
+
+            long size = file.readInt() & 0xFFFFFFFFL;
+            byte[] typeBytes = new byte[4];
+            file.readFully(typeBytes);
+            String type = new String(typeBytes, StandardCharsets.US_ASCII);
+
+            long headerSize = 8;
+            if(size == 1) {
+                size = file.readLong();
+                headerSize = 16;
+            } else if(size == 0) {
+                size = end - position;
+            }
+
+            if(size < headerSize || position + size > end) {
+                return null;
+            }
+
+            if(type.equals(wantedType)) {
+                return new long[] { position + headerSize, position + size };
+            }
+
+            position += size;
+        }
+
+        return null;
+    }
+
+    /*
+        ---------------------------------------------------------------
         Xóa file theo đường dẫn đã lưu
         ---------------------------------------------------------------
     */
@@ -289,6 +419,22 @@ public class FileStorageService {
             }
 
             return false;
+        } catch(IOException e) {
+            return false;
+        }
+    }
+
+    /*
+        ---------------------------------------------------------------
+        Hàm hỗ trợ: kiểm tra chữ ký file MP4
+        ---------------------------------------------------------------
+    */
+    private boolean isRealMp4(MultipartFile file) {
+        try(InputStream in = file.getInputStream()) {
+            byte[] head = in.readNBytes(8);
+
+            return head.length >= 8
+                    && head[4] == 'f' && head[5] == 't' && head[6] == 'y' && head[7] == 'p';
         } catch(IOException e) {
             return false;
         }

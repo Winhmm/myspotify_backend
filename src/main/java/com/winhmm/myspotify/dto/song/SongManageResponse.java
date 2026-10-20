@@ -43,6 +43,7 @@ import java.util.List;
         "title": "Chiều Mưa",
         "audioUrl": "/uploads/songs/audio/3f2a9c1e.mp3",
         "coverUrl": "/uploads/songs/covers/9b1c4d7f.jpg",
+        "canvasUrl": "/uploads/songs/canvas/8d1f2a7c.mp4",
         "durationSeconds": 215,
         "playCount": 0,
         "status": "REJECTED",
@@ -62,7 +63,7 @@ import java.util.List;
     BUILDER
     =====================================================================
 
-    Class có 15 trường → càng cần Builder hơn SongResponse
+    Class có 16 trường → càng cần Builder hơn SongResponse
     (giải thích chi tiết Builder Pattern xem trong SongResponse.java).
 
         SongManageResponse response = SongManageResponse.builder()
@@ -78,6 +79,7 @@ public class SongManageResponse {
     private String title;
     private String audioUrl;
     private String coverUrl;
+    private String canvasUrl;
     private Integer durationSeconds;
     private Long playCount;
     private SongStatus status;
@@ -95,6 +97,7 @@ public class SongManageResponse {
         this.title = builder.title;
         this.audioUrl = builder.audioUrl;
         this.coverUrl = builder.coverUrl;
+        this.canvasUrl = builder.canvasUrl;
         this.durationSeconds = builder.durationSeconds;
         this.playCount = builder.playCount;
         this.status = builder.status;
@@ -116,6 +119,7 @@ public class SongManageResponse {
     public String getTitle() { return title; }
     public String getAudioUrl() { return audioUrl; }
     public String getCoverUrl() { return coverUrl; }
+    public String getCanvasUrl() { return canvasUrl; }
     public Integer getDurationSeconds() { return durationSeconds; }
     public Long getPlayCount() { return playCount; }
     public SongStatus getStatus() { return status; }
@@ -133,6 +137,7 @@ public class SongManageResponse {
         private String title;
         private String audioUrl;
         private String coverUrl;
+        private String canvasUrl;
         private Integer durationSeconds;
         private Long playCount;
         private SongStatus status;
@@ -149,6 +154,7 @@ public class SongManageResponse {
         public Builder title(String title) { this.title = title; return this; }
         public Builder audioUrl(String audioUrl) { this.audioUrl = audioUrl; return this; }
         public Builder coverUrl(String coverUrl) { this.coverUrl = coverUrl; return this; }
+        public Builder canvasUrl(String canvasUrl) { this.canvasUrl = canvasUrl; return this; }
         public Builder durationSeconds(Integer durationSeconds) { this.durationSeconds = durationSeconds; return this; }
         public Builder playCount(Long playCount) { this.playCount = playCount; return this; }
         public Builder status(SongStatus status) { this.status = status; return this; }

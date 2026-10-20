@@ -14,7 +14,7 @@ import java.util.Map;
 
 /*
     =====================================================================
-    SongController - API NGƯỜI NGHE (UC20 - UC25)
+    SONGCONTROLLER - API NGƯỜI NGHE (UC20 - UC25)
     =====================================================================
 
     Các API trong class:

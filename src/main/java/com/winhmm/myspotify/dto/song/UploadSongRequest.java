@@ -109,7 +109,9 @@ public class UploadSongRequest {
     public void setCover(MultipartFile cover) { this.cover = cover; }
 
     public List<Long> getFeaturedArtistIds() { return featuredArtistIds; }
-    public void setFeaturedArtistIds(List<Long> featuredArtistIds) { this.featuredArtistIds = featuredArtistIds; }
+    public void setFeaturedArtistIds(List<Long> featuredArtistIds) {
+        this.featuredArtistIds = (featuredArtistIds != null) ? featuredArtistIds : new ArrayList<>();
+    }
 
     public LocalDateTime getReleaseAt() { return releaseAt; }
     public void setReleaseAt(LocalDateTime releaseAt) { this.releaseAt = releaseAt; }

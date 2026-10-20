@@ -25,6 +25,8 @@ import java.util.Set;
         getMySongs(...)            → bài hát của tôi (UC28)
         updateSong(...)            → sửa tên và danh sách feat (UC29)
         updateCover(...)           → đổi ảnh bìa (UC30)
+        updateCanvas(...)          → đăng hoặc thay video lặp Canvas
+        removeCanvas(...)          → gỡ video lặp Canvas
         updateReleaseSchedule(...) → đổi lịch phát hành (UC31)
         hideSong(...), showSong(...) → ẩn, hiện lại bài (UC32)
         deleteSong(...)            → xóa bài (UC33)
@@ -66,6 +68,13 @@ public class ArtistSongService {
         Thư mục con chứa ảnh bìa (bên trong thư mục upload gốc).
     */
     private static final String COVER_FOLDER = "songs/covers";
+
+    /*
+        Video lặp (Canvas): thư mục con chứa video và thời lượng cho phép (đơn vị giây).
+    */
+    private static final String CANVAS_FOLDER = "songs/canvas";
+    private static final double MIN_CANVAS_SECONDS = 7;
+    private static final double MAX_CANVAS_SECONDS = 10;
 
     private final SongRepository songRepository;
     private final UserRepository userRepository;
@@ -209,6 +218,72 @@ public class ArtistSongService {
 
     /*
         ---------------------------------------------------------------
+        Đăng hoặc thay video lặp (Canvas)
+        ---------------------------------------------------------------
+
+        Thứ tự an toàn (giống đổi ảnh bìa):
+        1. Lưu video mới lên ổ đĩa (FileStorageService kiểm tra MP4 thật, tối đa 50MB).
+        2. Đọc thời lượng, phải từ 7 đến 10 giây.
+        3. Lưu bài với đường dẫn video mới.
+        4. Lưu thành công → mới xóa video cũ (nếu có).
+        Bước 2 hoặc 3 lỗi → khối catch xóa video mới vừa lưu, video cũ còn nguyên.
+
+        Bước 1 lỗi thì không cần dọn gì, vì file chưa được ghi xuống ổ đĩa.
+
+        Không cần Admin duyệt lại (giống đổi ảnh bìa).
+        Bài đang REJECTED mà đổi Canvas → tự gửi duyệt lại.
+    */
+    public Song updateCanvas(Long artistId, Long songId, MultipartFile videoFile) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+
+        String oldCanvasUrl = song.getCanvasUrl();
+        String newCanvasUrl = fileStorageService.saveVideo(videoFile, CANVAS_FOLDER);
+
+        try {
+            checkCanvasDuration(newCanvasUrl);
+
+            song.setCanvasUrl(newCanvasUrl);
+            resubmitIfRejected(song);
+
+            Song saved = songRepository.save(song);
+            fileStorageService.delete(oldCanvasUrl);
+
+            return saved;
+        } catch(RuntimeException exception) {
+            fileStorageService.delete(newCanvasUrl);
+            throw exception;
+        }
+    }
+
+    /*
+        ---------------------------------------------------------------
+        Gỡ video lặp (Canvas)
+        ---------------------------------------------------------------
+        Lưu database trước (canvasUrl = null), thành công rồi mới xóa file.
+        Nếu xóa file trước mà lưu database lỗi, bài sẽ trỏ tới 1 file không còn tồn tại.
+
+        Bài chưa có Canvas → báo lỗi, để frontend biết thao tác không có tác dụng.
+    */
+    public Song removeCanvas(Long artistId, Long songId) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+
+        String oldCanvasUrl = song.getCanvasUrl();
+
+        if(oldCanvasUrl == null) {
+            throw new IllegalArgumentException("Song has no canvas video");
+        }
+
+        song.setCanvasUrl(null);
+        Song saved = songRepository.save(song);
+
+        fileStorageService.delete(oldCanvasUrl);
+        return saved;
+    }
+
+    /*
+        ---------------------------------------------------------------
         UC31 - Đổi lịch phát hành
         ---------------------------------------------------------------
     */
@@ -277,7 +352,8 @@ public class ArtistSongService {
         ---------------------------------------------------------------
         Đổi trạng thái DELETED, giữ bản ghi trong database (lịch sử, lượt nghe cũ).
 
-        Xóa hẳn file nhạc và ảnh bìa khỏi ổ đĩa (không chiếm dung lượng).
+        Xóa hẳn file nhạc, ảnh bìa và video Canvas khỏi ổ đĩa (không chiếm dung lượng).
+        fileStorageService.delete(null) không làm gì, nên bài không có ảnh bìa hoặc Canvas vẫn chạy bình thường.
     */
     public void deleteSong(Long artistId, Long songId) {
         getArtist(artistId);
@@ -288,6 +364,7 @@ public class ArtistSongService {
 
         fileStorageService.delete(song.getAudioUrl());
         fileStorageService.delete(song.getCoverUrl());
+        fileStorageService.delete(song.getCanvasUrl());
     }
 
     /*
@@ -388,7 +465,7 @@ public class ArtistSongService {
     }
 
     /*
-         ---------------------------------------------------------------
+        ---------------------------------------------------------------
         Hàm hỗ trợ: bài bị từ chối mà Artist đã sửa → tự gửi duyệt lại
         ---------------------------------------------------------------
     */
@@ -407,5 +484,20 @@ public class ArtistSongService {
     private boolean wasApproved(Song song) {
         return song.getStatus() == SongStatus.APPROVED
                 || song.getStatus() == SongStatus.HIDDEN;
+    }
+
+    /*
+        ---------------------------------------------------------------
+        Hàm hỗ trợ: video Canvas phải dài từ 7 đến 10 giây
+        ---------------------------------------------------------------
+    */
+    private void checkCanvasDuration(String canvasUrl) {
+        long durationMs = fileStorageService.getVideoDurationMs(canvasUrl);
+        double seconds = Math.round(durationMs / 100.0) / 10.0;
+
+        if(seconds < MIN_CANVAS_SECONDS || seconds > MAX_CANVAS_SECONDS) {
+            throw new IllegalArgumentException(
+                    "Canvas video must be between 7 and 10 seconds (current: " + seconds + "s)");
+        }
     }
 }

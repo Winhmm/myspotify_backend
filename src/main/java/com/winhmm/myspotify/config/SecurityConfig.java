@@ -207,9 +207,10 @@ public class SecurityConfig {
                             Ví dụ: tài khoản USER gọi GET /api/admin/users,
                             Controller có @PreAuthorize("hasRole('ADMIN')") → bị từ chối → 403.
 
-                            Lưu ý: nếu GlobalExceptionHandler có hàm bắt Exception.class,
-                            lỗi từ @PreAuthorize có thể bị hàm đó bắt trước và trả 500.
-                            Khi đó cần thêm 1 handler riêng cho AccessDeniedException.
+                            Lưu ý: lỗi từ @PreAuthorize xảy ra bên trong Controller,
+                            nên thường được GlobalExceptionHandler.handleAccessDenied bắt trước
+                            (cũng trả 403 với cùng message). Handler ở đây xử lý các trường hợp
+                            bị chặn ngay ở tầng filter.
                         */
                         .accessDeniedHandler((request, response, accessDeniedException) ->
                                 writeJsonError(response, 403, "You do not have permission to access this resource"))

@@ -62,5 +62,7 @@ public class UpdateSongRequest {
     public void setTitle(String title) { this.title = title; }
 
     public List<Long> getFeaturedArtistIds() { return featuredArtistIds; }
-    public void setFeaturedArtistIds(List<Long> featuredArtistIds) { this.featuredArtistIds = featuredArtistIds; }
+    public void setFeaturedArtistIds(List<Long> featuredArtistIds) {
+        this.featuredArtistIds = (featuredArtistIds != null) ? featuredArtistIds : new ArrayList<>();
+    }
 }

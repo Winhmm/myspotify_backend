@@ -103,7 +103,7 @@ public class UserController {
             POST /api/users/logout      (không cần body, chỉ cần header Authorization)
 
         Xóa phiên trong Redis (key session:{email}).
-        → Token hiện tại hết hiệu lực ngay lập tức, dù vẫn còn hạn 24 giờ.
+        → Token hiện tại hết hiệu lực ngay lập tức, dù vẫn còn hạn.
         → Ai lấy được token này cũng không dùng được nữa (401).
 
         Kết quả: 200 { "message": "Logout successful" }

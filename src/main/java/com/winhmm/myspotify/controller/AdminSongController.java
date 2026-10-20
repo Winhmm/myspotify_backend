@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 /*
     =====================================================================
-    AdminSongController - API ADMIN QUẢN LÝ BÀI HÁT (UC34 - UC36)
+    ADMINSONGCONTROLLER - API ADMIN QUẢN LÝ BÀI HÁT (UC34 - UC36)
     =====================================================================
 
     Các API trong class:

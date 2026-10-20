@@ -204,7 +204,8 @@ public class AuthController {
            Nếu đang đăng nhập ở thiết bị khác, phiên cũ bị ghi đè
            → thiết bị cũ bị đăng xuất ở request tiếp theo (401).
            → Mỗi tài khoản chỉ đăng nhập được ở 1 nơi tại 1 thời điểm.
-        5. Tạo JWT chứa email (sub) và mã phiên (jti), sống 24 giờ.
+        5. Tạo JWT chứa email (sub) và mã phiên (jti), sống 7 ngày
+           (thời hạn lấy từ cấu hình JWT trong application.properties).
 
         -----------------------------------------------------
         Vì sao sai email và sai mật khẩu báo cùng 1 message?

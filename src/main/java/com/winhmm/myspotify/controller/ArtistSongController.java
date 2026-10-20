@@ -19,7 +19,7 @@ import java.util.Map;
 
 /*
     =====================================================================
-    ArtistSongController - API ARTIST QUẢN LÝ BÀI HÁT CỦA MÌNH (UC26 - UC33, UC37)
+    ARTISTSONGCONTROLLER - API ARTIST QUẢN LÝ BÀI HÁT CỦA MÌNH (UC26 - UC33, UC37)
     =====================================================================
 
     Các API trong class:
@@ -28,6 +28,8 @@ import java.util.Map;
         GET    /api/artist/search-artists?keyword=  → tìm nghệ sĩ để feat
         PUT    /api/artist/songs/{songId}           → sửa tên bài và danh sách feat
         PUT    /api/artist/songs/{songId}/cover     → đổi ảnh bìa
+        PUT    /api/artist/songs/{songId}/canvas    → đăng hoặc thay video lặp (Canvas)
+        DELETE /api/artist/songs/{songId}/canvas    → gỡ video lặp (Canvas)
         PUT    /api/artist/songs/{songId}/release   → đổi lịch phát hành
         PUT    /api/artist/songs/{songId}/hide      → ẩn bài
         PUT    /api/artist/songs/{songId}/show      → hiện lại bài đã ẩn
@@ -48,7 +50,7 @@ import java.util.Map;
                               │
                       Artist sửa bài ──► PENDING (tự gửi duyệt lại)
 
-        Artist xóa bài (bất kỳ lúc nào) ──► DELETED (xóa luôn file nhạc và ảnh bìa)
+        Artist xóa bài (bất kỳ lúc nào) ──► DELETED (xóa luôn file nhạc, ảnh bìa và video Canvas)
 
     =====================================================================
     CÁC ANNOTATION Ở ĐẦU CLASS
@@ -95,11 +97,11 @@ import java.util.Map;
     KHI NÀO DÙNG JSON, KHI NÀO DÙNG FORM-DATA?
     =====================================================================
 
-    - API có gửi file (đăng bài, đổi ảnh bìa)
+    - API có gửi file (đăng bài, đổi ảnh bìa, đăng video Canvas)
       → multipart/form-data. JSON chỉ chứa chữ, không gửi được file nhị phân (mp3, jpg).
     - API chỉ có chữ (sửa tên, đổi lịch)
       → JSON (application/json), dùng @RequestBody.
-    - API không cần dữ liệu gửi lên (ẩn, hiện, xóa) → không có body.
+    - API không cần dữ liệu gửi lên (ẩn, hiện, xóa, gỡ Canvas) → không có body.
 */
 @PreAuthorize("hasRole('ARTIST')")
 @RestController
@@ -337,6 +339,73 @@ public class ArtistSongController {
 
     /*
         ---------------------------------------------------------------
+        Đăng hoặc thay video lặp (Canvas)
+        ---------------------------------------------------------------
+        Ví dụ gọi (Postman: Body → form-data):
+            PUT /api/artist/songs/15/canvas
+            KEY: canvas   TYPE: File   VALUE: canvas-8s.mp4
+
+        Quy định video:
+            - Định dạng MP4.
+            - Dài từ 7 đến 10 giây (làm tròn tới 0.1 giây).
+            - Tối đa 50MB.
+            - Khuyến nghị: video dọc tỉ lệ 9:16 (VD 720 x 1280), không cần tiếng
+              (frontend luôn phát ở chế độ tắt tiếng).
+
+        @RequestParam("canvas") MultipartFile canvas
+            → API chỉ có 1 trường nên lấy thẳng file, không cần tạo DTO (giống đổi ảnh bìa).
+            → Thiếu key "canvas" → 400 "File is required".
+
+        Frontend phát video:
+            <video src="http://<server>/uploads/songs/canvas/abc.mp4" autoplay muted loop playsinline></video>
+            - autoplay   : tự phát khi trang hiện ra.
+            - loop       : hết video tự phát lại từ đầu.
+            - muted      : bắt buộc, vì trình duyệt chặn tự phát video có tiếng.
+            - playsinline: trên iPhone, video chạy ngay trong trang, không bật toàn màn hình.
+            canvasUrl = null → hiện ảnh bìa như cũ.
+
+        Lỗi có thể gặp:
+            400 "File is required"                → thiếu key "canvas"
+            400 "Only MP4 videos are allowed"     → gửi ảnh, file .mov...
+            400 "Invalid or corrupted video file" → file giả mạo hoặc hỏng
+            400 "Video must not exceed 50MB"
+            400 "Canvas video must be between 7 and 10 seconds (current: 12.0s)"
+            400 "Song does not exist"             → bài không phải của mình, hoặc đã xóa
+
+        JSON trả về: SongManageResponse, có "canvasUrl" mới.
+    */
+    @PutMapping(value = "/songs/{songId}/canvas", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<SongManageResponse> updateCanvas(Authentication authentication,
+                                                           @PathVariable Long songId,
+                                                           @RequestParam("canvas") MultipartFile canvas) {
+        Song song = artistSongService.updateCanvas(me(authentication), songId, canvas);
+        return ResponseEntity.ok(SongMapper.toManageResponse(song));
+    }
+
+    /*
+        ---------------------------------------------------------------
+        Gỡ video lặp (Canvas)
+        ---------------------------------------------------------------
+        Ví dụ gọi:
+            DELETE /api/artist/songs/15/canvas      (không cần body)
+
+        File video bị xóa khỏi ổ đĩa, "canvasUrl" trở về null
+        → frontend quay lại hiện ảnh bìa.
+
+        Lỗi có thể gặp:
+            400 "Song has no canvas video" → bài chưa có Canvas
+
+        JSON trả về: SongManageResponse với "canvasUrl": null.
+    */
+    @DeleteMapping("/songs/{songId}/canvas")
+    public ResponseEntity<SongManageResponse> removeCanvas(Authentication authentication,
+                                                           @PathVariable Long songId) {
+        Song song = artistSongService.removeCanvas(me(authentication), songId);
+        return ResponseEntity.ok(SongMapper.toManageResponse(song));
+    }
+
+    /*
+        ---------------------------------------------------------------
         UC31 - Đổi lịch phát hành
         ---------------------------------------------------------------
         Ví dụ gọi:
@@ -411,7 +480,7 @@ public class ArtistSongController {
 
         Xóa mềm (soft delete):
             - Bản ghi vẫn còn trong database, chỉ đổi status = DELETED.
-            - File nhạc và ảnh bìa bị xóa hẳn khỏi ổ đĩa (không chiếm dung lượng).
+            - File nhạc, ảnh bìa và video Canvas bị xóa hẳn khỏi ổ đĩa (không chiếm dung lượng).
 
         Vì sao không xóa hẳn bản ghi?
             - Giữ lịch sử (bài từng tồn tại, từng có bao nhiêu lượt nghe).

@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 /*
     =====================================================================
-    ListeningHistory - 1 LƯỢT NGHE CỦA 1 NGƯỜI DÙNG (MONGODB)
+    LISTENINGHISTORY - 1 LƯỢT NGHE CỦA 1 NGƯỜI DÙNG (MONGODB)
     =====================================================================
 
     Các field:
@@ -34,7 +34,7 @@ import java.time.LocalDateTime;
             "_id": ObjectId("6710a3f2c9e77b1a2d3e4f50"),
             "userId": 5,
             "songId": 15,
-            "playedAt": ISODate("2026-10-12T15:55:10Z"),
+            "playedAt": ISODate("2026-10-12T08:55:10Z"),
             "_class": "com.winhmm.myspotify.document.ListeningHistory"
         }
     _class do Spring tự thêm, để biết đọc document này thành class nào.
