@@ -1,10 +1,12 @@
 package com.winhmm.myspotify.service;
 
+import com.winhmm.myspotify.entity.Genre;
 import com.winhmm.myspotify.entity.Song;
 import com.winhmm.myspotify.entity.User;
 import com.winhmm.myspotify.enums.AccountStatus;
 import com.winhmm.myspotify.enums.Role;
 import com.winhmm.myspotify.enums.SongStatus;
+import com.winhmm.myspotify.repository.GenreRepository;
 import com.winhmm.myspotify.repository.SongRepository;
 import com.winhmm.myspotify.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -78,13 +80,16 @@ public class ArtistSongService {
 
     private final SongRepository songRepository;
     private final UserRepository userRepository;
+    private final GenreRepository genreRepository;
     private final FileStorageService fileStorageService;
 
     public ArtistSongService(SongRepository songRepository,
                              UserRepository userRepository,
+                             GenreRepository genreRepository,
                              FileStorageService fileStorageService) {
         this.songRepository = songRepository;
         this.userRepository = userRepository;
+        this.genreRepository = genreRepository;
         this.fileStorageService = fileStorageService;
     }
 
@@ -96,17 +101,25 @@ public class ArtistSongService {
         1. Kiểm tra người đăng là Artist đang hoạt động.
         2. Kiểm tra lịch phát hành (nếu có phải ở tương lai).
         3. Kiểm tra danh sách nghệ sĩ feat.
-        4. Lưu file nhạc → đọc thời lượng (file giả thì báo lỗi).
-        5. Lưu ảnh bìa (nếu có).
-        6. Lưu bài hát vào database với trạng thái PENDING (chờ Admin duyệt).
+        4. Kiểm tra thể loại có tồn tại.
+        5. Lưu file nhạc → đọc thời lượng (file giả thì báo lỗi).
+        6. Lưu ảnh bìa (nếu có).
+        7. Lưu bài hát vào database với trạng thái PENDING (chờ Admin duyệt).
+
+        Bước 1 đến 4 chỉ đọc database, chưa ghi file nào.
+        Sai ở đây thì báo lỗi ngay, không phải lưu file nhạc rồi lại xóa.
+
+        Thể loại chọn 1 lần ở đây. Sau khi đăng, không API nào đổi được
+        (updateSong chỉ sửa tên và danh sách feat).
     */
-    public Song uploadSong(Long artistId, String title, MultipartFile audioFile,
+    public Song uploadSong(Long artistId, String title, Long genreId, MultipartFile audioFile,
                            MultipartFile coverFile, List<Long> featuredArtistIds,
                            LocalDateTime releaseAt) {
         User artist = getArtist(artistId);
 
         checkFutureTime(releaseAt);
         Set<User> featuredArtists = loadFeaturedArtists(artistId, featuredArtistIds);
+        Genre genre = getGenre(genreId);
 
         /*
             Lưu file nhạc lên ổ đĩa. Từ đây trở đi, nếu có lỗi phải xóa file này.
@@ -124,6 +137,7 @@ public class ArtistSongService {
             Song song = new Song();
             song.setArtist(artist);
             song.setTitle(title.trim());
+            song.setGenre(genre);
             song.setAudioUrl(audioUrl);
             song.setCoverUrl(coverUrl);
             song.setDurationSeconds(duration);
@@ -171,6 +185,8 @@ public class ArtistSongService {
           (Bài đã phát hành vẫn sửa tên được, VD sửa lỗi chính tả).
 
         - Bài REJECTED → sửa xong tự về PENDING (gửi duyệt lại).
+
+        - Không sửa thể loại: thể loại chỉ chọn 1 lần lúc đăng bài.
     */
     public Song updateSong(Long artistId, Long songId, String title, List<Long> featuredArtistIds) {
         getArtist(artistId);
@@ -381,6 +397,23 @@ public class ArtistSongService {
         }
 
         return artist;
+    }
+
+    /*
+        ---------------------------------------------------------------
+        Hàm hỗ trợ: lấy thể loại theo id
+        ---------------------------------------------------------------
+        genreId == null: phòng trường hợp Service được gọi từ chỗ khác không qua @Valid
+        (UploadSongRequest đã có @NotNull chặn trước).
+        findById(null) sẽ ném lỗi khó hiểu, nên kiểm tra null trước.
+    */
+    private Genre getGenre(Long genreId) {
+        if(genreId == null) {
+            throw new IllegalArgumentException("Genre is required");
+        }
+
+        return genreRepository.findById(genreId)
+                .orElseThrow(() -> new IllegalArgumentException("Genre does not exist"));
     }
 
     /*

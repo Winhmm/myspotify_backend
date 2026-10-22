@@ -1,9 +1,11 @@
 package com.winhmm.myspotify.service;
 
+import com.winhmm.myspotify.entity.Genre;
 import com.winhmm.myspotify.entity.Song;
 import com.winhmm.myspotify.entity.User;
 import com.winhmm.myspotify.enums.AccountStatus;
 import com.winhmm.myspotify.enums.Role;
+import com.winhmm.myspotify.repository.GenreRepository;
 import com.winhmm.myspotify.repository.SongRepository;
 import com.winhmm.myspotify.repository.UserRepository;
 import org.springframework.data.domain.Page;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /*
     =====================================================================
@@ -22,14 +25,15 @@ import java.time.LocalDateTime;
     =====================================================================
 
     Các chức năng:
-        getPublishedSongs(...) → danh sách bài đã phát hành (UC20)
+        getPublishedSongs(...) → danh sách bài đã phát hành, lọc được theo thể loại (UC20)
+        getGenres()            → danh sách thể loại nhạc
         searchSongs(...)       → tìm kiếm bài (UC21)
         getPublishedSong(...)  → chi tiết 1 bài (UC22)
         play(...)              → tăng lượt nghe và ghi lịch sử nghe (UC24)
         getArtist(...)         → thông tin 1 Artist cho trang nghệ sĩ (UC25)
         getArtistSongs(...)    → bài của 1 Artist cho trang nghệ sĩ (UC25)
 
-    Được gọi từ SongController. Mọi tài khoản đã đăng nhập đều dùng được.
+    Được gọi từ SongController và GenreController. Mọi tài khoản đã đăng nhập đều dùng được.
 
     =====================================================================
     CHỈ TRẢ BÀI "ĐÃ PHÁT HÀNH"
@@ -54,6 +58,7 @@ public class SongService {
 
     private final SongRepository songRepository;
     private final UserRepository userRepository;
+    private final GenreRepository genreRepository;
 
     /*
         StringRedisTemplate: công cụ Spring cung cấp để gửi lệnh tới Redis
@@ -64,10 +69,12 @@ public class SongService {
 
     public SongService(SongRepository songRepository,
                        UserRepository userRepository,
+                       GenreRepository genreRepository,
                        StringRedisTemplate redisTemplate,
                        ListeningHistoryService listeningHistoryService) {
         this.songRepository = songRepository;
         this.userRepository = userRepository;
+        this.genreRepository = genreRepository;
         this.redisTemplate = redisTemplate;
         this.listeningHistoryService = listeningHistoryService;
     }
@@ -78,9 +85,27 @@ public class SongService {
         UC20 - Danh sách bài đã phát hành
         ---------------------------------------------------------------
         1 trang bài đã phát hành, mới phát hành trước.
+
+        genreId:
+        - null       → mọi thể loại (như trước khi có phần thể loại).
+        - có giá trị → chỉ bài thuộc thể loại đó (trang Genres của frontend).
     */
-    public Page<Song> getPublishedSongs(int page, int size) {
-        return songRepository.findPublished(LocalDateTime.now(), pageable(page, size));
+    public Page<Song> getPublishedSongs(Long genreId, int page, int size) {
+        if(genreId == null) {
+            return songRepository.findPublished(LocalDateTime.now(), pageable(page, size));
+        }
+
+        return songRepository.findPublishedByGenre(genreId, LocalDateTime.now(), pageable(page, size));
+    }
+
+    /*
+        ---------------------------------------------------------------
+        Danh sách thể loại nhạc
+        ---------------------------------------------------------------
+        Mọi thể loại, xếp theo tên A → Z. Chỉ có khoảng 25 dòng nên không phân trang.
+    */
+    public List<Genre> getGenres() {
+        return genreRepository.findAllByOrderByNameAsc();
     }
 
     /*
@@ -96,7 +121,7 @@ public class SongService {
     */
     public Page<Song> searchSongs(String keyword, int page, int size) {
         if(keyword == null || keyword.isBlank()) {
-            return getPublishedSongs(page, size);
+            return getPublishedSongs(null, page, size);
         }
 
         return songRepository.searchPublished(keyword.trim(), LocalDateTime.now(), pageable(page, size));

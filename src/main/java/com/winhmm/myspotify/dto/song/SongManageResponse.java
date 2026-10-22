@@ -53,6 +53,8 @@ import java.util.List;
         "artistId": 5,
         "artistName": "Mây Chiều",
         "featuredArtists": [ { "id": 12, "artistName": "Sóng Nhỏ" } ],
+        "genreId": 24,
+        "genreName": "Chill",
         "createdAt": "2026-10-12T16:30:00",
         "updatedAt": "2026-10-12T17:05:00"
     }
@@ -63,7 +65,7 @@ import java.util.List;
     BUILDER
     =====================================================================
 
-    Class có 16 trường → càng cần Builder hơn SongResponse
+    Class có 18 trường → càng cần Builder hơn SongResponse
     (giải thích chi tiết Builder Pattern xem trong SongResponse.java).
 
         SongManageResponse response = SongManageResponse.builder()
@@ -89,6 +91,8 @@ public class SongManageResponse {
     private Long artistId;
     private String artistName;
     private List<ArtistSummary> featuredArtists;
+    private Long genreId;
+    private String genreName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -107,6 +111,8 @@ public class SongManageResponse {
         this.artistId = builder.artistId;
         this.artistName = builder.artistName;
         this.featuredArtists = builder.featuredArtists;
+        this.genreId = builder.genreId;
+        this.genreName = builder.genreName;
         this.createdAt = builder.createdAt;
         this.updatedAt = builder.updatedAt;
     }
@@ -129,6 +135,8 @@ public class SongManageResponse {
     public Long getArtistId() { return artistId; }
     public String getArtistName() { return artistName; }
     public List<ArtistSummary> getFeaturedArtists() { return featuredArtists; }
+    public Long getGenreId() { return genreId; }
+    public String getGenreName() { return genreName; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 
@@ -147,6 +155,8 @@ public class SongManageResponse {
         private Long artistId;
         private String artistName;
         private List<ArtistSummary> featuredArtists;
+        private Long genreId;
+        private String genreName;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
 
@@ -164,6 +174,8 @@ public class SongManageResponse {
         public Builder artistId(Long artistId) { this.artistId = artistId; return this; }
         public Builder artistName(String artistName) { this.artistName = artistName; return this; }
         public Builder featuredArtists(List<ArtistSummary> featuredArtists) { this.featuredArtists = featuredArtists; return this; }
+        public Builder genreId(Long genreId) { this.genreId = genreId; return this; }
+        public Builder genreName(String genreName) { this.genreName = genreName; return this; }
         public Builder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
         public Builder updatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; return this; }
 

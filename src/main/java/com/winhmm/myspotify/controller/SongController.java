@@ -18,7 +18,7 @@ import java.util.Map;
     =====================================================================
 
     Các API trong class:
-        GET  /api/songs                          → danh sách bài đã phát hành
+        GET  /api/songs?genreId=                 → danh sách bài đã phát hành, lọc được theo thể loại
         GET  /api/songs/search?keyword=          → tìm kiếm bài
         GET  /api/songs/{songId}                 → chi tiết 1 bài
         POST /api/songs/{songId}/play            → ghi nhận 1 lượt nghe
@@ -107,6 +107,13 @@ public class SongController {
         Ví dụ gọi:
             GET /api/songs                    → trang đầu, 20 bài
             GET /api/songs?page=1&size=10     → trang thứ hai, 10 bài mỗi trang
+            GET /api/songs?genreId=24         → chỉ bài thuộc thể loại 24 (trang Genres)
+
+        genreId không bắt buộc (required = false):
+            - Không gửi → mọi thể loại.
+            - Gửi chữ, VD genreId=abc → 400 "Invalid parameter: genreId".
+            - Gửi id không tồn tại → trang rỗng ("content": []).
+            Danh sách id thể loại: GET /api/genres (GenreController).
 
         Sắp xếp: mới phát hành lên đầu (releaseAt giảm dần, cài trong SongService).
         Phân trang an toàn: page âm → 0, size ngoài khoảng 1 - 50 → tự chỉnh lại.
@@ -124,7 +131,9 @@ public class SongController {
                         "releaseAt": "2026-10-12T16:30:00",
                         "artistId": 5,
                         "artistName": "Mây Chiều",
-                        "featuredArtists": [ { "id": 12, "artistName": "Sóng Nhỏ" } ]
+                        "featuredArtists": [ { "id": 12, "artistName": "Sóng Nhỏ" } ],
+                        "genreId": 24,
+                        "genreName": "Chill"
                     }
                 ],
                 "page": 0,
@@ -142,10 +151,11 @@ public class SongController {
     */
     @GetMapping
     public ResponseEntity<PageResponse<SongResponse>> getSongs(
+            @RequestParam(required = false) Long genreId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(SongMapper.toPageResponse(
-                songService.getPublishedSongs(page, size), SongMapper::toSongResponse));
+                songService.getPublishedSongs(genreId, page, size), SongMapper::toSongResponse));
     }
 
     /*
@@ -309,4 +319,3 @@ public class SongController {
                 artist.getId(), artist.getArtistName(), artist.getBio(), artist.getAvatarUrl(), songs));
     }
 }
-

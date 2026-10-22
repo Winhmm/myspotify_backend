@@ -31,6 +31,7 @@ import java.util.List;
 
         KEY                TYPE   BẮT BUỘC   VÍ DỤ
         title              Text   Có         Chiều Mưa
+        genreId            Text   Có         24   (id lấy từ GET /api/genres, chọn 1 lần, đăng xong không đổi được)
         audio              File   Có         chieu-mua.mp3
         cover              File   Không      bia.jpg
         featuredArtistIds  Text   Không      12   (lặp lại key để feat nhiều người:
@@ -40,6 +41,7 @@ import java.util.List;
     Frontend (JavaScript):
         const form = new FormData();
         form.append("title", "Chiều Mưa");
+        form.append("genreId", 24);
         form.append("audio", fileInput.files[0]);
         form.append("featuredArtistIds", 12);
         form.append("featuredArtistIds", 13);
@@ -88,6 +90,9 @@ public class UploadSongRequest {
     @Size(max = 150, message = "Title must not exceed 150 characters")
     private String title;
 
+    @NotNull(message = "Genre is required")
+    private Long genreId;
+
     @NotNull(message = "Audio file is required")
     private MultipartFile audio;
 
@@ -101,6 +106,9 @@ public class UploadSongRequest {
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
+
+    public Long getGenreId() { return genreId; }
+    public void setGenreId(Long genreId) { this.genreId = genreId; }
 
     public MultipartFile getAudio() { return audio; }
     public void setAudio(MultipartFile audio) { this.audio = audio; }

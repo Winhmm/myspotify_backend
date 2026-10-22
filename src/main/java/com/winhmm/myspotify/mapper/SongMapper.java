@@ -1,9 +1,11 @@
 package com.winhmm.myspotify.mapper;
 
 import com.winhmm.myspotify.dto.song.ArtistSummary;
+import com.winhmm.myspotify.dto.song.GenreResponse;
 import com.winhmm.myspotify.dto.song.PageResponse;
 import com.winhmm.myspotify.dto.song.SongManageResponse;
 import com.winhmm.myspotify.dto.song.SongResponse;
+import com.winhmm.myspotify.entity.Genre;
 import com.winhmm.myspotify.entity.Song;
 import com.winhmm.myspotify.entity.User;
 import com.winhmm.myspotify.enums.AccountStatus;
@@ -24,6 +26,7 @@ import java.util.function.Function;
 
     Các method:
         toArtistSummary(user)      : User → ArtistSummary          (id và nghệ danh)
+        toGenreResponse(genre)     : Genre → GenreResponse         (id và tên thể loại)
         toSongResponse(song)       : Song → SongResponse           (cho người nghe)
         toManageResponse(song)     : Song → SongManageResponse     (cho Artist, Admin)
         toPageResponse(page, ...)  : Page<Song> → PageResponse<T>  (1 trang kết quả)
@@ -85,6 +88,39 @@ public class SongMapper {
 
     /*
         ---------------------------------------------------------------
+        Genre → GenreResponse (id và tên thể loại)
+        ---------------------------------------------------------------
+        Dùng ở GenreController (GET /api/genres).
+    */
+    public static GenreResponse toGenreResponse(Genre genre) {
+        return new GenreResponse(genre.getId(), genre.getName());
+    }
+
+    /*
+        ---------------------------------------------------------------
+        Thể loại của 1 bài: id và tên
+        ---------------------------------------------------------------
+        Mọi bài đều có thể loại (bài mới bắt buộc chọn, bài cũ đã gán bằng câu UPDATE),
+        nhưng cột genre_id trong database vẫn cho phép NULL.
+        → Kiểm tra null trước khi đọc, để lỡ có bài thiếu thể loại cũng không lỗi
+          NullPointerException (500), chỉ trả genreId, genreName = null.
+
+        Toán tử 3 ngôi:  điều kiện ? giá trị nếu đúng : giá trị nếu sai
+            genre != null ? genre.getId() : null
+            → có thể loại thì lấy id, không có thì null.
+    */
+    private static Long genreId(Song song) {
+        Genre genre = song.getGenre();
+        return genre != null ? genre.getId() : null;
+    }
+
+    private static String genreName(Song song) {
+        Genre genre = song.getGenre();
+        return genre != null ? genre.getName() : null;
+    }
+
+    /*
+        ---------------------------------------------------------------
         Danh sách nghệ sĩ feat đang hoạt động của 1 bài
         ---------------------------------------------------------------
     */
@@ -119,6 +155,8 @@ public class SongMapper {
                 .artistId(song.getArtist().getId())
                 .artistName(song.getArtist().getArtistName())
                 .featuredArtists(activeFeaturedArtists(song))
+                .genreId(genreId(song))
+                .genreName(genreName(song))
                 .build();
     }
 
@@ -147,6 +185,8 @@ public class SongMapper {
                 .artistId(song.getArtist().getId())
                 .artistName(song.getArtist().getArtistName())
                 .featuredArtists(activeFeaturedArtists(song))
+                .genreId(genreId(song))
+                .genreName(genreName(song))
                 .createdAt(song.getCreatedAt())
                 .updatedAt(song.getUpdatedAt())
                 .build();

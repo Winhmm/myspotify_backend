@@ -13,7 +13,7 @@ import java.util.Set;
     =====================================================================
 
     Các cột chính:
-        id, artist_id, title, audio_url, cover_url, canvas_url, duration_seconds, play_count,
+                id, artist_id, genre_id, title, audio_url, cover_url, canvas_url, duration_seconds, play_count,
         status, release_at, reject_reason, created_at, updated_at, version
 
     Bảng phụ: song_featured_artists (danh sách Artist feat của mỗi bài).
@@ -159,6 +159,15 @@ public class Song {
             inverseJoinColumns = @JoinColumn(name = "artist_id")
     )
     private Set<User> featuredArtists = new HashSet<>();
+
+    /*
+        ---------------------------------------------------------------
+        Thể loại nhạc
+        ---------------------------------------------------------------
+    */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "genre_id")
+    private Genre genre;
 
     /*
         ---------------------------------------------------------------
@@ -346,6 +355,9 @@ public class Song {
 
     public Set<User> getFeaturedArtists() { return featuredArtists; }
     public void setFeaturedArtists(Set<User> featuredArtists) { this.featuredArtists = featuredArtists; }
+
+    public Genre getGenre() { return genre; }
+    public void setGenre(Genre genre) { this.genre = genre; }
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }

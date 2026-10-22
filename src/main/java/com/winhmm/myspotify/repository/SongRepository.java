@@ -17,11 +17,11 @@ import java.util.Collection;
 
 /*
     =====================================================================
-        SONGREPOSITORY - TRUY CẬP BẢNG SONGS (MYSQL)
+    SONGREPOSITORY - TRUY CẬP BẢNG SONGS (MYSQL)
     =====================================================================
 
     Các truy vấn:
-        Người nghe : findPublished, searchPublished, findPublishedById,
+        Người nghe : findPublished, findPublishedByGenre, searchPublished, findPublishedById,
                      findPublishedByArtist, incrementPlayCount
         Artist     : findByArtistIdAndStatusNotOrderByCreatedAtDesc, findByIdAndArtistId
         Admin      : findByStatusNot, findByStatus
@@ -158,6 +158,24 @@ public interface SongRepository extends JpaRepository<Song, Long> {
     */
     @Query("SELECT s FROM Song s WHERE " + PUBLISHED_CONDITION)
     Page<Song> findPublished(@Param("now") LocalDateTime now, Pageable pageable);
+
+    /*
+        ---------------------------------------------------------------
+        UC20 (lọc theo thể loại) - Bài đã phát hành của 1 thể loại, có phân trang
+        ---------------------------------------------------------------
+        Giống findPublished, thêm điều kiện s.genre.id = :genreId.
+
+        s.genre.id: đọc thẳng cột genre_id của bảng songs, Hibernate không cần JOIN sang bảng genres.
+
+        Câu đếm (cho totalPages) Spring tự sinh: SELECT COUNT(s) ... cùng điều kiện WHERE.
+        Không cần viết countQuery riêng vì câu này không có DISTINCT hay LEFT JOIN.
+
+        genreId không tồn tại → không bài nào khớp → trang rỗng, không báo lỗi.
+    */
+    @Query("SELECT s FROM Song s WHERE s.genre.id = :genreId AND " + PUBLISHED_CONDITION)
+    Page<Song> findPublishedByGenre(@Param("genreId") Long genreId,
+                                    @Param("now") LocalDateTime now,
+                                    Pageable pageable);
 
     /*
         ---------------------------------------------------------------

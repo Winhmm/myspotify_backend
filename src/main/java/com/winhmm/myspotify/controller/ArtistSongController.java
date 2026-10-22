@@ -138,54 +138,59 @@ public class ArtistSongController {
     }
 
     /*
-        ---------------------------------------------------------------
-        UC26 - Tải lên bài hát
-        ---------------------------------------------------------------
+    ---------------------------------------------------------------
+    UC26 - Tải lên bài hát
+    ---------------------------------------------------------------
 
-        Ví dụ gọi (Postman: Body → form-data):
-            POST /api/artist/songs
-            Content-Type: multipart/form-data
+    Ví dụ gọi (Postman: Body → form-data):
+        POST /api/artist/songs
+        Content-Type: multipart/form-data
 
-            KEY                TYPE    VALUE
-            title              Text    Chiều Mưa
-            audio              File    chieu-mua.mp3
-            cover              File    bia.jpg                 (không bắt buộc)
-            featuredArtistIds  Text    12                      (không bắt buộc)
-            featuredArtistIds  Text    13                      (lặp key để feat nhiều người)
-            releaseAt          Text    2026-12-24T20:00:00     (không bắt buộc)
+        KEY                TYPE    VALUE
+        title              Text    Chiều Mưa
+        genreId            Text    24                      (bắt buộc, id từ GET /api/genres)
+        audio              File    chieu-mua.mp3
+        cover              File    bia.jpg                 (không bắt buộc)
+        featuredArtistIds  Text    12                      (không bắt buộc)
+        featuredArtistIds  Text    13                      (lặp key để feat nhiều người)
+        releaseAt          Text    2026-12-24T20:00:00     (không bắt buộc)
 
-        consumes = MediaType.MULTIPART_FORM_DATA_VALUE
-            → API này chỉ nhận multipart/form-data.
-            → Gửi JSON vào → 415 Unsupported Media Type.
+    consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+        → API này chỉ nhận multipart/form-data.
+        → Gửi JSON vào → 415 Unsupported Media Type.
 
-        @ModelAttribute UploadSongRequest request
-            → Spring đọc từng trường của form-data rồi gọi setter tương ứng:
-              setTitle("Chiều Mưa"), setAudio(file), setCover(file),
-              setFeaturedArtistIds([12, 13]), setReleaseAt(...).
-            → Giống @RequestBody nhưng dành cho form-data.
-            → releaseAt đổi từ chuỗi sang LocalDateTime nhờ @DateTimeFormat trong DTO.
+    @ModelAttribute UploadSongRequest request
+        → Spring đọc từng trường của form-data rồi gọi setter tương ứng:
+          setTitle("Chiều Mưa"), setGenreId(24), setAudio(file), setCover(file),
+          setFeaturedArtistIds([12, 13]), setReleaseAt(...).
+        → Giống @RequestBody nhưng dành cho form-data.
+        → releaseAt đổi từ chuỗi sang LocalDateTime nhờ @DateTimeFormat trong DTO.
 
-        @Valid → kiểm tra trong DTO:
-            @NotBlank và @Size(max = 150) cho title,
-            @NotNull cho audio, @Size(max = 5) cho featuredArtistIds.
+    @Valid → kiểm tra trong DTO:
+        @NotBlank và @Size(max = 150) cho title,
+        @NotNull cho genreId và audio, @Size(max = 5) cho featuredArtistIds.
 
-        Service làm gì:
-            1. Kiểm tra người đăng là Artist đang hoạt động.
-            2. Lịch phát hành (nếu có) phải ở tương lai.
-            3. Kiểm tra danh sách feat (tối đa 5, không tự feat mình, phải là Artist ACTIVE).
-            4. Lưu file nhạc → đọc thời lượng (file giả, VD .txt đổi đuôi .mp3 → báo lỗi).
-            5. Lưu ảnh bìa (kiểm tra chữ ký file, chặn PDF đổi đuôi .png).
-            6. Lưu bài với trạng thái PENDING.
-            Từ bước 4, bước nào lỗi → xóa các file vừa lưu, không để lại file rác trên ổ đĩa.
+    Service làm gì:
+        1. Kiểm tra người đăng là Artist đang hoạt động.
+        2. Lịch phát hành (nếu có) phải ở tương lai.
+        3. Kiểm tra danh sách feat (tối đa 5, không tự feat mình, phải là Artist ACTIVE).
+        4. Kiểm tra thể loại có tồn tại (sai id → 400 "Genre does not exist").
+        5. Lưu file nhạc → đọc thời lượng (file giả, VD .txt đổi đuôi .mp3 → báo lỗi).
+        6. Lưu ảnh bìa (kiểm tra chữ ký file, chặn PDF đổi đuôi .png).
+        7. Lưu bài với trạng thái PENDING.
+        Từ bước 5, bước nào lỗi → xóa các file vừa lưu, không để lại file rác trên ổ đĩa.
 
-        JSON trả về: SongManageResponse với "status": "PENDING".
-    */
+    Thể loại chỉ chọn được lúc đăng bài, sau đó không đổi được (API sửa bài không nhận genreId).
+
+    JSON trả về: SongManageResponse với "status": "PENDING".
+*/
     @PostMapping(value = "/songs", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<SongManageResponse> uploadSong(Authentication authentication,
                                                          @Valid @ModelAttribute UploadSongRequest request) {
         Song song = artistSongService.uploadSong(
                 me(authentication),
                 request.getTitle(),
+                request.getGenreId(),
                 request.getAudio(),
                 request.getCover(),
                 request.getFeaturedArtistIds(),

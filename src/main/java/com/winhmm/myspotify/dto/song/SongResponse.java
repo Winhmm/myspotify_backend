@@ -30,8 +30,13 @@ import java.util.List;
         "releaseAt": "2026-10-12T16:30:00",
         "artistId": 5,
         "artistName": "Mây Chiều",
-        "featuredArtists": [ { "id": 12, "artistName": "Sóng Nhỏ" } ]
+        "featuredArtists": [ { "id": 12, "artistName": "Sóng Nhỏ" } ],
+        "genreId": 24,
+        "genreName": "Chill"
     }
+
+    genreId, genreName: thể loại của bài (chọn lúc đăng bài, không đổi được).
+    Để phẳng 2 trường giống artistId, artistName, frontend đọc thẳng song.genreName.
 
     canvasUrl: video lặp (Canvas) của bài, null nếu Artist chưa đăng
     → frontend hiện ảnh bìa (coverUrl) thay thế.
@@ -43,7 +48,7 @@ import java.util.List;
     BUILDER PATTERN - VÌ SAO DÙNG?
     =====================================================================
 
-    Vấn đề: class có 11 trường. Nếu dùng constructor thường:
+    Vấn đề: class có 13 trường. Nếu dùng constructor thường:
         new SongResponse(15L, "Chiều Mưa", "/uploads/...", "/uploads/...", 215, 1024L,
                          time, 5L, "Mây Chiều", list);
     → Đọc vào không biết số 215 là gì, 1024L là gì.
@@ -80,6 +85,8 @@ public class SongResponse {
     private Long artistId;
     private String artistName;
     private List<ArtistSummary> featuredArtists;
+    private Long genreId;
+    private String genreName;
 
     private SongResponse(Builder builder) {
         this.id = builder.id;
@@ -93,6 +100,8 @@ public class SongResponse {
         this.artistId = builder.artistId;
         this.artistName = builder.artistName;
         this.featuredArtists = builder.featuredArtists;
+        this.genreId = builder.genreId;
+        this.genreName = builder.genreName;
     }
 
     public static Builder builder() {
@@ -110,6 +119,8 @@ public class SongResponse {
     public Long getArtistId() { return artistId; }
     public String getArtistName() { return artistName; }
     public List<ArtistSummary> getFeaturedArtists() { return featuredArtists; }
+    public Long getGenreId() { return genreId; }
+    public String getGenreName() { return genreName; }
 
     public static class Builder {
         private Long id;
@@ -123,6 +134,8 @@ public class SongResponse {
         private Long artistId;
         private String artistName;
         private List<ArtistSummary> featuredArtists;
+        private Long genreId;
+        private String genreName;
 
         public Builder id(Long id) { this.id = id; return this; }
         public Builder title(String title) { this.title = title; return this; }
@@ -135,6 +148,8 @@ public class SongResponse {
         public Builder artistId(Long artistId) { this.artistId = artistId; return this; }
         public Builder artistName(String artistName) { this.artistName = artistName; return this; }
         public Builder featuredArtists(List<ArtistSummary> featuredArtists) { this.featuredArtists = featuredArtists; return this; }
+        public Builder genreId(Long genreId) { this.genreId = genreId; return this; }
+        public Builder genreName(String genreName) { this.genreName = genreName; return this; }
 
         public SongResponse build() {
             return new SongResponse(this);
