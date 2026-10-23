@@ -1,6 +1,7 @@
 package com.winhmm.myspotify.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.winhmm.myspotify.enums.AccessStatus;
 import com.winhmm.myspotify.enums.AccountStatus;
 import com.winhmm.myspotify.enums.ArtistRequestStatus;
 import com.winhmm.myspotify.enums.Role;
@@ -34,12 +35,26 @@ import jakarta.persistence.*;
       nên đăng nhập bằng email vẫn tìm rất nhanh.
 
     -----------------------------------------------------
-    Một tài khoản có 3 trạng thái độc lập
+    Một tài khoản có 4 trạng thái độc lập
     -----------------------------------------------------
     - accountStatus      : tài khoản có dùng được không (AccountStatus).
     - role               : quyền trong hệ thống (Role).
     - artistRequestStatus: tiến trình xin làm Artist (ArtistRequestStatus).
+    - accessStatus       : có được chủ dự án cho vào web không (AccessStatus).
     Ví dụ: Artist bị khóa → role = ARTIST, accountStatus = DISABLED, artistRequestStatus = APPROVED.
+
+    -----------------------------------------------------
+    Quyền vào web (accessStatus)
+    -----------------------------------------------------
+    Web chỉ dành cho người được chủ dự án cho phép (tránh người lạ dùng, liên quan bản quyền nhạc).
+    - Mọi tài khoản mới đăng ký đều là REFUSE → đăng ký, nhập OTP bình thường nhưng không đăng nhập được.
+    - Chủ dự án cấp quyền bằng SQL:
+          UPDATE users SET access_status = 'ACCEPT' WHERE email = 'nam@gmail.com';
+    - Thu hồi quyền:
+          UPDATE users SET access_status = 'REFUSE' WHERE email = 'nam@gmail.com';
+      Người đang đăng nhập bị chặn ngay từ request tiếp theo (xem CustomUserDetailsService).
+    - Không có API nào đổi được cột này, kể cả API của Admin.
+      Admin cũng phải là ACCEPT mới đăng nhập được.
 
     -----------------------------------------------------
     Lưu ý về VPS
@@ -88,6 +103,14 @@ public class User {
     @Column(name = "artist_request_status", length = 20, nullable = false)
     private ArtistRequestStatus artistRequestStatus = ArtistRequestStatus.NONE;
 
+    /*
+        Mặc định REFUSE: tài khoản tạo bằng new User() (đăng ký) luôn bị chặn
+        cho tới khi chủ dự án đổi thành ACCEPT bằng SQL.
+    */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "access_status", length = 20, nullable = false)
+    private AccessStatus accessStatus = AccessStatus.REFUSE;
+
     @Column(name = "artist_name", length = 100)
     private String artistName;
 
@@ -120,6 +143,9 @@ public class User {
 
     public ArtistRequestStatus getArtistRequestStatus() { return artistRequestStatus; }
     public void setArtistRequestStatus(ArtistRequestStatus artistRequestStatus) { this.artistRequestStatus = artistRequestStatus; }
+
+    public AccessStatus getAccessStatus() { return accessStatus; }
+    public void setAccessStatus(AccessStatus accessStatus) { this.accessStatus = accessStatus; }
 
     public String getArtistName() { return artistName; }
     public void setArtistName(String artistName) { this.artistName = artistName; }

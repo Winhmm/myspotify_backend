@@ -2,6 +2,7 @@ package com.winhmm.myspotify.service;
 
 import com.winhmm.myspotify.dto.auth.*;
 import com.winhmm.myspotify.entity.User;
+import com.winhmm.myspotify.enums.AccessStatus;
 import com.winhmm.myspotify.enums.AccountStatus;
 import com.winhmm.myspotify.enums.OtpPurpose;
 import com.winhmm.myspotify.enums.Role;
@@ -107,7 +108,7 @@ public class AuthService {
         Trường hợp 3: email chưa tồn tại
         -----------------------------------------------------
         1. Username phải chưa ai dùng.
-        2. Tạo User mới: UNVERIFIED, role USER, mật khẩu đã băm.
+        2. Tạo User mới: UNVERIFIED, role USER, quyền vào web REFUSE, mật khẩu đã băm.
         3. Lưu vào database.
         4. Tạo và gửi OTP mục đích REGISTER.
 
@@ -157,6 +158,7 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(password));
         user.setAccountStatus(AccountStatus.UNVERIFIED);
         user.setRole(Role.USER);
+        user.setAccessStatus(AccessStatus.REFUSE);
 
         userRepository.save(user);
 
@@ -175,6 +177,8 @@ public class AuthService {
         4. Mã đúng → chuyển tài khoản sang ACTIVE.
 
         Không tự đăng nhập sau khi xác thực: người dùng đăng nhập ở bước tiếp theo.
+        Sau bước này tài khoản vẫn là REFUSE → chưa đăng nhập được
+        cho tới khi chủ dự án đổi thành ACCEPT bằng SQL.
     */
     @Transactional
     public void verifyOtp(String email, String otpCode) {
@@ -204,22 +208,23 @@ public class AuthService {
            passwordEncoder.matches(mậtKhẩuGốc, chuỗiĐãBăm): BCrypt lấy "muối" có sẵn
            trong chuỗi đã băm, băm lại mật khẩu vừa nhập rồi so 2 kết quả.
         3. Kiểm tra trạng thái tài khoản.
+        4. Kiểm tra quyền vào web: khác ACCEPT → "Account has not been approved yet".
 
         Sai email hoặc sai mật khẩu → cùng 1 message "Email or password is incorrect"
         → người ngoài không đoán được email nào đã đăng ký.
 
-        Trạng thái được kiểm tra sau mật khẩu → chỉ người biết mật khẩu
-        mới biết tài khoản đang bị khóa hay chưa xác thực.
+        Trạng thái và quyền vào web được kiểm tra sau mật khẩu → chỉ người biết mật khẩu
+        mới biết tài khoản đang bị khóa, chưa xác thực hay chưa được duyệt.
 
         -----------------------------------------------------
         Tạo phiên và token
         -----------------------------------------------------
-        4. sessionService.createSession(email):
+        5. sessionService.createSession(email):
            sinh 1 UUID mới, ghi vào Redis (key session:{email}), sống 24 giờ.
            Ghi đè phiên cũ → thiết bị đăng nhập trước đó bị đăng xuất.
-        5. jwtUtil.generateToken(user, sessionId):
+        6. jwtUtil.generateToken(user, sessionId):
            tạo JWT chứa email (sub) và UUID vừa sinh (jti).
-        6. Trả token, userId, username, role cho frontend.
+        7. Trả token, userId, username, role cho frontend.
 
         Không cần @Transactional vì hàm này không ghi gì vào MySQL.
     */
@@ -241,6 +246,15 @@ public class AuthService {
 
         if (user.getAccountStatus() == AccountStatus.DELETED) {
             throw new IllegalArgumentException("Account has been deleted");
+        }
+
+        /*
+            Chỉ tài khoản được chủ dự án cho phép (ACCEPT) mới đăng nhập được.
+            Dùng "!= ACCEPT" (không dùng "== REFUSE") để an toàn:
+            nếu cột này vì lý do nào đó bị null thì cũng bị chặn.
+        */
+        if (user.getAccessStatus() != AccessStatus.ACCEPT) {
+            throw new IllegalArgumentException("Account has not been approved yet");
         }
 
         /*
