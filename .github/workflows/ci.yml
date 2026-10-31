@@ -1,10 +1,14 @@
 # =====================================================================
-# CI - TỰ ĐỘNG BUILD PROJECT MỖI KHI PUSH LÊN GITHUB
+# CI/CD - TỰ ĐỘNG BUILD VÀ DEPLOY LÊN VPS MỖI KHI PUSH LÊN MAIN
 # =====================================================================
 #
 # File này nằm ở .github/workflows/ci.yml.
 # GitHub tự tìm mọi file .yml trong thư mục .github/workflows và làm theo nội dung bên trong.
-# Không cần cài đặt gì thêm, push file này lên là GitHub Actions tự hoạt động.
+#
+# Workflow gồm 2 job chạy nối tiếp nhau:
+#   1. build : tải code, cài Java, build ra file JAR      → CI (kiểm tra code có build được không)
+#   2. deploy: SSH vào VPS, chạy deploy.sh                → CD (đưa code mới lên server)
+# Job deploy chỉ chạy khi job build xanh, và chỉ khi code nằm trên nhánh main.
 #
 # -----------------------------------------------------
 # Từ vựng cần biết
@@ -17,6 +21,8 @@
 # - Step    : từng bước nhỏ trong 1 job, chạy lần lượt từ trên xuống.
 #             Bước nào lỗi thì các bước sau không chạy nữa, job báo đỏ.
 # - Action  : step viết sẵn do người khác làm, gọi bằng uses: (giống dùng thư viện).
+# - Secret  : thông tin bí mật cất trong Settings → Secrets and variables → Actions,
+#             gọi ra bằng ${{ secrets.TÊN }}. Không ai xem lại được, lỡ in ra log thì bị che thành ***.
 #
 # -----------------------------------------------------
 # YAML là gì?
@@ -29,23 +35,24 @@
 # - Dấu # bắt đầu 1 dòng comment, GitHub bỏ qua.
 
 # Tên workflow, hiển thị trong tab Actions trên GitHub.
-name: CI
+name: CI/CD
 
 # =====================================================================
 # KHI NÀO WORKFLOW CHẠY?
 # =====================================================================
 on:
-  # Mỗi lần push code lên nhánh main.
+  # Mỗi lần push code lên nhánh main → build, rồi deploy.
   push:
     branches: [ main ]
 
-  # Mỗi lần tạo hoặc cập nhật 1 Pull Request muốn gộp vào main.
-  # Làm tính năng mới trên nhánh riêng, mở Pull Request là biết ngay code có build được không,
-  # trước khi gộp vào main.
+  # Mỗi lần tạo hoặc cập nhật 1 Pull Request muốn gộp vào main → chỉ build, không deploy.
+  # Làm tính năng mới trên nhánh riêng (VD nhánh playlist), mở Pull Request là biết ngay
+  # code có build được không, trước khi gộp vào main.
   pull_request:
     branches: [ main ]
 
   # Thêm nút "Run workflow" trong tab Actions, để chạy bằng tay khi cần mà không phải push.
+  # Chạy bằng tay trên nhánh main thì cũng deploy (VD muốn khởi động lại server với code hiện tại).
   workflow_dispatch:
 
 # Quyền của workflow: chỉ cần đọc code, không cần ghi gì lên repo.
@@ -55,9 +62,9 @@ permissions:
 
 jobs:
   # =====================================================================
-  # JOB BUILD: TẢI CODE, CÀI JAVA, BUILD RA FILE JAR
+  # JOB 1 - BUILD: TẢI CODE, CÀI JAVA, BUILD RA FILE JAR
   # =====================================================================
-  # "build" là tên mã của job (tự đặt), các job khác dùng tên này để tham chiếu tới.
+  # "build" là tên mã của job (tự đặt). Job deploy bên dưới dùng tên này để chờ job build.
   build:
     # Tên hiển thị trên giao diện GitHub.
     name: Build with Maven
@@ -116,6 +123,53 @@ jobs:
       #                    MongoDB và file trên máy cá nhân, máy ảo của GitHub không có.
       #
       # Code compile lỗi (thiếu dấu ;, sai tên biến, gọi hàm không tồn tại...)
-      # → lệnh này thất bại → job báo đỏ → biết ngay trước khi deploy.
+      # → lệnh này thất bại → job báo đỏ ❌ → job deploy không chạy → server giữ nguyên bản cũ.
       - name: Build (skip tests)
         run: ./mvnw -B package -DskipTests
+
+  # =====================================================================
+  # JOB 2 - DEPLOY: SSH VÀO VPS, CHẠY DEPLOY.SH
+  # =====================================================================
+  # Job này không build lại trên máy ảo, mà nhờ VPS tự làm, đúng như khi bạn deploy bằng tay:
+  #   GitHub SSH vào VPS → chạy bash /home/myspotify/deploy.sh
+  #   → deploy.sh: git pull → build bằng Maven → tắt app cũ → chạy app mới
+  #   → chờ /actuator/health trả về "UP".
+  #
+  # deploy.sh tự trả về mã lỗi (exit 1) khi bất kỳ bước nào hỏng
+  # (pull lỗi, build lỗi, app không khởi động được trong 60 giây).
+  # → Job này báo đỏ ❌, và log của GitHub hiện luôn 30 dòng cuối của app.log để tìm lỗi.
+  deploy:
+    name: Deploy to VPS
+
+    # needs: chỉ chạy sau khi job build chạy xong và thành công.
+    # Không có dòng này thì 2 job chạy song song, code lỗi vẫn bị deploy.
+    needs: build
+
+    # if: điều kiện để job được chạy. Chỉ deploy khi thỏa cả 2 ý:
+    # 1. Sự kiện là push hoặc bấm "Run workflow" bằng tay (không phải Pull Request).
+    #    Pull Request chỉ để kiểm tra build, code chưa được gộp vào main thì không deploy.
+    # 2. github.ref == 'refs/heads/main': đang chạy trên nhánh main.
+    #    refs/heads/main là tên đầy đủ của nhánh main trong Git.
+    # Ký hiệu: || nghĩa là "hoặc", && nghĩa là "và".
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+
+    runs-on: ubuntu-latest
+
+    # Deploy gồm build trên VPS (khoảng 1 đến 2 phút) và chờ app khởi động (tối đa 60 giây).
+    # Quá 15 phút thì chắc chắn có gì bất thường, GitHub tự dừng.
+    timeout-minutes: 15
+
+    # concurrency: mỗi lúc chỉ có 1 lần deploy chạy.
+    # Push 2 lần liên tiếp thì lần deploy sau phải chờ lần trước xong,
+    # tránh 2 lần deploy.sh cùng lúc tắt và bật app, giẫm chân nhau.
+    # - group: tên nhóm (tự đặt). Các lần chạy cùng tên nhóm thì phải xếp hàng.
+    # - cancel-in-progress: false → không hủy lần đang chạy giữa chừng, để nó chạy xong.
+    concurrency:
+      group: deploy-vps
+      cancel-in-progress: false
+
+    steps:
+    # -----------------------------------------------------
+    # Bước duy nhất: SSH vào VPS và chạy deploy.sh
+    # -----------------------------------------------------
+    # appleboy/ssh-action: action có sẵn, làm
