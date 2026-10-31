@@ -1,0 +1,121 @@
+# =====================================================================
+# CI - TỰ ĐỘNG BUILD PROJECT MỖI KHI PUSH LÊN GITHUB
+# =====================================================================
+#
+# File này nằm ở .github/workflows/ci.yml.
+# GitHub tự tìm mọi file .yml trong thư mục .github/workflows và làm theo nội dung bên trong.
+# Không cần cài đặt gì thêm, push file này lên là GitHub Actions tự hoạt động.
+#
+# -----------------------------------------------------
+# Từ vựng cần biết
+# -----------------------------------------------------
+# - Workflow: 1 quy trình tự động, chính là file này.
+# - Event   : sự kiện kích hoạt workflow (khai báo ở phần on:), VD push code lên GitHub.
+# - Job     : 1 nhóm việc chạy trên 1 máy riêng. 1 workflow có thể có nhiều job.
+# - Runner  : máy ảo GitHub cho mượn để chạy job (ở đây là Ubuntu Linux).
+#             Mỗi lần chạy là 1 máy trống hoàn toàn mới, chạy xong máy bị xóa.
+# - Step    : từng bước nhỏ trong 1 job, chạy lần lượt từ trên xuống.
+#             Bước nào lỗi thì các bước sau không chạy nữa, job báo đỏ.
+# - Action  : step viết sẵn do người khác làm, gọi bằng uses: (giống dùng thư viện).
+#
+# -----------------------------------------------------
+# YAML là gì?
+# -----------------------------------------------------
+# Định dạng file cấu hình, dùng thụt lề để thể hiện cấp cha con (giống Python).
+# - Chỉ thụt lề bằng dấu cách, không dùng phím Tab.
+# - Thụt lề sai 1 dấu cách là file hỏng, GitHub báo lỗi ngay trong tab Actions.
+# - "tên: giá trị"  là 1 cặp khóa và giá trị.
+# - Dòng bắt đầu bằng "- " là 1 phần tử của danh sách.
+# - Dấu # bắt đầu 1 dòng comment, GitHub bỏ qua.
+
+# Tên workflow, hiển thị trong tab Actions trên GitHub.
+name: CI
+
+# =====================================================================
+# KHI NÀO WORKFLOW CHẠY?
+# =====================================================================
+on:
+  # Mỗi lần push code lên nhánh main.
+  push:
+    branches: [ main ]
+
+  # Mỗi lần tạo hoặc cập nhật 1 Pull Request muốn gộp vào main.
+  # Làm tính năng mới trên nhánh riêng, mở Pull Request là biết ngay code có build được không,
+  # trước khi gộp vào main.
+  pull_request:
+    branches: [ main ]
+
+  # Thêm nút "Run workflow" trong tab Actions, để chạy bằng tay khi cần mà không phải push.
+  workflow_dispatch:
+
+# Quyền của workflow: chỉ cần đọc code, không cần ghi gì lên repo.
+# Nguyên tắc bảo mật: chỉ cấp đúng quyền cần dùng, không cấp thừa.
+permissions:
+  contents: read
+
+jobs:
+  # =====================================================================
+  # JOB BUILD: TẢI CODE, CÀI JAVA, BUILD RA FILE JAR
+  # =====================================================================
+  # "build" là tên mã của job (tự đặt), các job khác dùng tên này để tham chiếu tới.
+  build:
+    # Tên hiển thị trên giao diện GitHub.
+    name: Build with Maven
+
+    # Chạy trên máy ảo Ubuntu bản mới nhất GitHub đang cung cấp.
+    runs-on: ubuntu-latest
+
+    # Chạy quá 15 phút thì GitHub tự dừng, tránh tốn phút miễn phí nếu bị treo.
+    timeout-minutes: 15
+
+    steps:
+      # -----------------------------------------------------
+      # Bước 1: tải code của repo về máy ảo
+      # -----------------------------------------------------
+      # Máy ảo lúc đầu trống trơn, chưa có code. Action checkout làm việc giống lệnh git clone.
+      # @v5 là phiên bản của action. Ghi rõ phiên bản để action không tự đổi cách chạy.
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      # -----------------------------------------------------
+      # Bước 2: cài Java 17
+      # -----------------------------------------------------
+      # with: truyền tham số cho action, giống truyền tham số khi gọi hàm.
+      # - distribution: temurin → bản Java miễn phí phổ biến (Eclipse Temurin).
+      # - java-version: '17'    → trùng với <java.version>17</java.version> trong pom.xml.
+      #   Đặt trong dấu nháy để YAML hiểu là chuỗi, không phải số.
+      # - cache: maven          → lưu lại thư viện Maven đã tải (thư mục ~/.m2).
+      #   Lần đầu phải tải hết thư viện (Spring, MySQL driver, jjwt...) nên chậm.
+      #   Các lần sau lấy lại từ cache, nhanh hơn nhiều.
+      #   Cache tự làm mới khi file pom.xml thay đổi (VD thêm dependency mới).
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # -----------------------------------------------------
+      # Bước 3: cấp quyền chạy cho file mvnw
+      # -----------------------------------------------------
+      # run: chạy 1 lệnh trong terminal Linux của máy ảo.
+      # mvnw (Maven Wrapper) là script tự tải đúng phiên bản Maven mà project cần.
+      # File mvnw trong repo đang thiếu quyền chạy (do commit từ Windows),
+      # thiếu bước này thì bước 4 báo lỗi "Permission denied".
+      # chmod +x = thêm quyền chạy (x = execute) cho file.
+      - name: Make mvnw executable
+        run: chmod +x mvnw
+
+      # -----------------------------------------------------
+      # Bước 4: build project ra file JAR
+      # -----------------------------------------------------
+      # ./mvnw package: compile code, đóng gói thành target/myspotify-0.0.1-SNAPSHOT.jar.
+      # - -B (batch mode): chế độ không tương tác, log gọn hơn, phù hợp khi chạy tự động.
+      # - -DskipTests    : không chạy test (test vẫn được compile, nên test viết sai cú pháp
+      #                    vẫn bị phát hiện). Tạm bỏ qua vì 6 test hiện tại cần MySQL, Redis,
+      #                    MongoDB và file trên máy cá nhân, máy ảo của GitHub không có.
+      #
+      # Code compile lỗi (thiếu dấu ;, sai tên biến, gọi hàm không tồn tại...)
+      # → lệnh này thất bại → job báo đỏ → biết ngay trước khi deploy.
+      - name: Build (skip tests)
+        run: ./mvnw -B package -DskipTests
