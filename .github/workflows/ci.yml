@@ -169,7 +169,29 @@ jobs:
       cancel-in-progress: false
 
     steps:
-    # -----------------------------------------------------
-    # Bước duy nhất: SSH vào VPS và chạy deploy.sh
-    # -----------------------------------------------------
-    # appleboy/ssh-action: action có sẵn, làm
+      # -----------------------------------------------------
+      # Bước duy nhất: SSH vào VPS và chạy deploy.sh
+      # -----------------------------------------------------
+      # appleboy/ssh-action: action có sẵn, làm đúng việc "ssh vào máy chủ rồi chạy lệnh".
+      #
+      # Tham số:
+      # - host    : địa chỉ VPS, lấy từ secret VPS_HOST (157.66.100.87).
+      # - username: user đăng nhập, lấy từ secret VPS_USER (root).
+      # - key     : private key, lấy từ secret VPS_SSH_KEY.
+      #             VPS so khớp với public key trong ~/.ssh/authorized_keys rồi cho vào,
+      #             không cần mật khẩu.
+      # - port    : cổng SSH, mặc định của Linux là 22.
+      # - command_timeout: chạy lệnh quá 10 phút thì dừng.
+      # - script  : lệnh chạy trên VPS. Giống hệt lệnh bạn vẫn gõ khi deploy bằng tay.
+      #
+      # Mã lỗi của deploy.sh được trả về cho GitHub:
+      # exit 0 → bước này xanh ✅, exit 1 → bước này đỏ ❌.
+      - name: Run deploy.sh on VPS
+        uses: appleboy/ssh-action@v1.2.4
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          command_timeout: 10m
+          script: bash /home/myspotify/deploy.sh
