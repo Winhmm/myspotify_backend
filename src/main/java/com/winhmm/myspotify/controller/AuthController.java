@@ -57,6 +57,34 @@ package com.winhmm.myspotify.controller;
     - @RestController: class này nhận request HTTP và trả về dữ liệu JSON
       (giá trị trả về của mỗi hàm được Spring tự chuyển thành JSON).
     - @RequestMapping("/api/auth"): mọi đường dẫn trong class đều bắt đầu bằng /api/auth.
+    (Giải thích chi tiết về @RestController, @RequestMapping, constructor: xem GenreController.)
+
+    -----------------------------------------------------
+    Các dòng import
+    -----------------------------------------------------
+    - com.winhmm.myspotify.dto.auth.*: mượn tất cả DTO trong package dto.auth
+      (RegisterRequest, VerifyOtpRequest, LoginRequest, LoginResponse,
+      ForgotPasswordRequest, ResetPasswordRequest).
+    - AuthService   : Service chứa nghiệp vụ đăng ký, đăng nhập, OTP.
+    - Valid         : bật kiểm tra dữ liệu trong DTO.
+    - ResponseEntity: toàn bộ response HTTP (mã trạng thái, header, body).
+    - PostMapping, RequestBody, RequestMapping, RestController: annotation của Spring MVC.
+    - Map           : kiểu cặp "khóa → giá trị", dùng để trả { "message": "..." }.
+
+    -----------------------------------------------------
+    Vì sao mọi API ở đây đều dùng POST?
+    -----------------------------------------------------
+    - Mật khẩu, mã OTP phải nằm trong body, không được nằm trên URL.
+      Dữ liệu trên URL (VD /login?password=123) bị lưu trong lịch sử trình duyệt
+      và log của máy chủ, rất dễ lộ.
+    - Request GET thường không có body, nên phải dùng POST.
+    - Các API này đều tạo ra thay đổi (tạo tài khoản, tạo phiên, tạo OTP...), đúng với ý nghĩa của POST.
+
+    -----------------------------------------------------
+    Vì sao các hàm ở đây không có tham số Authentication?
+    -----------------------------------------------------
+    Người gọi các API này chưa đăng nhập (chưa có token),
+    nên không có ai để lấy thông tin. Email được gửi trực tiếp trong body.
 */
 import com.winhmm.myspotify.dto.auth.*;
 import com.winhmm.myspotify.service.AuthService;
@@ -95,13 +123,20 @@ public class AuthController {
         Luồng xử lý (AuthService.register)
         -----------------------------------------------------
         Trường hợp 1: email chưa tồn tại
-            → Tạo User mới: accountStatus = UNVERIFIED, role = USER.
+            → Username đã có người dùng → 400 "Username already exists".
+            → Tạo User mới: accountStatus = UNVERIFIED, role = USER, accessStatus = REFUSE.
             → Mật khẩu được băm bằng BCrypt trước khi lưu.
             → Tạo mã OTP (mục đích REGISTER) và gửi về email.
 
+            accessStatus = REFUSE nghĩa là: dù xác thực OTP xong, tài khoản vẫn chưa đăng nhập được
+            cho tới khi chủ dự án đổi sang ACCEPT bằng SQL:
+                UPDATE users SET access_status = 'ACCEPT' WHERE email = 'maychieu@gmail.com';
+            Mục đích: chỉ bạn bè được cho phép mới dùng được web (tránh người lạ, liên quan bản quyền nhạc).
+
         Trường hợp 2: email đã tồn tại nhưng chưa xác thực (UNVERIFIED)
             Ví dụ: người dùng đăng ký hôm qua nhưng chưa nhập OTP, mã đã hết hạn.
-            → Cập nhật username và mật khẩu mới.
+            → Cập nhật username và mật khẩu mới
+              (username mới trùng với tài khoản khác → 400 "Username already exists").
             → Gửi lại OTP mới.
             Đây cũng chính là cách "gửi lại OTP đăng ký":
             frontend chỉ cần gọi lại API này với cùng thông tin.
@@ -127,6 +162,31 @@ public class AuthController {
 
         Frontend: đăng ký thành công → chuyển sang màn hình nhập OTP,
         giữ lại email để gửi kèm ở bước xác thực.
+
+        -----------------------------------------------------
+        Đọc code
+        -----------------------------------------------------
+        @PostMapping("/register"): xử lý POST, đường dẫn đầy đủ = "/api/auth" + "/register".
+
+        Kiểu trả về ResponseEntity<Map<String, String>>:
+        response có body là 1 Map, khóa kiểu String, giá trị kiểu String
+        → Jackson đổi thành JSON { "message": "..." }.
+
+        @Valid @RequestBody RegisterRequest request:
+        - @RequestBody: Jackson đọc JSON trong body, tạo đối tượng RegisterRequest:
+              new RegisterRequest(), rồi setUsername("maychieu"), setEmail(...), setPassword(...).
+          Tên trường JSON phải trùng tên trường trong DTO.
+        - @Valid: chạy các annotation kiểm tra trong RegisterRequest (VD @NotBlank, @Email, @Size)
+          trước khi hàm chạy. Sai → hàm không chạy → 400 kèm message ghi trong annotation.
+
+        authService.register(request.getUsername(), request.getEmail(), request.getPassword());
+        - Lấy từng giá trị trong DTO bằng getter, truyền xuống Service.
+        - Hàm void: chạy xong không lỗi là đăng ký thành công.
+          Lỗi thì Service ném exception, dòng return không chạy tới.
+
+        return ResponseEntity.ok(Map.of("message", "..."));
+        - Map.of tạo nhanh 1 Map có 1 cặp khóa "message" → câu thông báo.
+        - ok(...) → mã 200.
     */
     @PostMapping("/register")
     public ResponseEntity<Map<String, String>> register(@Valid @RequestBody RegisterRequest request) {
@@ -158,6 +218,7 @@ public class AuthController {
            - Mã có khớp không.
            - Khớp → đánh dấu mã đã dùng, không dùng lại được nữa.
         4. Chuyển accountStatus sang ACTIVE.
+           accessStatus vẫn giữ REFUSE (xem UC01), chưa đăng nhập được ngay.
 
         -----------------------------------------------------
         Kết quả
@@ -175,6 +236,8 @@ public class AuthController {
 
         Frontend: xác thực thành công không tự đăng nhập.
         Chuyển người dùng sang màn hình đăng nhập.
+        Nếu chủ dự án chưa cấp quyền, đăng nhập sẽ nhận 400 "Account has not been approved yet"
+        → frontend nên hiện thông báo kiểu "Tài khoản đang chờ duyệt".
     */
     @PostMapping("/verify-otp")
     public ResponseEntity<Map<String, String>> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
@@ -200,12 +263,16 @@ public class AuthController {
         1. Tìm User theo email.
         2. So mật khẩu bằng BCrypt (passwordEncoder.matches).
         3. Kiểm tra trạng thái tài khoản: UNVERIFIED, DISABLED, DELETED → báo lỗi.
-        4. Tạo phiên mới trong Redis (key session:{email}, giá trị là 1 UUID).
+        4. Kiểm tra quyền truy cập: accessStatus khác ACCEPT → 400 "Account has not been approved yet".
+           Dùng điều kiện "khác ACCEPT" (không dùng "bằng REFUSE") cho an toàn:
+           nếu cột này vì lý do nào đó bị null thì cũng bị chặn.
+        5. Tạo phiên mới trong Redis (key session:{email}, giá trị là 1 UUID).
            Nếu đang đăng nhập ở thiết bị khác, phiên cũ bị ghi đè
            → thiết bị cũ bị đăng xuất ở request tiếp theo (401).
            → Mỗi tài khoản chỉ đăng nhập được ở 1 nơi tại 1 thời điểm.
-        5. Tạo JWT chứa email (sub) và mã phiên (jti), sống 7 ngày
-           (thời hạn lấy từ cấu hình JWT trong application.properties).
+        6. Tạo JWT chứa email (sub) và mã phiên (jti).
+           Thời hạn của token lấy từ app.jwt.expiration-ms trong application.properties
+           (đơn vị mili giây: 86400000 = 24 giờ, 604800000 = 7 ngày).
 
         -----------------------------------------------------
         Vì sao sai email và sai mật khẩu báo cùng 1 message?
@@ -214,7 +281,7 @@ public class AuthController {
         kẻ gian thử nhiều email sẽ biết email nào đã đăng ký trong hệ thống.
         Báo chung "Email or password is incorrect" thì không đoán được.
 
-        Các lỗi về trạng thái tài khoản (chưa xác thực, bị khóa, đã xóa) chỉ hiện
+        Các lỗi về trạng thái tài khoản (chưa xác thực, bị khóa, đã xóa, chưa được duyệt) chỉ hiện
         sau khi nhập đúng mật khẩu → người ngoài không dò được trạng thái của tài khoản khác.
 
         -----------------------------------------------------
@@ -233,6 +300,7 @@ public class AuthController {
             400 "Account is not verified yet"
             400 "Account has been disabled"
             400 "Account has been deleted"
+            400 "Account has not been approved yet"   → chủ dự án chưa cấp quyền (REFUSE)
             429 → đăng nhập quá 10 lần trong 1 phút từ cùng 1 IP
 
         -----------------------------------------------------
@@ -245,6 +313,18 @@ public class AuthController {
           Lưu ý: role trong response này chỉ đúng tại thời điểm đăng nhập.
           Nếu Admin đổi role sau đó, gọi GET /api/users/me/profile để lấy role mới nhất.
         - Nhận 401 ở bất kỳ API nào → xóa token, chuyển về trang đăng nhập.
+
+        -----------------------------------------------------
+        Đọc code
+        -----------------------------------------------------
+        Khác các API khác trong class: kiểu trả về là ResponseEntity<LoginResponse>,
+        không phải Map. LoginResponse là DTO có 4 trường (token, userId, username, role).
+        Jackson đọc các getter của DTO (getToken() → "token", getUserId() → "userId"...)
+        để tạo JSON. Dùng DTO thay vì Map vì có nhiều trường và frontend cần cấu trúc cố định.
+
+        LoginResponse response = authService.login(...);
+        - Service kiểm tra và tạo token, trả về đối tượng LoginResponse.
+        - Gán vào biến response rồi trả về với mã 200.
     */
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {

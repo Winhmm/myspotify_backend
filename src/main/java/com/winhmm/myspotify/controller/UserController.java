@@ -1,5 +1,25 @@
 package com.winhmm.myspotify.controller;
 
+/*
+    -----------------------------------------------------
+    Các dòng import
+    -----------------------------------------------------
+    (package, import, annotation là gì: xem giải thích chi tiết trong GenreController.)
+
+    - com.winhmm.myspotify.dto.user.*: mượn tất cả DTO trong package dto.user
+      (UserProfileResponse, UpdateProfileRequest, ChangePasswordRequest, ArtistRequest...).
+    - User          : entity người dùng (1 dòng trong bảng users).
+    - UserMapper    : đổi entity User sang UserProfileResponse (bỏ password).
+    - SessionService: quản lý phiên đăng nhập trong Redis (dùng khi đăng xuất).
+    - UserService   : Service chứa nghiệp vụ tài khoản cá nhân.
+    - Valid         : bật kiểm tra dữ liệu trong DTO.
+    - MediaType     : hằng số tên loại dữ liệu, VD MULTIPART_FORM_DATA_VALUE.
+    - ResponseEntity, Authentication: giống các controller khác.
+    - org.springframework.web.bind.annotation.*: mượn tất cả annotation của Spring MVC.
+    - MultipartFile : đối tượng đại diện cho 1 file được upload (ảnh đại diện).
+    - Map           : kiểu cặp "khóa → giá trị", dùng để trả { "message": "..." }.
+*/
+
 import com.winhmm.myspotify.dto.user.*;
 import com.winhmm.myspotify.entity.User;
 import com.winhmm.myspotify.mapper.UserMapper;
@@ -69,6 +89,15 @@ import java.util.Map;
     Các API trả thông tin cá nhân dùng UserMapper.toUserProfileResponse()
     (dùng chung với AdminController), để không trả trường password ra ngoài.
 */
+/*
+    -----------------------------------------------------
+    Annotation trên class và 2 dependency
+    -----------------------------------------------------
+    - @RestController: class này là controller, giá trị return được đổi thành JSON.
+    - @RequestMapping("/api/users"): mọi API trong class bắt đầu bằng /api/users.
+    - userService, sessionService: Spring tự tạo rồi truyền vào constructor
+      (tiêm phụ thuộc, xem giải thích chi tiết trong GenreController).
+*/
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
@@ -89,6 +118,13 @@ public class UserController {
 
         Hàm private, dùng chung cho mọi API bên dưới.
         Email không còn trong database (rất hiếm) → 400 "User does not exist".
+
+        - private: hàm nội bộ, frontend không gọi được (không có @GetMapping, @PutMapping...).
+        - Long   : kiểu trả về là id người dùng.
+        Đọc thân hàm từ trong ra ngoài:
+            authentication.getName() → email
+            userService.getByEmail() → User trong MySQL
+            .getId()                 → id
     */
     private Long me(Authentication authentication) {
         return userService.getByEmail(authentication.getName()).getId();
@@ -110,6 +146,14 @@ public class UserController {
 
         Frontend: xóa token đã lưu và chuyển về trang đăng nhập.
         Backend không xóa được token nằm trong trình duyệt, chỉ làm nó mất hiệu lực.
+
+        -----------------------------------------------------
+        Đọc code
+        -----------------------------------------------------
+        - @PostMapping("/logout"): đường dẫn đầy đủ = "/api/users" + "/logout".
+        - Controller gọi thẳng SessionService (không qua UserService),
+          vì đăng xuất chỉ có đúng 1 việc là xóa phiên, không có quy tắc nghiệp vụ nào khác.
+        - authentication.getName() → email → xóa key session:{email} trong Redis.
     */
     @PostMapping("/logout")
     public ResponseEntity<Map<String, String>> logout(Authentication authentication) {
@@ -144,6 +188,17 @@ public class UserController {
           (role trong response đăng nhập có thể đã cũ nếu Admin vừa đổi).
         - fullName, avatarUrl, artistName, bio có thể null → hiển thị giá trị mặc định.
         - artistRequestStatus = PENDING → hiện "Yêu cầu đang chờ duyệt".
+
+        -----------------------------------------------------
+        Đọc code
+        -----------------------------------------------------
+        User user = userService.getProfile(me(authentication));
+            1. me(authentication) → id người đang đăng nhập.
+            2. userService.getProfile(id) → entity User.
+            3. Gán vào biến user.
+        return ResponseEntity.ok(UserMapper.toUserProfileResponse(user));
+            Đổi entity sang DTO (bỏ password, chỉ giữ thông tin cần hiển thị) rồi trả về 200.
+        Hầu hết API trong class đều theo đúng khuôn này: lấy id → gọi Service → đổi DTO → trả về.
     */
     @GetMapping("/me/profile")
     public ResponseEntity<UserProfileResponse> getProfile(Authentication authentication) {
@@ -294,6 +349,19 @@ public class UserController {
 
         Frontend: hiển thị ảnh bằng địa chỉ server + avatarUrl,
         ví dụ http://157.66.100.87:8080/uploads/avatars/3f2c8a1e.jpg
+
+        -----------------------------------------------------
+        Đọc code
+        -----------------------------------------------------
+        @PostMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+            - value: đường dẫn.
+            - consumes: chỉ nhận request có Content-Type là multipart/form-data.
+            Khi annotation có nhiều thông tin thì ghi rõ tên từng thông tin (value = ..., consumes = ...).
+
+        @RequestParam("file") MultipartFile file
+            - Lấy phần có tên "file" trong form-data (tên trong ngoặc phải trùng KEY trong Postman).
+            - MultipartFile: đối tượng Spring tạo cho file upload, có tên file gốc (getOriginalFilename),
+              kích thước (getSize), loại file (getContentType) và nội dung để đọc (getInputStream).
     */
     @PostMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<UserProfileResponse> updateAvatar(Authentication authentication,

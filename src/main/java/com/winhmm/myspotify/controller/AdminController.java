@@ -1,5 +1,25 @@
 package com.winhmm.myspotify.controller;
 
+/*
+    -----------------------------------------------------
+    Các dòng import
+    -----------------------------------------------------
+    (package, import, annotation là gì: xem giải thích chi tiết trong GenreController.)
+
+    - AssignRoleRequest  : DTO nhận role mới khi Admin gán role (UC18).
+    - UserProfileResponse: DTO thông tin tài khoản trả về frontend (không có password).
+    - UserMapper         : đổi entity User sang UserProfileResponse.
+    - AdminService       : Service chứa nghiệp vụ quản trị tài khoản.
+    - Valid              : bật kiểm tra dữ liệu trong DTO.
+    - ResponseEntity     : toàn bộ response HTTP (mã trạng thái, header, body).
+    - PreAuthorize       : kiểm tra quyền (role) trước khi chạy hàm.
+    - org.springframework.web.bind.annotation.*:
+      dấu * = mượn tất cả annotation trong package đó (RestController, RequestMapping,
+      GetMapping, PutMapping, PathVariable, RequestBody...).
+    - List, Map          : danh sách, và kiểu cặp "khóa → giá trị".
+    - Collectors         : công cụ gom kết quả của stream thành List (dùng ở UC15, UC17).
+*/
+
 import com.winhmm.myspotify.dto.user.AssignRoleRequest;
 import com.winhmm.myspotify.dto.user.UserProfileResponse;
 import com.winhmm.myspotify.mapper.UserMapper;
@@ -57,20 +77,41 @@ import java.util.stream.Collectors;
     - Khóa tài khoản → đá người đó ra khỏi mọi thiết bị ngay lập tức.
     - Mọi thay đổi role có hiệu lực ngay ở request tiếp theo của người bị đổi,
       không cần họ đăng nhập lại (vì role được đọc từ MySQL ở mỗi request).
+    - Không có API đổi access_status (ACCEPT, REFUSE): chỉ chủ dự án đổi bằng SQL,
+      kể cả Admin cũng không cấp quyền truy cập cho người khác qua API được.
 
     -----------------------------------------------------
     Admin đầu tiên
     -----------------------------------------------------
     Không có API tạo Admin (nếu có thì ai cũng tự biến mình thành Admin được).
     Admin đầu tiên được tạo bằng SQL sau khi đăng ký và xác thực tài khoản bình thường:
-        UPDATE users SET role = 'ADMIN' WHERE email = 'admin@gmail.com';
+        UPDATE users SET role = 'ADMIN', access_status = 'ACCEPT' WHERE email = 'admin@gmail.com';
+
+    Phải đổi cả access_status: mọi tài khoản mới đăng ký đều là REFUSE,
+    chưa được đổi sang ACCEPT thì không đăng nhập được, kể cả khi đã là ADMIN.
+
     Các Admin sau: Admin hiện tại gán qua PUT /api/admin/users/{userId}/role.
+    Người được gán cũng phải có access_status = ACCEPT (chủ dự án cấp bằng SQL) thì mới đăng nhập được.
 
     -----------------------------------------------------
     Chuyển entity sang DTO
     -----------------------------------------------------
     Dùng UserMapper.toUserProfileResponse() (dùng chung với UserController),
     để không trả trường password ra ngoài.
+*/
+/*
+    -----------------------------------------------------
+    3 annotation trên class
+    -----------------------------------------------------
+    - @PreAuthorize("hasRole('ADMIN')"): đặt trên class → áp dụng cho mọi hàm bên trong.
+      Không phải chép lại lên từng hàm, và không sợ quên hàm nào.
+    - @RestController: class này là controller, giá trị return được đổi thành JSON
+      (xem giải thích chi tiết trong GenreController).
+    - @RequestMapping("/api/admin"): mọi API trong class bắt đầu bằng /api/admin.
+    Thứ tự viết các annotation không quan trọng.
+
+    Biến adminService và constructor: Spring tự tạo AdminService rồi truyền vào
+    (tiêm phụ thuộc, xem GenreController).
 */
 @PreAuthorize("hasRole('ADMIN')")
 @RestController
@@ -112,6 +153,17 @@ public class AdminController {
 
         Lưu ý: chưa phân trang. Phù hợp với lượng người dùng của đồ án.
         Khi có hàng chục nghìn tài khoản thì nên phân trang như GET /api/songs.
+
+        -----------------------------------------------------
+        Đọc code
+        -----------------------------------------------------
+        - @GetMapping("/users"): xử lý GET, đường dẫn đầy đủ = "/api/admin" + "/users".
+        - ResponseEntity<List<UserProfileResponse>>: response có body là danh sách
+          các UserProfileResponse (cách đọc generic < >: xem GenreController).
+        - .collect(Collectors.toList()) và .toList() (dùng ở các controller khác)
+          đều gom kết quả thành List. .toList() ngắn hơn, có từ Java 16.
+          Khác biệt nhỏ: danh sách từ .toList() không sửa được, ở đây chỉ đọc nên như nhau.
+        - return ResponseEntity.ok(result): trả mã 200 kèm danh sách.
     */
     @GetMapping("/users")
     public ResponseEntity<List<UserProfileResponse>> getAllUsers() {
@@ -147,6 +199,18 @@ public class AdminController {
         - Nếu là Artist: toàn bộ bài hát tự ẩn khỏi người nghe.
 
         Kết quả: 200 { "message": "Account has been locked" }
+
+        -----------------------------------------------------
+        Đọc code
+        -----------------------------------------------------
+        - @PutMapping("/users/{userId}/lock"): xử lý PUT, {userId} là chỗ trống trong đường dẫn.
+        - @PathVariable Long userId: lấy giá trị chỗ trống gán vào userId,
+          Spring tự đổi "6" thành số 6 (giải thích kỹ hơn trong LyricsController).
+        - adminService.lockAccount(userId): hàm void (không trả gì).
+          Chạy xong không lỗi là khóa thành công. Lỗi thì Service ném exception,
+          dòng return không chạy tới, GlobalExceptionHandler trả 400 kèm message.
+        - Map.of("message", "...") → JSON { "message": "Account has been locked" }.
+        Các API unlock, approve, reject bên dưới có cấu trúc giống hệt.
     */
     @PutMapping("/users/{userId}/lock")
     public ResponseEntity<Map<String, String>> lockAccount(@PathVariable Long userId) {
@@ -293,6 +357,19 @@ public class AdminController {
             400 "Invalid request data"    → role không tồn tại, VD "SUPERADMIN"
 
         Kết quả: 200 { "message": "Role has been assigned successfully" }
+
+        -----------------------------------------------------
+        Đọc code: hàm nhận cả @PathVariable và @RequestBody
+        -----------------------------------------------------
+        - @PathVariable Long userId: id tài khoản lấy từ đường dẫn (/users/7/role → 7).
+        - @RequestBody AssignRoleRequest request: lấy JSON trong body đổi thành đối tượng.
+          Jackson tạo new AssignRoleRequest() rồi gọi setRole(...).
+          Chuỗi "ADMIN" trong JSON được tự đổi sang enum Role.ADMIN.
+          Chuỗi không có trong enum (VD "SUPERADMIN") → không đổi được
+          → 400 "Invalid request data".
+        - @Valid: kiểm tra annotation trong AssignRoleRequest trước khi chạy hàm,
+          VD @NotNull trên role → thiếu role → 400 "Role must not be null".
+        - request.getRole(): lấy role đã được đổi sang enum, truyền xuống Service.
     */
     @PutMapping("/users/{userId}/role")
     public ResponseEntity<Map<String, String>> assignRole(@PathVariable Long userId,

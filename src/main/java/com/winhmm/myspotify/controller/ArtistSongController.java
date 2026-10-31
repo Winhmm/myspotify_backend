@@ -1,5 +1,26 @@
 package com.winhmm.myspotify.controller;
 
+/*
+    -----------------------------------------------------
+    Các dòng import
+    -----------------------------------------------------
+    (package, import, annotation là gì: xem giải thích chi tiết trong GenreController.)
+
+    - com.winhmm.myspotify.dto.song.*: mượn tất cả DTO trong package dto.song
+      (UploadSongRequest, UpdateSongRequest, UpdateReleaseRequest, SongManageResponse, ArtistSummary...).
+    - Song             : entity bài hát (1 dòng trong bảng songs).
+    - SongMapper       : đổi entity sang DTO.
+    - ArtistSongService: Service chứa nghiệp vụ Artist quản lý bài hát.
+    - UserService      : dùng để đổi email trong token thành id.
+    - Valid            : kiểm tra các trường bên trong 1 DTO.
+    - MediaType        : hằng số tên các loại dữ liệu, VD MULTIPART_FORM_DATA_VALUE = "multipart/form-data".
+    - ResponseEntity, PreAuthorize, Authentication: giống các controller khác.
+    - Validated        : bật kiểm tra annotation đặt thẳng trên tham số (giải thích bên dưới).
+    - org.springframework.web.bind.annotation.*: mượn tất cả annotation của Spring MVC.
+    - MultipartFile    : đối tượng đại diện cho 1 file được upload (nhạc, ảnh, video).
+    - List, Map        : danh sách, và kiểu cặp "khóa → giá trị".
+*/
+
 import com.winhmm.myspotify.dto.song.*;
 import com.winhmm.myspotify.entity.Song;
 import com.winhmm.myspotify.mapper.SongMapper;
@@ -102,6 +123,18 @@ import java.util.Map;
     - API chỉ có chữ (sửa tên, đổi lịch)
       → JSON (application/json), dùng @RequestBody.
     - API không cần dữ liệu gửi lên (ẩn, hiện, xóa, gỡ Canvas) → không có body.
+
+    =====================================================================
+    BẢNG TÓM TẮT CÁCH NHẬN DỮ LIỆU TỪ FRONTEND
+    =====================================================================
+
+        Annotation        Lấy dữ liệu từ đâu                 Ví dụ trong file này
+        @PathVariable     chỗ trống trong đường dẫn           /songs/{songId} → songId
+        @RequestParam     query string sau dấu ?              ?keyword=may
+                          hoặc 1 trường của form-data         file "cover"
+        @RequestBody      body dạng JSON                      { "title": "...", ... }
+        @ModelAttribute   nhiều trường form-data → 1 DTO      đăng bài (title, audio, cover...)
+        Authentication    token của người đang đăng nhập      lấy email → id
 */
 @PreAuthorize("hasRole('ARTIST')")
 @RestController
@@ -131,59 +164,75 @@ public class ArtistSongController {
         - Token hiện chỉ chứa email (sub) và mã phiên (jti).
         - Tra id từ email vẫn nhanh vì cột email có UNIQUE → MySQL tự tạo index.
 
-        private: hàm nội bộ, chỉ dùng trong class này.
+        private: hàm nội bộ, chỉ dùng trong class này
+        (không có @GetMapping, @PutMapping... nên không phải API, frontend không gọi được).
     */
     private Long me(Authentication authentication) {
         return userService.getByEmail(authentication.getName()).getId();
     }
 
     /*
-    ---------------------------------------------------------------
-    UC26 - Tải lên bài hát
-    ---------------------------------------------------------------
+        ---------------------------------------------------------------
+        UC26 - Tải lên bài hát
+        ---------------------------------------------------------------
 
-    Ví dụ gọi (Postman: Body → form-data):
-        POST /api/artist/songs
-        Content-Type: multipart/form-data
+        Ví dụ gọi (Postman: Body → form-data):
+            POST /api/artist/songs
+            Content-Type: multipart/form-data
 
-        KEY                TYPE    VALUE
-        title              Text    Chiều Mưa
-        genreId            Text    24                      (bắt buộc, id từ GET /api/genres)
-        audio              File    chieu-mua.mp3
-        cover              File    bia.jpg                 (không bắt buộc)
-        featuredArtistIds  Text    12                      (không bắt buộc)
-        featuredArtistIds  Text    13                      (lặp key để feat nhiều người)
-        releaseAt          Text    2026-12-24T20:00:00     (không bắt buộc)
+            KEY                TYPE    VALUE
+            title              Text    Chiều Mưa
+            genreId            Text    24                      (bắt buộc, id từ GET /api/genres)
+            audio              File    chieu-mua.mp3
+            cover              File    bia.jpg                 (không bắt buộc)
+            featuredArtistIds  Text    12                      (không bắt buộc)
+            featuredArtistIds  Text    13                      (lặp key để feat nhiều người)
+            releaseAt          Text    2026-12-24T20:00:00     (không bắt buộc)
 
-    consumes = MediaType.MULTIPART_FORM_DATA_VALUE
-        → API này chỉ nhận multipart/form-data.
-        → Gửi JSON vào → 415 Unsupported Media Type.
+        consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+            → API này chỉ nhận multipart/form-data.
+            → Gửi JSON vào → 415 Unsupported Media Type.
 
-    @ModelAttribute UploadSongRequest request
-        → Spring đọc từng trường của form-data rồi gọi setter tương ứng:
-          setTitle("Chiều Mưa"), setGenreId(24), setAudio(file), setCover(file),
-          setFeaturedArtistIds([12, 13]), setReleaseAt(...).
-        → Giống @RequestBody nhưng dành cho form-data.
-        → releaseAt đổi từ chuỗi sang LocalDateTime nhờ @DateTimeFormat trong DTO.
+        @PostMapping(value = "/songs", consumes = ...):
+            Khi annotation có nhiều thông tin thì ghi rõ tên từng thông tin:
+            value là đường dẫn, consumes là loại dữ liệu nhận vào.
+            (Khi chỉ có đường dẫn thì viết gọn @PostMapping("/songs").)
 
-    @Valid → kiểm tra trong DTO:
-        @NotBlank và @Size(max = 150) cho title,
-        @NotNull cho genreId và audio, @Size(max = 5) cho featuredArtistIds.
+        @ModelAttribute UploadSongRequest request
+            → Spring đọc từng trường của form-data rồi gọi setter tương ứng:
+              setTitle("Chiều Mưa"), setGenreId(24), setAudio(file), setCover(file),
+              setFeaturedArtistIds([12, 13]), setReleaseAt(...).
+            → Giống @RequestBody nhưng dành cho form-data.
+            → releaseAt đổi từ chuỗi sang LocalDateTime nhờ @DateTimeFormat trong DTO.
 
-    Service làm gì:
-        1. Kiểm tra người đăng là Artist đang hoạt động.
-        2. Lịch phát hành (nếu có) phải ở tương lai.
-        3. Kiểm tra danh sách feat (tối đa 5, không tự feat mình, phải là Artist ACTIVE).
-        4. Kiểm tra thể loại có tồn tại (sai id → 400 "Genre does not exist").
-        5. Lưu file nhạc → đọc thời lượng (file giả, VD .txt đổi đuôi .mp3 → báo lỗi).
-        6. Lưu ảnh bìa (kiểm tra chữ ký file, chặn PDF đổi đuôi .png).
-        7. Lưu bài với trạng thái PENDING.
-        Từ bước 5, bước nào lỗi → xóa các file vừa lưu, không để lại file rác trên ổ đĩa.
+        @Valid → kiểm tra trong DTO:
+            @NotBlank và @Size(max = 150) cho title,
+            @NotNull cho genreId và audio, @Size(max = 5) cho featuredArtistIds.
 
-    Thể loại chỉ chọn được lúc đăng bài, sau đó không đổi được (API sửa bài không nhận genreId).
+        Service làm gì:
+            1. Kiểm tra người đăng là Artist đang hoạt động.
+            2. Lịch phát hành (nếu có) phải ở tương lai.
+            3. Kiểm tra danh sách feat (tối đa 5, không tự feat mình, phải là Artist ACTIVE).
+            4. Kiểm tra thể loại có tồn tại (sai id → 400 "Genre does not exist").
+            5. Lưu file nhạc → đọc thời lượng (file giả, VD .txt đổi đuôi .mp3 → báo lỗi).
+            6. Lưu ảnh bìa (kiểm tra chữ ký file, chặn PDF đổi đuôi .png).
+            7. Lưu bài với trạng thái PENDING.
+            Từ bước 5, bước nào lỗi → xóa các file vừa lưu, không để lại file rác trên ổ đĩa.
 
-    JSON trả về: SongManageResponse với "status": "PENDING".
-*/
+        Thể loại chỉ chọn được lúc đăng bài, sau đó không đổi được (API sửa bài không nhận genreId).
+
+        -----------------------------------------------------
+        Đọc thân hàm
+        -----------------------------------------------------
+        Song song = artistSongService.uploadSong(...);
+            - Gọi Service với 7 tham số, lấy từ DTO bằng getter (request.getTitle()...).
+              Tham số đầu tiên là id Artist lấy từ token (hàm me), không lấy từ frontend.
+            - Service trả về entity Song vừa lưu, gán vào biến song.
+        return ResponseEntity.ok(SongMapper.toManageResponse(song));
+            - Đổi entity sang DTO rồi trả về 200 (không trả thẳng entity ra ngoài).
+
+        JSON trả về: SongManageResponse với "status": "PENDING".
+    */
     @PostMapping(value = "/songs", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<SongManageResponse> uploadSong(Authentication authentication,
                                                          @Valid @ModelAttribute UploadSongRequest request) {
@@ -269,6 +318,11 @@ public class ArtistSongController {
             [ { "id": 5, "artistName": "Mây Chiều" }, { "id": 19, "artistName": "Mây Xanh" } ]
 
         Frontend lấy "id" của người được chọn, gửi vào featuredArtistIds khi đăng hoặc sửa bài.
+
+        @RequestParam("keyword") String keyword:
+        - Lấy tham số "keyword" trong query string: /search-artists?keyword=may → keyword = "may".
+        - Tên trong ngoặc là tên tham số trên URL. Ở đây trùng tên biến nên có thể bỏ,
+          ghi rõ ra cho dễ đọc.
     */
     @GetMapping("/search-artists")
     public ResponseEntity<List<ArtistSummary>> searchArtists(Authentication authentication,
@@ -300,6 +354,11 @@ public class ArtistSongController {
 
         Bài đang REJECTED mà Artist sửa → tự chuyển về PENDING và xóa lý do từ chối cũ,
         để Admin duyệt lại.
+
+        Hàm nhận 3 loại dữ liệu cùng lúc:
+        - Authentication             → ai đang gọi (lấy id bằng hàm me).
+        - @PathVariable Long songId  → bài nào (số trong đường dẫn).
+        - @Valid @RequestBody ...    → nội dung sửa (JSON trong body, kiểm tra bằng @Valid).
     */
     @PutMapping("/songs/{songId}")
     public ResponseEntity<SongManageResponse> updateSong(Authentication authentication,

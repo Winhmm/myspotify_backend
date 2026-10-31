@@ -1,5 +1,24 @@
 package com.winhmm.myspotify.controller;
 
+/*
+    -----------------------------------------------------
+    Các dòng import
+    -----------------------------------------------------
+    (package, import, annotation là gì: xem giải thích chi tiết trong GenreController.)
+
+    - ArtistSongsResponse: DTO trang nghệ sĩ (thông tin nghệ sĩ + 1 trang bài hát).
+    - PageResponse       : DTO 1 trang dữ liệu kèm thông tin phân trang.
+    - SongResponse       : DTO bài hát bản rút gọn cho người nghe.
+    - User               : entity người dùng (dùng ở trang nghệ sĩ để lấy tên, bio, ảnh).
+    - SongMapper         : đổi entity sang DTO.
+    - SongService        : Service chứa nghiệp vụ người nghe.
+    - ResponseEntity     : toàn bộ response HTTP (mã trạng thái, header, body).
+    - Authentication     : thông tin người đang đăng nhập (dùng ở API /play).
+    - org.springframework.web.bind.annotation.*: mượn tất cả annotation của Spring MVC
+      (RestController, RequestMapping, GetMapping, PostMapping, PathVariable, RequestParam...).
+    - Map                : kiểu cặp "khóa → giá trị", dùng để trả { "message": "..." }.
+*/
+
 import com.winhmm.myspotify.dto.song.ArtistSongsResponse;
 import com.winhmm.myspotify.dto.song.PageResponse;
 import com.winhmm.myspotify.dto.song.SongResponse;
@@ -91,6 +110,15 @@ import java.util.Map;
     Mỗi lượt nghe được tính qua POST /api/songs/{songId}/play cũng được lưu vào MongoDB.
     Xem lịch sử: GET /api/users/me/history (ListeningHistoryController).
 */
+/*
+    -----------------------------------------------------
+    Annotation trên class
+    -----------------------------------------------------
+    - @RestController: class này là controller, giá trị return được đổi thành JSON.
+    - @RequestMapping("/api/songs"): mọi API trong class bắt đầu bằng /api/songs.
+    - Không có @PreAuthorize: không giới hạn role (xem phần "Ai được gọi?" ở trên).
+    Biến songService và constructor: tiêm phụ thuộc (xem giải thích chi tiết trong GenreController).
+*/
 @RestController
 @RequestMapping("/api/songs")
 public class SongController {
@@ -126,6 +154,7 @@ public class SongController {
                         "title": "Chiều Mưa",
                         "audioUrl": "/uploads/songs/audio/3f2a9c1e.mp3",
                         "coverUrl": "/uploads/songs/covers/9b1c4d7f.jpg",
+                        "canvasUrl": null,
                         "durationSeconds": 215,
                         "playCount": 1024,
                         "releaseAt": "2026-10-12T16:30:00",
@@ -146,8 +175,31 @@ public class SongController {
             - totalPages để vẽ nút chuyển trang (1, 2, 3, ..., 7).
             - audioUrl ghép với địa chỉ server để phát nhạc.
             - coverUrl = null → hiển thị ảnh bìa mặc định.
+            - canvasUrl khác null → phát video lặp (Canvas) thay cho ảnh bìa ở màn hình đang phát,
+              canvasUrl = null → hiện ảnh bìa như bình thường.
             - durationSeconds đổi sang "3:35" để hiển thị.
             - featuredArtists rỗng [] → không hiện chữ "ft.".
+
+        -----------------------------------------------------
+        Đọc code: 3 tham số @RequestParam
+        -----------------------------------------------------
+        @RequestParam lấy tham số trong query string (phần sau dấu ? của URL):
+            /api/songs?genreId=24&page=1&size=10 → genreId = 24, page = 1, size = 10
+
+        - @RequestParam(required = false) Long genreId
+          + required = false: không gửi cũng được. Không gửi → genreId = null → không lọc.
+          + Dùng Long (đối tượng) vì Long nhận được null, còn long (nguyên thủy) thì không.
+        - @RequestParam(defaultValue = "0") int page
+          + Không gửi → dùng "0". Giá trị mặc định luôn viết dạng chuỗi, Spring tự đổi sang int.
+          + int không thể null, nên phải có defaultValue.
+        - @RequestParam(defaultValue = "20") int size: tương tự, mặc định 20 bài mỗi trang.
+
+        Thân hàm (đọc từ trong ra ngoài):
+        1. songService.getPublishedSongs(genreId, page, size) → Page<Song> (1 trang entity).
+        2. SongMapper.toPageResponse(page, SongMapper::toSongResponse)
+           → đổi từng Song thành SongResponse, đóng gói cùng thông tin phân trang.
+           SongMapper::toSongResponse là cách viết gọn của song -> SongMapper.toSongResponse(song).
+        3. ResponseEntity.ok(...) → mã 200.
     */
     @GetMapping
     public ResponseEntity<PageResponse<SongResponse>> getSongs(
@@ -192,6 +244,10 @@ public class SongController {
             "/search" là đường dẫn cố định, còn "/{songId}" bên dưới là khuôn có biến.
             Spring ưu tiên đường dẫn cố định, nên "/search" không bị hiểu nhầm
             thành songId = "search".
+
+        @RequestParam(defaultValue = "") String keyword:
+            Không gửi keyword → keyword = "" (chuỗi rỗng, không phải null)
+            → Service không phải lo trường hợp null.
     */
     @GetMapping("/search")
     public ResponseEntity<PageResponse<SongResponse>> searchSongs(
@@ -220,6 +276,10 @@ public class SongController {
         Lỗi có thể gặp:
             400 "Song does not exist"
             400 "Invalid parameter: songId" → id không phải số, VD /api/songs/abc
+
+        @GetMapping("/{songId}") + @PathVariable Long songId:
+            {songId} là chỗ trống trong đường dẫn, /api/songs/15 → songId = 15
+            (giải thích kỹ hơn trong LyricsController).
     */
     @GetMapping("/{songId}")
     public ResponseEntity<SongResponse> getSong(@PathVariable Long songId) {
@@ -258,6 +318,16 @@ public class SongController {
         Luôn trả 200 { "message": "Play recorded" }, kể cả khi lượt đó bị bỏ qua
         vì nghe lại quá nhanh. Không báo "bạn nghe quá nhanh" để kẻ gian
         không dò được quy luật chống spam.
+
+        -----------------------------------------------------
+        Đọc code
+        -----------------------------------------------------
+        - @PostMapping("/{songId}/play"): xử lý POST tới /api/songs/15/play.
+        - Authentication authentication: Spring tự truyền thông tin người đang đăng nhập.
+          authentication.getName() trả về email, truyền xuống Service để chống nghe ảo
+          và ghi lịch sử nghe.
+        - songService.play(...) không trả gì (void), nên Controller tự tạo câu thông báo
+          bằng Map.of → JSON { "message": "Play recorded" }.
     */
     @PostMapping("/{songId}/play")
     public ResponseEntity<Map<String, String>> play(Authentication authentication,
@@ -304,6 +374,22 @@ public class SongController {
         Đường dẫn:
             Đặt dưới /api/songs/artists/... (không phải /api/artists/...)
             để không nhầm với /api/artist/... (API quản lý của Artist trong ArtistSongController).
+
+        -----------------------------------------------------
+        Đọc code
+        -----------------------------------------------------
+        User artist = songService.getArtist(artistId);
+            Biến artist kiểu entity User (tài khoản của nghệ sĩ).
+            Controller chỉ đọc vài trường (id, nghệ danh, bio, ảnh), không trả thẳng entity ra ngoài.
+
+        PageResponse<SongResponse> songs = SongMapper.toPageResponse(...);
+            1 trang bài hát của nghệ sĩ, đã đổi sang DTO (giống UC20).
+
+        new ArtistSongsResponse(artist.getId(), artist.getArtistName(), artist.getBio(),
+                                artist.getAvatarUrl(), songs)
+            Gọi constructor của DTO, truyền 5 giá trị theo đúng thứ tự khai báo trong DTO,
+            tạo ra 1 đối tượng chứa cả thông tin nghệ sĩ lẫn danh sách bài.
+            new = tạo đối tượng mới. DTO này ít trường nên dùng constructor, không cần Builder.
     */
     @GetMapping("/artists/{artistId}")
     public ResponseEntity<ArtistSongsResponse> getArtistPage(

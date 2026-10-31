@@ -1,5 +1,27 @@
 package com.winhmm.myspotify.controller;
 
+/*
+    -----------------------------------------------------
+    Các dòng import
+    -----------------------------------------------------
+    (package, import, annotation là gì: xem giải thích chi tiết trong GenreController.)
+
+    - PageResponse      : DTO chứa 1 trang dữ liệu kèm thông tin phân trang
+                          (content, page, size, totalElements, totalPages).
+    - RejectSongRequest : DTO nhận lý do khi Admin từ chối hoặc gỡ bài.
+    - SongManageResponse: DTO bài hát bản đầy đủ cho Admin và Artist (có status, rejectReason...).
+    - SongStatus        : enum các trạng thái bài hát (PENDING, APPROVED, REJECTED, HIDDEN, DELETED).
+    - SongMapper        : đổi entity Song sang DTO.
+    - AdminSongService  : Service chứa nghiệp vụ Admin quản lý bài hát.
+    - Valid, ResponseEntity, PreAuthorize: giống các controller khác.
+    - org.springframework.web.bind.annotation.*: mượn tất cả annotation của Spring MVC
+      (RestController, RequestMapping, GetMapping, PutMapping, PathVariable, RequestParam, RequestBody...).
+
+    Enum là gì?
+    Là kiểu dữ liệu chỉ có 1 số giá trị cố định, VD SongStatus chỉ có 5 giá trị kể trên.
+    Gõ sai (VD SongStatus.PENDDING) thì IntelliJ báo lỗi ngay, an toàn hơn dùng chuỗi "PENDING".
+*/
+
 import com.winhmm.myspotify.dto.song.PageResponse;
 import com.winhmm.myspotify.dto.song.RejectSongRequest;
 import com.winhmm.myspotify.dto.song.SongManageResponse;
@@ -58,6 +80,8 @@ import org.springframework.web.bind.annotation.*;
     - Email có tồn tại không.
     - Mật khẩu có đúng không: passwordEncoder.matches(mật khẩu gửi lên, mật khẩu đã hash).
     - Tài khoản có đang ACTIVE không (chưa xác thực, bị khóa, đã xóa → từ chối).
+    - Tài khoản đã được chủ dự án cấp quyền truy cập chưa
+      (access_status phải là ACCEPT, còn REFUSE → "Account has not been approved yet").
     Sai email hoặc sai mật khẩu đều báo chung "Email or password is incorrect",
     để kẻ gian không dò được email nào có tồn tại trong hệ thống.
 
@@ -221,6 +245,7 @@ import org.springframework.web.bind.annotation.*;
         password = <mật khẩu đã hash bằng BCrypt>
         role = ADMIN
         account_status = ACTIVE
+        access_status = ACCEPT
 
     Bước 6.2:
     Chuyển entity User thành đối tượng UserDetails (dạng mà Spring Security hiểu):
@@ -229,7 +254,8 @@ import org.springframework.web.bind.annotation.*;
             .withUsername(user.getEmail())
             .password(user.getPassword())
             .roles(user.getRole().name())
-            .disabled(user.getAccountStatus() != AccountStatus.ACTIVE)
+            .disabled(user.getAccountStatus() != AccountStatus.ACTIVE
+                    || user.getAccessStatus() != AccessStatus.ACCEPT)
             .build();
 
     Code ghi tên đầy đủ org.springframework.security.core.userdetails.User
@@ -246,8 +272,10 @@ import org.springframework.web.bind.annotation.*;
     - roles("ADMIN"): Spring tự thêm tiền tố → authority "ROLE_ADMIN".
       role USER → "ROLE_USER", role ARTIST → "ROLE_ARTIST".
 
-    - disabled(...): accountStatus khác ACTIVE (UNVERIFIED, DISABLED, DELETED)
-      → tài khoản bị đánh dấu không hoạt động.
+    - disabled(...): tài khoản bị đánh dấu không hoạt động khi
+      + accountStatus khác ACTIVE (UNVERIFIED, DISABLED, DELETED), hoặc
+      + accessStatus khác ACCEPT (chủ dự án chưa cấp hoặc đã thu hồi quyền truy cập).
+      Dấu || nghĩa là "hoặc": chỉ cần 1 trong 2 điều kiện đúng là bị đánh dấu.
 
     Không tìm thấy User (VD có người xóa thẳng dòng đó khỏi MySQL trong lúc phiên Redis vẫn còn)
     → ném UsernameNotFoundException → khối catch trong filter bắt
@@ -261,8 +289,10 @@ import org.springframework.web.bind.annotation.*;
 
         if (userDetails.isEnabled()) { ... }
 
-    Tài khoản bị khóa, chưa xác thực hoặc đã xóa → isEnabled() = false
-    → không xác thực, dù token và phiên đều hợp lệ.
+    Tài khoản bị khóa, chưa xác thực, đã xóa, hoặc bị chủ dự án đổi sang REFUSE
+    → isEnabled() = false → không xác thực, dù token và phiên đều hợp lệ.
+    Nhờ vậy, đổi access_status sang REFUSE trong MySQL là người đó bị chặn ngay
+    từ request tiếp theo, không cần chờ token hết hạn.
 
     Tài khoản đang hoạt động → tạo Authentication:
 
@@ -305,7 +335,8 @@ import org.springframework.web.bind.annotation.*;
     Lưu ý: rate limit đếm trước bước kiểm tra quyền, nên cả request bị 401 hay 403
     cũng tính vào giới hạn (chống kẻ gian gửi dồn dập để dò quyền).
 
-    Không đếm: request OPTIONS (trình duyệt tự gửi để hỏi CORS), /uploads/** (file nhạc, ảnh).
+    Không đếm: request OPTIONS (trình duyệt tự gửi để hỏi CORS), /uploads/** (file nhạc, ảnh),
+    /actuator/** (kiểm tra server) và các trang Swagger.
 
     =====================================================================
     (9) SecurityConfig KIỂM TRA QUY TẮC TRUY CẬP
@@ -341,7 +372,8 @@ import org.springframework.web.bind.annotation.*;
     Có ROLE_ADMIN → cho phép chạy approveSong().
 
     Không có (VD chỉ có ROLE_USER hoặc ROLE_ARTIST)
-    → ném AccessDeniedException ngay trong lúc gọi method controller
+    → ném AuthorizationDeniedException (lớp con của AccessDeniedException)
+      ngay trong lúc gọi method controller
     → GlobalExceptionHandler.handleAccessDenied bắt lại → trả 403:
         { "message": "You do not have permission to access this resource" }
 
@@ -396,9 +428,9 @@ import org.springframework.web.bind.annotation.*;
         SongMapper.toManageResponse(song)
 
     Chuyển entity Song → SongManageResponse, gồm:
-        id, title, audioUrl, coverUrl, durationSeconds, playCount,
+        id, title, audioUrl, coverUrl, canvasUrl, durationSeconds, playCount,
         status, released, releaseAt, rejectReason,
-        artistId, artistName, featuredArtists, createdAt, updatedAt.
+        artistId, artistName, featuredArtists, genreId, genreName, createdAt, updatedAt.
 
     released được tính sẵn: APPROVED và releaseAt <= bây giờ
     → frontend biết bài "Đã phát hành" hay "Đã lên lịch" mà không cần tự so thời gian.
@@ -423,6 +455,7 @@ import org.springframework.web.bind.annotation.*;
     {
         "id": 15,
         "title": "Chiều Mưa",
+        "canvasUrl": null,
         "status": "APPROVED",
         "released": true,
         "releaseAt": "2026-10-14T00:05:00",
@@ -430,6 +463,8 @@ import org.springframework.web.bind.annotation.*;
         "artistId": 5,
         "artistName": "Mây Chiều",
         "featuredArtists": [ { "id": 12, "artistName": "Sóng Nhỏ" } ],
+        "genreId": 24,
+        "genreName": "Chill",
         ...
     }
 
@@ -444,7 +479,7 @@ import org.springframework.web.bind.annotation.*;
         -> Lấy email và sessionId từ JWT
         -> SessionService đối chiếu sessionId với Redis
         -> CustomUserDetailsService tải User (kèm role mới nhất) từ MySQL
-        -> Tài khoản ACTIVE → lưu Authentication vào SecurityContext
+        -> Tài khoản ACTIVE và ACCEPT → lưu Authentication vào SecurityContext
         -> RateLimitFilter đếm request (vượt → 429)
         -> SecurityConfig: chưa xác thực → 401
         -> DispatcherServlet chọn method approveSong
@@ -458,6 +493,18 @@ import org.springframework.web.bind.annotation.*;
 
     Mọi lỗi đều trả về cùng 1 dạng JSON: { "message": "..." }
     → frontend luôn đọc lỗi bằng error.response.data.message.
+*/
+/*
+    -----------------------------------------------------
+    3 annotation trên class
+    -----------------------------------------------------
+    - @PreAuthorize("hasRole('ADMIN')"): áp dụng cho mọi hàm trong class, chỉ ADMIN gọi được.
+    - @RestController: class này là controller, giá trị return được đổi thành JSON
+      (xem giải thích chi tiết trong GenreController).
+    - @RequestMapping("/api/admin/songs"): mọi API trong class bắt đầu bằng /api/admin/songs.
+
+    Biến adminSongService và constructor: Spring tự tạo AdminSongService rồi truyền vào
+    (tiêm phụ thuộc, xem GenreController).
 */
 @PreAuthorize("hasRole('ADMIN')")
 @RestController
@@ -478,6 +525,16 @@ public class AdminSongController {
         GET /api/admin/songs?status=PENDING           → chỉ bài đang chờ duyệt
         GET /api/admin/songs?status=APPROVED&page=1   → bài đã duyệt, trang thứ 2
 
+        Tham số:
+        - status (không bắt buộc, required = false):
+            + Không gửi → mọi bài trừ bài đã xóa (DELETED).
+            + Gửi 1 trạng thái: PENDING, APPROVED, REJECTED, HIDDEN
+              (gửi DELETED thì xem được các bài đã xóa, nhưng file nhạc và ảnh của chúng đã mất).
+            + Spring tự đổi chuỗi "PENDING" sang enum SongStatus.PENDING.
+              Gửi giá trị không có trong enum, VD status=ABC → 400 "Invalid parameter: status".
+        - page (mặc định 0): số trang, bắt đầu từ 0. Gửi số âm → tự chỉnh về 0.
+        - size (mặc định 20): số bài mỗi trang, tự giới hạn trong khoảng 1 đến 50.
+
         Luồng xử lý:
         1. adminSongService.getSongs(...)
            → Page<Song>: bài của trang này + tổng số bài, tổng số trang.
@@ -489,6 +546,31 @@ public class AdminSongController {
 
         3. ResponseEntity.ok(...) → HTTP 200 kèm JSON:
            { "content": [...], "page": 0, "size": 20, "totalElements": 35, "totalPages": 2 }
+
+        -----------------------------------------------------
+        @RequestParam: lấy tham số trên đường dẫn (query string)
+        -----------------------------------------------------
+        Query string là phần sau dấu ? trong URL, các cặp tên=giá trị nối bằng dấu &:
+            /api/admin/songs?status=APPROVED&page=1
+                             └───────┬───────────┘
+                               status = "APPROVED", page = "1"
+
+        @RequestParam SongStatus status: lấy tham số tên "status" gán vào biến status.
+        Tên biến trùng tên tham số nên không cần ghi tên trong ngoặc.
+
+        Các tùy chọn:
+        - required = false     : không gửi cũng được → biến nhận giá trị null.
+                                 (Mặc định required = true: thiếu tham số → 400.)
+        - defaultValue = "0"   : không gửi → dùng giá trị mặc định "0".
+                                 Giá trị mặc định luôn viết dạng chuỗi, Spring tự đổi sang int.
+
+        Vì sao status dùng required = false, còn page và size dùng defaultValue?
+        - status kiểu SongStatus (đối tượng) → được phép null → null nghĩa là "không lọc".
+        - page, size kiểu int (kiểu nguyên thủy) → không thể null
+          → bắt buộc có giá trị mặc định, nếu không thì thiếu tham số sẽ báo lỗi.
+
+        Kiểu trả về ResponseEntity<PageResponse<SongManageResponse>>, đọc từ ngoài vào trong:
+            response HTTP → body là PageResponse → content bên trong là danh sách SongManageResponse.
     */
     @GetMapping
     public ResponseEntity<PageResponse<SongManageResponse>> getSongs(
@@ -497,21 +579,18 @@ public class AdminSongController {
             @RequestParam(defaultValue = "20") int size) {
 
         /*
-            Nhận kết quả phân trang từ Service và phương thức chuyển đổi DTO.
-
-            Chuyển từng Song thành SongManageResponse.
-
-            Đóng gói danh sách DTO cùng thông tin phân trang vào PageResponse.
+            Đọc câu lệnh bên dưới từ trong ra ngoài:
+            1. adminSongService.getSongs(status, page, size)
+               → Page<Song>: danh sách bài của trang này kèm thông tin phân trang.
+            2. SongMapper.toPageResponse(page, SongMapper::toManageResponse)
+               → nhận 2 tham số: Page<Song> và "cách đổi 1 Song thành DTO".
+                 SongMapper::toManageResponse là cách viết gọn của
+                     song -> SongMapper.toManageResponse(song)
+                 toPageResponse áp dụng cách đổi đó cho từng bài,
+                 rồi đóng gói cùng page, size, totalElements, totalPages vào PageResponse.
+            3. ResponseEntity.ok(...) → HTTP 200 kèm PageResponse (Jackson đổi thành JSON).
         */
         return ResponseEntity.ok(SongMapper.toPageResponse(
-                /*
-                    Gọi Service để lấy danh sách bài hát theo trạng thái status,
-                    kết quả là một đối tượng Page<Song> chứa danh sách
-                    bài hát và thông tin phân trang.
-
-                    SongMapper::toManageResponse chuyển từng đối tượng Song thành SongManageResponse (DTO)
-                    để trả dữ liệu phù hợp cho frontend.
-                */
                 adminSongService.getSongs(status, page, size),
                 SongMapper::toManageResponse));
     }
@@ -539,6 +618,19 @@ public class AdminSongController {
         JSON trả về: 1 SongManageResponse với "status": "APPROVED".
         "released": true  → đã tới giờ, người nghe thấy ngay.
         "released": false → đang chờ tới lịch phát hành.
+
+        -----------------------------------------------------
+        Đọc code (1 dòng, đọc từ trong ra ngoài)
+        -----------------------------------------------------
+            return ResponseEntity.ok(SongMapper.toManageResponse(adminSongService.approveSong(songId)));
+
+        1. adminSongService.approveSong(songId) → Service duyệt bài, trả về entity Song đã lưu.
+        2. SongMapper.toManageResponse(song)    → đổi Song sang SongManageResponse.
+        3. ResponseEntity.ok(dto)               → response 200 với body là DTO.
+        Viết dài tương đương:
+            Song song = adminSongService.approveSong(songId);
+            SongManageResponse dto = SongMapper.toManageResponse(song);
+            return ResponseEntity.ok(dto);
     */
     @PutMapping("/{songId}/approve")
     public ResponseEntity<SongManageResponse> approveSong(@PathVariable Long songId) {
@@ -549,6 +641,31 @@ public class AdminSongController {
         ---------------------------------------------------------------
         UC35 - Từ chối bài đang chờ duyệt.
         ---------------------------------------------------------------
+        Ví dụ gọi:
+            PUT /api/admin/songs/15/reject
+            Content-Type: application/json
+            Body: { "reason": "Ảnh bìa không phù hợp" }
+
+        @Valid @RequestBody RejectSongRequest request:
+        - @RequestBody: Spring đọc JSON trong body, tạo đối tượng RejectSongRequest.
+        - @Valid: kiểm tra các annotation trong DTO trước khi chạy method:
+            + reason thiếu, rỗng hoặc toàn dấu cách → 400 "Reason is required".
+            + reason dài quá 255 ký tự              → 400 "Reason must not exceed 255 characters".
+          Bắt buộc có lý do để Artist biết vì sao bị từ chối mà sửa.
+
+        Luồng xử lý (AdminSongService.rejectSong):
+        1. Bài không tồn tại hoặc đã xóa → 400 "Song does not exist".
+        2. Bài phải đang PENDING → nếu không: 400 "Only pending songs can be rejected".
+        3. Đổi trạng thái sang REJECTED, lưu lý do (đã bỏ dấu cách thừa ở 2 đầu bằng trim()).
+
+        Sau đó:
+        - Artist thấy lý do trong GET /api/artist/songs (trường rejectReason).
+        - Artist sửa bài (tên, danh sách feat, ảnh bìa hoặc video Canvas) → bài tự quay về PENDING,
+          lý do cũ bị xóa, Admin duyệt lại từ đầu.
+
+        JSON trả về: SongManageResponse với "status": "REJECTED" và "rejectReason".
+
+        request.getReason(): lấy lý do từ DTO (getter), truyền xuống Service cùng songId.
     */
     @PutMapping("/{songId}/reject")
     public ResponseEntity<SongManageResponse> rejectSong(@PathVariable Long songId,
@@ -561,8 +678,28 @@ public class AdminSongController {
         ---------------------------------------------------------------
         UC36 - Gỡ bài đã duyệt (kể cả bài Artist đang ẩn).
         ---------------------------------------------------------------
+        Ví dụ gọi:
+            PUT /api/admin/songs/15/remove
+            Content-Type: application/json
+            Body: { "reason": "Vi phạm bản quyền" }
+
+        Khác với từ chối (UC35):
+        - Từ chối: bài chưa từng được duyệt (đang PENDING).
+        - Gỡ: bài đã duyệt (APPROVED), kể cả bài Artist đang ẩn (HIDDEN).
+          VD phát hiện bài vi phạm bản quyền sau khi đã phát hành.
+
+        Luồng xử lý (AdminSongService.removeSong):
+        1. Bài không tồn tại hoặc đã xóa → 400 "Song does not exist".
+        2. Bài phải đang APPROVED hoặc HIDDEN → nếu không: 400 "Only approved songs can be removed".
+        3. Đổi trạng thái sang REJECTED, lưu lý do.
+           → Người nghe không thấy bài nữa ngay lập tức (không còn thỏa điều kiện phát hành).
+           → Lượt nghe, file nhạc, ảnh bìa vẫn giữ nguyên.
+           → Artist sửa bài thì bài quay về PENDING, chờ Admin duyệt lại.
+
         Dùng lại RejectSongRequest vì cấu trúc giống hệt (chỉ cần 1 trường reason),
         không cần tạo thêm DTO mới.
+
+        JSON trả về: SongManageResponse với "status": "REJECTED" và "rejectReason".
     */
     @PutMapping("/{songId}/remove")
     public ResponseEntity<SongManageResponse> removeSong(@PathVariable Long songId,
