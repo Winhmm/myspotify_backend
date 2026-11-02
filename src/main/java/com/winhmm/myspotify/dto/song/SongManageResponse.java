@@ -1,5 +1,15 @@
 package com.winhmm.myspotify.dto.song;
 
+/*
+    -----------------------------------------------------
+    Các dòng import
+    -----------------------------------------------------
+    (Các khái niệm cơ bản: xem RegisterRequest. Thứ tự đọc package dto.song: xem UploadSongRequest.)
+
+    - SongStatus   : enum trạng thái bài hát (PENDING, APPROVED, REJECTED, HIDDEN, DELETED).
+    - LocalDateTime: kiểu ngày giờ của Java.
+    - List         : danh sách, dùng cho featuredArtists.
+*/
 import com.winhmm.myspotify.enums.SongStatus;
 
 import java.time.LocalDateTime;
@@ -7,16 +17,27 @@ import java.util.List;
 
 /*
     =====================================================================
-    SongManageResponse - THÔNG TIN BÀI HÁT ĐẦY ĐỦ CHO ARTIST VÀ ADMIN
+    SONGMANAGERESPONSE - THÔNG TIN BÀI HÁT ĐẦY ĐỦ CHO ARTIST VÀ ADMIN
     =====================================================================
 
     Dùng ở:
     - ArtistSongController: "Bài hát của tôi" (UC28) và kết quả sau mỗi thao tác
-      (đăng, sửa, đổi ảnh, đổi lịch, ẩn, hiện).
+      (đăng, sửa, đổi ảnh, đổi video Canvas, đổi lịch, ẩn, hiện).
     - AdminSongController : danh sách bài (UC34), kết quả duyệt, từ chối, gỡ.
 
     Có thêm so với SongResponse (bản cho người nghe):
         status, released, rejectReason, createdAt, updatedAt.
+    13 trường còn lại giống hệt SongResponse (ý nghĩa từng trường: xem SongResponse).
+
+    -----------------------------------------------------
+    5 trường thêm
+    -----------------------------------------------------
+    - status      : trạng thái bài, kiểu enum SongStatus.
+                    Jackson tự chuyển enum thành chuỗi theo tên, VD SongStatus.REJECTED → "REJECTED".
+    - released    : bài đã thật sự phát hành chưa (true hoặc false), backend tính sẵn.
+    - rejectReason: lý do Admin từ chối hoặc gỡ bài, null nếu không bị từ chối.
+    - createdAt   : thời điểm Artist đăng bài.
+    - updatedAt   : thời điểm sửa gần nhất.
 
     =====================================================================
     FRONTEND HIỂN THỊ NHÃN TRẠNG THÁI
@@ -28,10 +49,12 @@ import java.util.List;
         APPROVED   true       → "Đã phát hành"
         REJECTED   false      → "Bị từ chối"    (kèm rejectReason)
         HIDDEN     false      → "Đã ẩn"
+        DELETED    false      → "Đã xóa"        (chỉ Admin thấy, khi lọc status=DELETED)
 
     Vì sao cần thêm "released" khi đã có "status"?
     - Bài APPROVED có 2 tình trạng khác nhau: đã tới giờ phát hành hay chưa.
-    - Backend tính sẵn (so releaseAt với giờ server) → frontend không phải tự so thời gian,
+    - Backend tính sẵn (released = APPROVED và releaseAt <= giờ server, trong SongMapper)
+      → frontend không phải tự so thời gian,
       tránh sai lệch do đồng hồ máy người dùng chạy sai.
 
     =====================================================================
@@ -59,14 +82,13 @@ import java.util.List;
         "updatedAt": "2026-10-12T17:05:00"
     }
 
-    Enum SongStatus → JSON: Jackson tự chuyển thành chuỗi tên enum, VD "REJECTED".
-
     =====================================================================
     BUILDER
     =====================================================================
 
     Class có 18 trường → càng cần Builder hơn SongResponse
-    (giải thích chi tiết Builder Pattern xem trong SongResponse.java).
+    (giải thích chi tiết Builder pattern xem trong SongResponse.java,
+    cấu trúc code ở đây giống hệt, chỉ thêm 5 trường).
 
         SongManageResponse response = SongManageResponse.builder()
                 .id(1L)
@@ -77,6 +99,13 @@ import java.util.List;
     Được dùng duy nhất trong SongMapper.toManageResponse(song).
 */
 public class SongManageResponse {
+    /*
+        18 thuộc tính, đều private.
+
+        released là boolean (chữ b thường, kiểu nguyên thủy): luôn là true hoặc false, không bao giờ null.
+        Các trường còn lại dùng kiểu đối tượng (Long, Integer, String...) nên có thể null,
+        VD releaseAt = null (chưa đặt lịch), rejectReason = null (không bị từ chối).
+    */
     private Long id;
     private String title;
     private String audioUrl;
@@ -96,6 +125,10 @@ public class SongManageResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    /*
+        Constructor private: chỉ Builder gọi được, chép từng giá trị từ Builder sang
+        (giải thích chi tiết: xem SongResponse).
+    */
     private SongManageResponse(Builder builder) {
         this.id = builder.id;
         this.title = builder.title;
@@ -117,10 +150,21 @@ public class SongManageResponse {
         this.updatedAt = builder.updatedAt;
     }
 
+    /*
+        Điểm bắt đầu: SongManageResponse.builder() trả về 1 Builder rỗng (xem SongResponse).
+    */
     public static Builder builder() {
         return new Builder();
     }
 
+    /*
+        -----------------------------------------------------
+        Getter (Jackson gọi để tạo JSON)
+        -----------------------------------------------------
+        isReleased() thay vì getReleased():
+        thuộc tính kiểu boolean nguyên thủy đặt tên getter là is + tên thuộc tính.
+        Jackson bỏ chữ "is" → key "released" trong JSON (giống isSynced() trong LyricsResponse).
+    */
     public Long getId() { return id; }
     public String getTitle() { return title; }
     public String getAudioUrl() { return audioUrl; }
@@ -140,6 +184,16 @@ public class SongManageResponse {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 
+    /*
+        -----------------------------------------------------
+        Class Builder lồng bên trong
+        -----------------------------------------------------
+        Giống hệt Builder của SongResponse:
+        - 18 thuộc tính "nháp" giống SongManageResponse.
+        - Mỗi hàm gán 1 giá trị rồi return this để gọi nối tiếp.
+        - build() gọi new SongManageResponse(this) tạo đối tượng thật.
+        Giải thích chi tiết từng dòng: xem SongResponse.
+    */
     public static class Builder {
         private Long id;
         private String title;

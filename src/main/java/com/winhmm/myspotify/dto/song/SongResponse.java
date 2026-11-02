@@ -1,14 +1,25 @@
 package com.winhmm.myspotify.dto.song;
 
+/*
+    -----------------------------------------------------
+    Các dòng import
+    -----------------------------------------------------
+    (Các khái niệm cơ bản: xem RegisterRequest. Thứ tự đọc package dto.song: xem UploadSongRequest.)
+
+    - LocalDateTime: kiểu ngày giờ của Java, dùng cho releaseAt.
+    - List         : danh sách, dùng cho featuredArtists.
+    ArtistSummary nằm cùng package dto.song nên không cần import.
+*/
 import java.time.LocalDateTime;
 import java.util.List;
 
 /*
     =====================================================================
-    SongResponse - THÔNG TIN BÀI HÁT CHO NGƯỜI NGHE (UC20 - UC25)
+    SONGRESPONSE - THÔNG TIN BÀI HÁT CHO NGƯỜI NGHE (UC20 - UC25)
     =====================================================================
 
-    Dùng ở: mọi API trong SongController (danh sách, tìm kiếm, chi tiết, trang nghệ sĩ)
+    Dùng ở: mọi API trong SongController (danh sách, tìm kiếm, chi tiết, trang nghệ sĩ),
+    3 API gợi ý trong RecommendationController,
     và phần "song" trong ListeningHistoryResponse.
 
     So với SongManageResponse (bản cho Artist, Admin), bản này không có:
@@ -35,11 +46,31 @@ import java.util.List;
         "genreName": "Chill"
     }
 
-    genreId, genreName: thể loại của bài (chọn lúc đăng bài, không đổi được).
-    Để phẳng 2 trường giống artistId, artistName, frontend đọc thẳng song.genreName.
+    -----------------------------------------------------
+    Ý nghĩa từng trường
+    -----------------------------------------------------
+    - id             : id bài hát.
+    - title          : tên bài.
+    - audioUrl       : đường dẫn file nhạc. Là đường dẫn tương đối, frontend ghép thêm địa chỉ server:
+                       "http://157.66.100.87:8080" + audioUrl → đặt vào thẻ <audio>.
+    - coverUrl       : đường dẫn ảnh bìa, null nếu Artist chưa có ảnh → frontend hiện ảnh mặc định.
+    - canvasUrl      : video lặp (Canvas) của bài, null nếu Artist chưa đăng
+                       → frontend hiện ảnh bìa (coverUrl) thay thế.
+    - durationSeconds: thời lượng, đơn vị giây (215 → frontend hiển thị "3:35").
+    - playCount      : tổng lượt nghe.
+    - releaseAt      : thời điểm phát hành.
+    - artistId, artistName: Artist chính (người đăng bài).
+    - featuredArtists: danh sách nghệ sĩ feat (mỗi phần tử là 1 ArtistSummary).
+                       Nghệ sĩ feat bị khóa tài khoản thì tự bị ẩn khỏi danh sách.
+                       Rỗng [] → frontend không hiện chữ "ft.".
+    - genreId, genreName: thể loại của bài (chọn lúc đăng bài, không đổi được).
 
-    canvasUrl: video lặp (Canvas) của bài, null nếu Artist chưa đăng
-    → frontend hiện ảnh bìa (coverUrl) thay thế.
+    Vì sao để phẳng artistId, artistName, genreId, genreName thay vì lồng object
+    { "artist": { "id": 5, "name": "..." } }?
+    Frontend đọc thẳng song.artistName, song.genreName, ngắn gọn hơn song.artist.name.
+
+    Vì sao kiểu Integer, Long (chữ hoa) mà không phải int, long?
+    Giữ đúng kiểu của entity Song, và kiểu đối tượng có thể null (VD bài cũ chưa có thể loại → genreId = null).
 
     LocalDateTime → JSON: Spring Boot tự chuyển sang chuỗi chuẩn ISO "2026-10-12T16:30:00"
     (không phải dạng số như 1760261400000), frontend dùng new Date(...) đọc được ngay.
@@ -63,7 +94,7 @@ import java.util.List;
                 .playCount(1024L)
                 .artistId(5L)
                 .build();
-    → Đọc là hiểu ngay, không thể nhầm thứ tự, trường nào chưa cần thì bỏ qua.
+    → Đọc là hiểu ngay, không thể nhầm thứ tự, trường nào chưa cần thì bỏ qua (giữ giá trị null).
 
     Cách hoạt động:
     1. SongResponse.builder() → tạo 1 đối tượng Builder rỗng.
@@ -71,9 +102,16 @@ import java.util.List;
        → nên gọi nối tiếp .title(...).durationSeconds(...) được (gọi là "method chaining").
     3. .build() → lấy hết giá trị trong Builder, tạo ra SongResponse thật.
 
+    Giống đi mua bánh mì: người bán (Builder) ghi lần lượt từng món bạn gọi
+    ("thêm pate", "thêm chả", "không hành"), gọi xong mới làm ra 1 ổ bánh hoàn chỉnh (build).
+
     Builder được dùng duy nhất trong SongMapper.toSongResponse(song).
+    Project tự viết Builder bằng tay (không dùng thư viện Lombok) để thấy rõ từng bước hoạt động.
 */
 public class SongResponse {
+    /*
+        13 thuộc tính, đều private. Ý nghĩa từng trường: xem phần "Ý nghĩa từng trường" ở trên.
+    */
     private Long id;
     private String title;
     private String audioUrl;
@@ -88,6 +126,19 @@ public class SongResponse {
     private Long genreId;
     private String genreName;
 
+    /*
+        -----------------------------------------------------
+        Constructor private, nhận vào 1 Builder
+        -----------------------------------------------------
+        - private: code bên ngoài class không gọi được new SongResponse(...).
+          → Cách duy nhất để tạo SongResponse là đi qua Builder (hàm build() bên dưới).
+          Class Builder nằm bên trong SongResponse nên vẫn gọi được constructor private này.
+        - Tham số builder: Builder đã được gán đủ giá trị.
+        - Mỗi dòng chép 1 giá trị từ Builder sang SongResponse:
+            this.id = builder.id;
+            this.id   : thuộc tính của SongResponse đang được tạo.
+            builder.id: thuộc tính cùng tên bên trong Builder.
+    */
     private SongResponse(Builder builder) {
         this.id = builder.id;
         this.title = builder.title;
@@ -104,10 +155,25 @@ public class SongResponse {
         this.genreName = builder.genreName;
     }
 
+    /*
+        -----------------------------------------------------
+        Điểm bắt đầu: SongResponse.builder()
+        -----------------------------------------------------
+        - static: gọi thẳng qua tên class SongResponse.builder(), không cần có sẵn 1 đối tượng SongResponse
+          (lúc này chưa có đối tượng nào, vì đang chuẩn bị tạo).
+        - Trả về 1 Builder rỗng (mọi thuộc tính đều null) để gán dần từng giá trị.
+    */
     public static Builder builder() {
         return new Builder();
     }
 
+    /*
+        -----------------------------------------------------
+        Getter (Jackson gọi để tạo JSON)
+        -----------------------------------------------------
+        Tên key trong JSON lấy theo tên getter: getAudioUrl() → "audioUrl"...
+        Không có setter: tạo xong qua Builder thì không sửa được nữa.
+    */
     public Long getId() { return id; }
     public String getTitle() { return title; }
     public String getAudioUrl() { return audioUrl; }
@@ -122,6 +188,20 @@ public class SongResponse {
     public Long getGenreId() { return genreId; }
     public String getGenreName() { return genreName; }
 
+    /*
+        =====================================================================
+        CLASS BUILDER (CLASS LỒNG BÊN TRONG SONGRESPONSE)
+        =====================================================================
+
+        public static class Builder: 1 class được viết bên trong class SongResponse.
+        - public: bên ngoài dùng được (SongMapper gọi SongResponse.builder().id(...)...).
+        - static: Builder tồn tại độc lập, không cần có sẵn 1 đối tượng SongResponse mới tạo được Builder.
+          (Đúng ý đồ: Builder có trước, SongResponse được tạo sau, từ Builder.)
+        - Tên đầy đủ khi gọi từ bên ngoài là SongResponse.Builder.
+
+        Builder có đúng 13 thuộc tính giống hệt SongResponse, đóng vai "tờ giấy nháp":
+        gán dần từng giá trị vào đây, đủ rồi mới tạo SongResponse thật.
+    */
     public static class Builder {
         private Long id;
         private String title;
@@ -137,6 +217,24 @@ public class SongResponse {
         private Long genreId;
         private String genreName;
 
+        /*
+            -----------------------------------------------------
+            Các hàm gán giá trị
+            -----------------------------------------------------
+            Đọc 1 dòng:
+                public Builder id(Long id) { this.id = id; return this; }
+                - Kiểu trả về là Builder (không phải void như setter thông thường).
+                - Tên hàm đặt đúng bằng tên thuộc tính, không có chữ "set" → đọc tự nhiên: .id(15L).
+                - this.id = id: gán giá trị vào thuộc tính của Builder.
+                - return this: trả về chính Builder này
+                  → gọi tiếp được hàm khác ngay sau dấu chấm: .id(15L).title("Chiều Mưa")...
+
+            Viết dài tương đương:
+                public Builder id(Long id) {
+                    this.id = id;
+                    return this;
+                }
+        */
         public Builder id(Long id) { this.id = id; return this; }
         public Builder title(String title) { this.title = title; return this; }
         public Builder audioUrl(String audioUrl) { this.audioUrl = audioUrl; return this; }
@@ -151,6 +249,14 @@ public class SongResponse {
         public Builder genreId(Long genreId) { this.genreId = genreId; return this; }
         public Builder genreName(String genreName) { this.genreName = genreName; return this; }
 
+        /*
+            -----------------------------------------------------
+            build(): tạo SongResponse thật từ Builder
+            -----------------------------------------------------
+            new SongResponse(this): gọi constructor private ở trên,
+            truyền vào chính Builder này (this) để constructor chép từng giá trị sang.
+            Đây là bước cuối của chuỗi: SongResponse.builder()...build().
+        */
         public SongResponse build() {
             return new SongResponse(this);
         }
