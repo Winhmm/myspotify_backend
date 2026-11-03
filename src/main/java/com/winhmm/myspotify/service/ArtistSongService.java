@@ -111,6 +111,17 @@ public class ArtistSongService {
 
         Thể loại chọn 1 lần ở đây. Sau khi đăng, không API nào đổi được
         (updateSong chỉ sửa tên và danh sách feat).
+
+        -----------------------------------------------------
+        Khối try / catch dọn file
+        -----------------------------------------------------
+        - audioUrl lưu xong ở ngoài try. Mọi bước sau nằm trong try.
+        - coverUrl khai báo ngoài try (= null) để khối catch dùng được.
+          Chưa kịp lưu ảnh bìa mà đã lỗi → coverUrl vẫn null → delete(null) không làm gì.
+        - catch(RuntimeException exception): bắt mọi lỗi (file nhạc giả, ảnh sai định dạng, lỗi database...)
+          → xóa file nhạc và ảnh vừa lưu → throw exception; ném lại ĐÚNG lỗi cũ
+          → GlobalExceptionHandler trả đúng mã lỗi (VD 400 "Invalid or corrupted audio file").
+        - releaseAt = null: chưa đặt lịch → phát hành ngay lúc Admin duyệt (xem AdminSongService.approveSong).
     */
     public Song uploadSong(Long artistId, String title, Long genreId, MultipartFile audioFile,
                            MultipartFile coverFile, List<Long> featuredArtistIds,
@@ -302,6 +313,23 @@ public class ArtistSongService {
         ---------------------------------------------------------------
         UC31 - Đổi lịch phát hành
         ---------------------------------------------------------------
+        Các bước:
+        1. Bài đã phát hành (đã duyệt và đã tới giờ) → không đổi lịch được nữa.
+        2. Lịch mới (nếu có) phải ở tương lai.
+        3. Gán lịch mới:
+
+            Trạng thái bài                 releaseAt gửi lên     Kết quả
+            PENDING, REJECTED              thời điểm tương lai   phát hành đúng giờ đó (sau khi được duyệt)
+            PENDING, REJECTED              null                  xóa lịch → phát hành ngay lúc được duyệt
+            APPROVED, HIDDEN (chưa tới giờ) thời điểm tương lai  dời lịch sang giờ mới
+            APPROVED, HIDDEN (chưa tới giờ) null                 releaseAt = bây giờ → phát hành ngay
+
+        Vì sao bài đã duyệt mà gửi null thì gán bây giờ, không để null?
+        Bài APPROVED có releaseAt = null thì điều kiện "releaseAt <= now" không bao giờ đúng
+        → bài không bao giờ phát hành. Gán bây giờ → phát hành ngay.
+
+        Đổi lịch không đổi trạng thái, không cần Admin duyệt lại.
+        (Kể cả bài REJECTED: đổi lịch không tự gửi duyệt lại, xem tài liệu test, mục "Giới hạn đã biết".)
     */
     public Song updateReleaseSchedule(Long artistId, Long songId, LocalDateTime releaseAt) {
         getArtist(artistId);
@@ -435,6 +463,19 @@ public class ArtistSongService {
         - Tối đa 5 người, không trùng nhau.
         - Không chứa chính Artist chính.
         - Mỗi người phải tồn tại, có role ARTIST và đang ACTIVE.
+
+        Các bước:
+        1. Không gửi hoặc danh sách rỗng → không feat ai (trả Set rỗng).
+        2. new HashSet<>(ids): Set không chứa phần tử trùng → tự bỏ id trùng, VD [12, 12, 13] → {12, 13}.
+           uniqueIds.remove(null): bỏ phần tử null nếu frontend lỡ gửi [12, null].
+        3. Quá 5 người → lỗi. Có id của chính mình → lỗi.
+        4. findAllById: lấy tất cả người được feat trong 1 câu SQL (WHERE id IN (...)).
+           Ai không phải ARTIST hoặc không ACTIVE → lỗi kèm id người đó.
+        5. Số người tìm được ít hơn số id gửi lên → có id không tồn tại → lỗi.
+           VD gửi {12, 13, 999}, chỉ tìm được 12 và 13 → "Some featured artists do not exist".
+
+        Kiểm tra "tối đa 5" ở đây là lớp thứ 2: DTO đã có @Size(max = 5),
+        nhưng @Size đếm cả id trùng, còn ở đây đếm sau khi đã bỏ trùng.
     */
     private Set<User> loadFeaturedArtists(Long artistId, List<Long> ids) {
         Set<User> result = new HashSet<>();
@@ -513,6 +554,7 @@ public class ArtistSongService {
         ---------------------------------------------------------------
         Hàm hỗ trợ: bài đã được Admin duyệt chưa?
         ---------------------------------------------------------------
+        HIDDEN cũng tính là đã duyệt: chỉ bài APPROVED mới ẩn được (xem hideSong).
     */
     private boolean wasApproved(Song song) {
         return song.getStatus() == SongStatus.APPROVED
@@ -523,6 +565,12 @@ public class ArtistSongService {
         ---------------------------------------------------------------
         Hàm hỗ trợ: video Canvas phải dài từ 7 đến 10 giây
         ---------------------------------------------------------------
+        Làm tròn tới 0,1 giây trước khi so:
+            durationMs = 6960   → 6960 / 100.0 = 69,6 → Math.round → 70 → 70 / 10.0 = 7,0 giây → hợp lệ
+            durationMs = 10049  → 100,49 → 100 → 10,0 giây → hợp lệ
+            durationMs = 10060  → 100,6  → 101 → 10,1 giây → lỗi
+        → Video 6,96 giây (gần như 7) không bị chặn oan, và message hiện số dễ đọc "(current: 10.1s)".
+        Chia cho 100.0 (có .0) để ra số thực; chia cho 100 (số nguyên) thì Java bỏ mất phần lẻ.
     */
     private void checkCanvasDuration(String canvasUrl) {
         long durationMs = fileStorageService.getVideoDurationMs(canvasUrl);

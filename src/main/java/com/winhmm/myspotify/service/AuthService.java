@@ -38,6 +38,9 @@ import java.util.Optional;
     - SessionService : tạo và xóa phiên đăng nhập trong Redis.
     Tất cả được Spring tự truyền vào qua constructor.
 
+    import com.winhmm.myspotify.dto.auth.*: dấu * nghĩa là import mọi class trong package dto.auth
+    (file này chỉ dùng LoginResponse). Viết import từng class cụ thể thì rõ ràng hơn, nhưng chạy như nhau.
+
     -----------------------------------------------------
     @Transactional là gì?
     -----------------------------------------------------
@@ -104,6 +107,9 @@ public class AuthService {
         Có. Kẻ gian đổi được mật khẩu của tài khoản chưa xác thực,
         nhưng mã OTP gửi về email của chủ thật, kẻ gian không kích hoạt được.
 
+        Xong trường hợp 2 thì return; (trong hàm void, return không kèm giá trị = kết thúc hàm ngay)
+        → không chạy xuống phần trường hợp 3 bên dưới.
+
         -----------------------------------------------------
         Trường hợp 3: email chưa tồn tại
         -----------------------------------------------------
@@ -111,6 +117,15 @@ public class AuthService {
         2. Tạo User mới: UNVERIFIED, role USER, quyền vào web REFUSE, mật khẩu đã băm.
         3. Lưu vào database.
         4. Tạo và gửi OTP mục đích REGISTER.
+
+        passwordEncoder.encode(password): băm mật khẩu bằng BCrypt.
+            "123456" → "$2a$10$N9qo8uLOickgx2ZMRZoMye..." (chuỗi 60 ký tự)
+        - Mỗi lần băm ra 1 chuỗi khác nhau, vì BCrypt trộn thêm "muối" (salt) ngẫu nhiên.
+        - Không giải ngược được từ chuỗi băm ra mật khẩu gốc.
+        → Database không bao giờ lưu mật khẩu gốc. Lộ database cũng không lộ mật khẩu.
+
+        Có Optional<User> existing ở đầu hàm: existing.isPresent() = có tài khoản dùng email này chưa,
+        existing.get() = lấy tài khoản đó ra (chỉ gọi sau khi đã kiểm tra isPresent).
 
         -----------------------------------------------------
         Khi có lỗi ở bước gửi OTP
@@ -224,7 +239,10 @@ public class AuthService {
            Ghi đè phiên cũ → thiết bị đăng nhập trước đó bị đăng xuất.
         6. jwtUtil.generateToken(user, sessionId):
            tạo JWT chứa email (sub) và UUID vừa sinh (jti).
-        7. Trả token, userId, username, role cho frontend.
+        7. Trả token, userId, username, role cho frontend:
+               { "token": "eyJhbGciOi...", "userId": 6, "username": "winhmm", "role": "USER" }
+           Frontend cất token để gắn vào header Authorization của mọi request sau,
+           dùng role để hiện đúng giao diện (USER, ARTIST, ADMIN).
 
         Không cần @Transactional vì hàm này không ghi gì vào MySQL.
     */

@@ -9,6 +9,69 @@ import java.util.UUID;
 
 /*
     =====================================================
+    PACKAGE SERVICE - THỨ TỰ ĐỌC
+    =====================================================
+
+    14 file, đọc từ dễ tới khó (file sau dùng lại kiến thức của file trước):
+        Nhóm Redis và email (nhỏ, được các Service khác dùng chung):
+             1. SessionService          (file này): phiên đăng nhập, Redis cơ bản
+             2. RateLimitService        : đếm request bằng Redis
+             3. EmailService            : gửi email
+             4. OtpService              : tạo, gửi, kiểm tra mã OTP, @Transactional
+        Nhóm tài khoản:
+             5. AuthService             : đăng ký, xác thực OTP, đăng nhập, quên mật khẩu
+             6. UserService             : thông tin cá nhân, đổi mật khẩu, đổi email, xin làm Artist
+             7. AdminService            : Admin quản lý tài khoản
+        Nhóm bài hát:
+             8. FileStorageService      : lưu, kiểm tra, xóa file nhạc, ảnh, video
+             9. ArtistSongService       : Artist quản lý bài của mình
+            10. AdminSongService        : Admin duyệt, từ chối, gỡ bài
+            11. SongService             : người nghe xem, tìm, nghe nhạc
+            12. ListeningHistoryService : lịch sử nghe (MongoDB, @Async)
+            13. LyricsService           : lời bài hát (regex)
+            14. RecommendationService   : gợi ý bài hát bằng AI (gọi sang Python)
+
+    =====================================================
+    SERVICE LÀ GÌ? (ĐỌC NẾU MỚI HỌC)
+    =====================================================
+
+    Kiến trúc 3 lớp của dự án:
+        Controller : nhận request, lấy dữ liệu từ request, gọi Service, trả response.
+        Service    : chứa quy tắc nghiệp vụ "được làm gì, khi nào, với điều kiện gì" (package này).
+        Repository : đọc và ghi database.
+
+    Những điểm chung của mọi file trong package:
+    - @Service: Spring tự tạo đúng 1 object của class lúc khởi động (gọi là bean),
+      rồi tự truyền vào nơi cần dùng qua constructor (constructor injection):
+          public AuthService(UserRepository userRepository, OtpService otpService, ...)
+          → Spring thấy constructor cần UserRepository, OtpService... thì tự tìm bean tương ứng truyền vào.
+          → Không bao giờ phải tự viết new AuthService(...).
+    - Thuộc tính private final: gán 1 lần trong constructor, sau đó không đổi được nữa.
+    - Vi phạm quy tắc → throw new IllegalArgumentException("message")
+      → GlobalExceptionHandler trả 400 { "message": "..." } cho frontend.
+    - @Transactional (chỉ có ở vài hàm): gom nhiều thao tác database thành 1 khối
+      "làm hết hoặc không làm gì" (giải thích chi tiết trong AuthService và OtpService).
+
+    =====================================================
+    REDIS LÀ GÌ? (ĐỌC NẾU MỚI HỌC)
+    =====================================================
+
+    Redis là 1 database lưu dữ liệu trong RAM, dạng "key → value" (giống 1 Map khổng lồ):
+        session:a@gmail.com    →  "3f2a9c1e-8b7d-..."
+        rate:user:a@gmail.com  →  "57"
+    - Rất nhanh (đọc ghi khoảng 1 ms), hợp với dữ liệu được đọc ở MỌI request.
+    - Mỗi key đặt được thời hạn sống (TTL): hết hạn Redis tự xóa, không cần code dọn dẹp.
+    - Theo tài liệu user.md, Redis của dự án không lưu xuống ổ đĩa: khởi động lại là mất hết.
+      Vì vậy chỉ lưu dữ liệu tạm (phiên đăng nhập, bộ đếm). Dữ liệu quan trọng vẫn ở MySQL.
+      Mất phiên → mọi người phải đăng nhập lại, không mất dữ liệu quan trọng nào.
+
+    Các loại key dự án đang dùng:
+        session:<email>          phiên đăng nhập            (SessionService)
+        rate:...                 bộ đếm rate limit          (RateLimitService)
+        otp-attempt:<id mã>      số lần nhập OTP            (OtpService)
+        play:<songId>:<email>    chống đếm trùng lượt nghe  (SongService)
+
+    =====================================================
     SESSIONSERVICE - QUẢN LÝ PHIÊN ĐĂNG NHẬP TRONG REDIS
     =====================================================
 
@@ -53,7 +116,14 @@ public class SessionService {
     /*
         StringRedisTemplate: công cụ Spring cung cấp sẵn để gửi lệnh tới Redis
         (key và value đều là chuỗi).
-        Spring tự tạo và truyền vào qua constructor.
+        Spring tự tạo và truyền vào qua constructor
+        (Spring Boot đọc cấu hình spring.data.redis.* để biết Redis nằm ở đâu).
+
+        Cách dùng trong file này:
+            redisTemplate.opsForValue()           → nhóm lệnh làm việc với value dạng chuỗi
+                .set(key, value, thờiHạn)         ~ lệnh Redis: SET key value EX số_giây
+                .get(key)                         ~ lệnh Redis: GET key (key không tồn tại → null)
+            redisTemplate.delete(key)             ~ lệnh Redis: DEL key
     */
     private final StringRedisTemplate redisTemplate;
 
@@ -83,9 +153,13 @@ public class SessionService {
         =====================================================
 
         1. Sinh mã phiên ngẫu nhiên bằng UUID (36 ký tự, gần như không thể đoán được).
+           UUID.randomUUID() tạo mã mới, .toString() đổi thành chuỗi để lưu.
         2. Lưu vào Redis, ghi đè phiên cũ (nếu có), tự xóa sau expirationMs.
            Tương đương lệnh Redis: SET session:<email> <mã phiên> EX <số giây>
         3. Trả mã phiên về cho AuthService để ghi vào token.
+
+        Duration.ofMillis(expirationMs): đổi số mili giây thành kiểu Duration (1 khoảng thời gian),
+        VD 86400000 ms → 24 giờ. Redis tự xóa key sau đúng khoảng thời gian này.
     */
     public String createSession(String email) {
         /*
@@ -150,5 +224,3 @@ public class SessionService {
         redisTemplate.delete(key(email));
     }
 }
-
-

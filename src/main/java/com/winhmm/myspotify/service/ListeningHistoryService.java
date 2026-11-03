@@ -65,6 +65,30 @@ public class ListeningHistoryService {
         @Async: ghi lịch sử ở thread riêng, API /play trả response ngay
         mà không chờ MongoDB Atlas phản hồi.
         Ghi lỗi thì chỉ log cảnh báo, không ảnh hưởng tới việc nghe nhạc.
+
+        -----------------------------------------------------
+        @Async hoạt động thế nào? (đọc nếu mới học)
+        -----------------------------------------------------
+        Thread: 1 "luồng chạy" của chương trình. Mỗi request được 1 thread xử lý từ đầu tới cuối.
+
+        Bình thường (đồng bộ): SongService.play gọi record() → đứng chờ record chạy xong → mới chạy tiếp.
+        Có @Async (bất đồng bộ): SongService.play gọi record() → Spring giao việc cho 1 thread khác
+        trong nhóm thread chạy nền → play chạy tiếp ngay, không chờ.
+
+            Thread của request : play() ──► gọi record() ──► trả 200 cho frontend
+                                                 │
+            Thread chạy nền    :                 └──► save vào MongoDB Atlas (mất 100 đến 300 ms qua mạng)
+
+        Điều kiện để @Async có tác dụng:
+        - MyspotifyApplication có @EnableAsync (đã bật).
+        - Hàm phải được gọi từ class KHÁC (ở đây SongService gọi sang). Giống @Transactional,
+          Spring bọc class trong 1 lớp vỏ (proxy), gọi từ bên trong chính class thì không đi qua lớp vỏ
+          → chạy đồng bộ như hàm thường.
+        - Hàm public, trả về void (hoặc CompletableFuture nếu cần lấy kết quả).
+
+        Vì sao phải tự try/catch bên trong?
+        Hàm chạy ở thread khác, lỗi ném ra không bay về SongService được (play đã chạy xong từ lâu).
+        Tự bắt và ghi log để còn biết mà sửa (VD IP server chưa được thêm vào Network Access của Atlas).
     */
     @Async
     public void record(Long userId, Long songId) {
@@ -92,6 +116,14 @@ public class ListeningHistoryService {
 
         /*
             Bước 2: lọc trùng, giữ lần nghe gần nhất của mỗi bài, giữ thứ tự.
+
+            - LinkedHashMap: Map nhớ thứ tự thêm vào (HashMap thường thì không giữ thứ tự).
+            - putIfAbsent(key, value): chỉ thêm khi key chưa có.
+              Danh sách đã xếp mới nhất trước → lần đầu gặp 1 bài chính là lần nghe gần nhất của bài đó,
+              các lần gặp sau (cũ hơn) bị bỏ qua.
+
+            VD 5 lượt nghe (mới → cũ): bài 15 (22:55), bài 7 (22:40), bài 15 (22:30), bài 9 (21:00), bài 7 (20:00)
+            → lastPlayedAt = { 15: 22:55, 7: 22:40, 9: 21:00 }
         */
         Map<Long, LocalDateTime> lastPlayedAt = new LinkedHashMap<>();
 

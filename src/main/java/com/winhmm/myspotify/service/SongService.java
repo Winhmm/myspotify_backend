@@ -145,6 +145,41 @@ public class SongService {
         ---------------------------------------------------------------
         UC24 - Tăng lượt nghe và ghi lịch sử nghe
         ---------------------------------------------------------------
+        Frontend gọi POST /api/songs/{songId}/play khi người dùng bắt đầu nghe 1 bài.
+        Tham số email: SongController truyền authentication.getName() (email trong token).
+
+        Các bước:
+        1. getPublishedSong(songId): bài phải đang phát hành, không thì 400 "Song does not exist".
+           Chỉ gọi để kiểm tra, không dùng kết quả trả về.
+        2. Chống đếm trùng bằng Redis:
+               setIfAbsent("play:15:a@gmail.com", "1", 30 giây)   ~ lệnh Redis: SET key 1 NX EX 30
+               NX = chỉ ghi khi key CHƯA tồn tại.
+           - Key chưa có → ghi được → trả true  → lần nghe đầu trong 30 giây → tính lượt.
+           - Key đã có  → không ghi → trả false → vừa nghe trong 30 giây → không tính.
+           Sau 30 giây Redis tự xóa key → lần sau lại được tính.
+           Chống: bấm play liên tục, tua đi tua lại, F5 trang để tăng lượt nghe ảo.
+        3. Được tính:
+           - songRepository.incrementPlayCount: tăng play_count bằng 1 câu UPDATE (xem SongRepository).
+           - Ghi lịch sử nghe vào MongoDB (ListeningHistoryService.record, chạy ở thread riêng).
+
+        -----------------------------------------------------
+        Đọc từng dòng
+        -----------------------------------------------------
+        Boolean firstTime: Boolean (chữ B hoa) là kiểu object, có thể null.
+        Boolean.TRUE.equals(firstTime): ra true chỉ khi firstTime đúng là true.
+            Viết if (firstTime) mà firstTime là null → NullPointerException.
+            Để Boolean.TRUE đứng trước → firstTime là null cũng không lỗi, chỉ ra false.
+
+        catch (Exception e) { shouldCount = true; }: Redis lỗi → vẫn tính lượt (fail-open).
+            Đếm dư vài lượt còn hơn làm hỏng chức năng nghe nhạc.
+
+        userRepository.findByEmail(email).ifPresent(user -> ...):
+            ifPresent: Optional có giá trị thì chạy đoạn code trong ngoặc, rỗng thì bỏ qua.
+            user -> listeningHistoryService.record(user.getId(), songId): lambda nhận user rồi gọi record.
+            Phải đổi email thành id, vì MongoDB lưu userId (số), còn token chỉ có email.
+
+        API luôn trả 200 "Play recorded", kể cả khi không được tính lượt (nghe lại trong 30 giây),
+        để không lộ quy luật chống spam (xem tài liệu test, mục "Giới hạn đã biết").
     */
     public void play(Long songId, String email) {
         getPublishedSong(songId);

@@ -104,6 +104,16 @@ public class AdminSongService {
         ---------------------------------------------------------------
         UC35 - Duyệt bài đang chờ duyệt
         ---------------------------------------------------------------
+        1. Chỉ duyệt bài PENDING.
+        2. Artist chính phải còn ACTIVE và còn role ARTIST
+           (bị khóa hoặc bị hạ role trong lúc chờ duyệt → không duyệt, "Artist account is not active").
+        3. Bài chưa đặt lịch (releaseAt = null) → gán releaseAt = bây giờ → phát hành ngay.
+           Bài đã đặt lịch → giữ nguyên, tới giờ tự phát hành.
+        4. Xóa lý do từ chối cũ (bài từng bị từ chối, Artist sửa xong được gửi duyệt lại).
+        5. Chuyển APPROVED, lưu, trả bài đã lưu để Controller đổi sang SongManageResponse.
+
+        song.getArtist(): Artist là quan hệ LAZY, tới lúc này Hibernate mới chạy SELECT lấy Artist
+        (chạy được vì spring.jpa.open-in-view mặc định bật, xem SongMapper).
     */
     public Song approveSong(Long songId) {
         Song song = getSong(songId);
@@ -133,6 +143,8 @@ public class AdminSongService {
         ---------------------------------------------------------------
 
         .trim() bỏ dấu cách thừa ở 2 đầu: "  Ảnh mờ  " → "Ảnh mờ".
+        reason đã được RejectSongRequest kiểm tra (@NotBlank, tối đa 255 ký tự) → không bao giờ null,
+        nên gọi reason.trim() an toàn.
     */
     public Song rejectSong(Long songId, String reason) {
         Song song = getSong(songId);
@@ -174,6 +186,9 @@ public class AdminSongService {
         ---------------------------------------------------------------
         Hàm hỗ trợ: lấy bài theo id cho Admin
         ---------------------------------------------------------------
+        Dùng findById (không lọc PUBLISHED_CONDITION): Admin thao tác được bài ở mọi trạng thái.
+        Riêng bài DELETED coi như không tồn tại: Admin vẫn thấy trong danh sách (lọc ?status=DELETED),
+        nhưng không duyệt, từ chối hay gỡ được.
     */
     private Song getSong(Long songId) {
         Song song = songRepository.findById(songId)

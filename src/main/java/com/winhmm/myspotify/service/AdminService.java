@@ -33,6 +33,20 @@ import java.util.List;
     Việc xóa phiên trong Redis nằm ngoài MySQL, không bị ảnh hưởng bởi transaction.
 
     -----------------------------------------------------
+    Mỗi chức năng đổi gì trong bảng users?
+    -----------------------------------------------------
+        Chức năng              account_status      role             artist_request_status   Xóa phiên Redis
+        lockAccount            ACTIVE → DISABLED   -                -                       Có
+        unlockAccount          DISABLED → ACTIVE   -                -                       Không
+        approveArtistRequest   -                   USER → ARTIST    PENDING → APPROVED      Không
+        rejectArtistRequest    -                   -                PENDING → REJECTED      Không
+                                                                    (xóa nghệ danh, bio)
+        assignRole             -                   → USER, ADMIN    → NONE (nếu đang là
+                                                                    Artist hoặc đang chờ)   Không
+    Chỉ lockAccount cần xóa phiên. Các chức năng khác không cần,
+    vì role được đọc lại từ MySQL ở mỗi request (xem phần dưới).
+
+    -----------------------------------------------------
     Thay đổi có hiệu lực ngay
     -----------------------------------------------------
     Role và trạng thái tài khoản được đọc lại từ MySQL ở mỗi request
@@ -64,6 +78,7 @@ public class AdminService {
         =====================================================
 
         Lấy mọi tài khoản ở mọi trạng thái, chưa phân trang.
+        findAll(): hàm có sẵn của JpaRepository (SELECT * FROM users), không cần khai báo trong UserRepository.
         Controller chuyển sang UserProfileResponse để bỏ trường password.
     */
     public List<User> getAllUsers() {

@@ -25,6 +25,13 @@ import java.time.Duration;
 
     Được gọi từ AuthService (đăng ký, quên mật khẩu) và UserService (đổi mật khẩu, đổi email).
 
+        Mục đích (OtpPurpose)   Bước 1: gửi mã                         Bước 2: nhập mã
+        REGISTER                AuthService.register                   AuthService.verifyOtp
+        RESET_PASSWORD          AuthService.forgotPassword             AuthService.resetPassword
+        CHANGE_PASSWORD         UserService.requestChangePasswordOtp   UserService.changePassword
+        CHANGE_EMAIL            UserService.requestUpdateEmailOtp      UserService.updateEmail
+    Bước 1 gọi generateAndSend, bước 2 gọi verifyAndConsume.
+
     -----------------------------------------------------
     Các quy tắc bảo mật
     -----------------------------------------------------
@@ -47,6 +54,14 @@ import java.time.Duration;
 public class OtpService {
     private final OtpVerificationRepository otpVerificationRepository;
     private final EmailService emailService;
+
+    /*
+        SecureRandom: bộ sinh số ngẫu nhiên dùng cho bảo mật.
+        Khác Random thường: Random tính ra từ 1 "hạt giống" theo công thức cố định,
+        biết vài số trước là có thể đoán được số sau. SecureRandom lấy độ ngẫu nhiên
+        từ hệ điều hành → không đoán trước được, phù hợp để sinh mã OTP.
+        static final: dùng chung 1 object cho cả class (tạo SecureRandom khá tốn, không tạo lại mỗi lần).
+    */
     private static final SecureRandom RANDOM = new SecureRandom();
 
     /*
@@ -94,6 +109,14 @@ public class OtpService {
         → Vô hiệu hóa mã cũ, lưu mã mới, gửi email luôn cùng thành công hoặc cùng bị hủy.
 
         Đặt ở hàm public vì Spring không áp dụng @Transactional cho hàm private.
+        Lý do: Spring bọc OtpService trong 1 "lớp vỏ" (proxy). Nơi khác gọi otpService.generateAndSend(...)
+        → đi qua lớp vỏ → lớp vỏ mở transaction rồi mới gọi hàm thật.
+        Còn createAndSend được gọi từ bên trong chính class này → không đi qua lớp vỏ
+        → @Transactional đặt ở đó sẽ bị bỏ qua. Nhưng vì createAndSend luôn được gọi từ
+        generateAndSend (đã có transaction) nên vẫn nằm gọn trong transaction đó.
+
+        Cùng tên generateAndSend nhưng khác số tham số (2 và 3): gọi là overload,
+        Java tự chọn đúng hàm theo số tham số lúc gọi.
     */
     @Transactional
     public void generateAndSend(User user, OtpPurpose purpose) {
@@ -260,7 +283,10 @@ public class OtpService {
             Lần đếm đầu tiên (attempts == 1) → đặt thời hạn 5 phút cho key,
             bằng thời hạn của mã, để Redis tự dọn dẹp.
 
-            Redis không phản hồi → attempts == null → coi như vượt giới hạn (an toàn hơn cho qua).
+            attempts == null → coi như vượt giới hạn (chặn lại an toàn hơn cho qua).
+            (Thực tế Redis mất kết nối thì lệnh increment ném lỗi luôn chứ không trả null
+             → lỗi bay ra ngoài → 500, không xác thực được OTP cho tới khi Redis chạy lại.
+             Kiểm tra null chỉ để phòng hờ.)
         */
         String attemptKey = "otp-attempt:" + otp.getId();
         Long attempts = redisTemplate.opsForValue().increment(attemptKey);

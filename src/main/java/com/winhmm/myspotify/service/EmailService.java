@@ -29,13 +29,39 @@ import org.springframework.stereotype.Service;
       những gì vừa lưu vào database (tài khoản mới, mã OTP).
     - Nhược điểm: API mất khoảng 2 đến 5 giây.
 
-    Chấp nhận nhược điểm này vì chỉ có 5 API gửi OTP bị ảnh hưởng,
-    và người dùng ít khi gọi các API này.
+    Chấp nhận nhược điểm này vì chỉ có 4 API gửi OTP bị ảnh hưởng,
+    và người dùng ít khi gọi các API này:
+        POST /api/auth/register
+        POST /api/auth/forgot-password
+        POST /api/users/me/change-password/request-otp
+        POST /api/users/me/email/request-otp
     Thời gian chờ tối đa được giới hạn bằng cấu hình spring.mail.properties.mail.smtp.*
     trong file properties, để request không bị treo khi Gmail không phản hồi.
+    Theo tài liệu user.md, cả 3 mốc đều là 5000 ms (5 giây):
+        connectiontimeout : chờ kết nối tới Gmail
+        timeout           : chờ Gmail trả lời
+        writetimeout      : chờ gửi xong nội dung thư
+    Quá 5 giây → JavaMail ném lỗi → EmailSendException → 503.
+
+    -----------------------------------------------------
+    Gửi qua Gmail cần cấu hình gì?
+    -----------------------------------------------------
+    Trong application.properties (đã gitignore, không đưa lên GitHub):
+        spring.mail.host=smtp.gmail.com
+        spring.mail.username=<địa chỉ Gmail dùng để gửi>
+        spring.mail.password=<mật khẩu ứng dụng 16 ký tự, KHÔNG phải mật khẩu Gmail thường>
+    Spring Boot đọc các dòng này và tự tạo sẵn bean JavaMailSender, class này chỉ việc nhận về dùng.
+    Sai mật khẩu ứng dụng → mọi lần gửi đều lỗi 503 (log có dòng "Could not send OTP email to ...").
 */
 @Service
 public class EmailService {
+    /*
+        - mailSender: công cụ gửi email của Spring (Spring Boot tạo sẵn từ cấu hình spring.mail.*).
+        - log: ghi lỗi gửi email vào log (giải thích Logger: xem GlobalExceptionHandler).
+        - fromEmail: địa chỉ người gửi, lấy từ spring.mail.username.
+          @Value đặt thẳng trên thuộc tính (field injection): Spring gán giá trị ngay sau khi tạo object.
+          Gmail chỉ cho gửi bằng đúng tài khoản đã đăng nhập SMTP, nên dùng lại spring.mail.username.
+    */
     private final JavaMailSender mailSender;
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
@@ -46,6 +72,39 @@ public class EmailService {
         this.mailSender = mailSender;
     }
 
+    /*
+        =====================================================
+        GỬI 1 EMAIL CHỨA MÃ OTP
+        =====================================================
+        Tham số:
+        - toEmail: địa chỉ nhận (email hiện tại, hoặc email mới khi đổi email).
+        - otpCode: mã 6 chữ số do OtpService sinh ra.
+
+        Các bước:
+        1. new SimpleMailMessage(): 1 email dạng chữ thường (không HTML, không file đính kèm).
+        2. setFrom("MySpotify <" + fromEmail + ">"): dạng "Tên hiển thị <địa chỉ>"
+           → hộp thư người nhận hiện tên "MySpotify" thay vì địa chỉ Gmail trần trụi.
+        3. setTo, setSubject, setText: người nhận, tiêu đề, nội dung.
+           "\n" là ký tự xuống dòng, "\n\n" là xuống dòng 2 lần (cách 1 dòng trống).
+        4. mailSender.send(message): kết nối tới Gmail và gửi, chờ tới khi gửi xong (đồng bộ).
+
+        Email người dùng nhận được:
+            Tiêu đề: MySpotify - Mã xác thực OTP
+
+            Xin chào,
+
+            Mã OTP của bạn là: 482913
+
+            Mã có hiệu lực trong 5 phút và chỉ sử dụng được 1 lần.
+            ...
+        Lưu ý: chữ "5 phút" viết cứng trong nội dung thư. Sau này đổi OTP_EXPIRE_MINUTES
+        trong OtpService thì nhớ sửa cả câu này.
+
+        Bất kỳ lỗi nào (sai mật khẩu ứng dụng, mất mạng, quá thời gian chờ...) → khối catch:
+        - Ghi log lỗi gốc (để người quản trị biết nguyên nhân thật).
+        - Ném EmailSendException với message gọn → transaction của nơi gọi rollback → 503.
+        Chi tiết luồng lỗi: xem EmailSendException và GlobalExceptionHandler.handleEmailSend.
+    */
     public void sendOtp(String toEmail, String otpCode) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();

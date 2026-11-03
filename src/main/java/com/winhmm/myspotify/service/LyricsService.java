@@ -256,6 +256,14 @@ public class LyricsService {
 
         rowNumber: số thứ tự dòng trong ô nhập (đếm cả dòng trống),
         để báo lỗi Artist biết chính xác dòng nào sai.
+
+        Cú pháp regex trong Java:
+        - TIMED_LINE.matcher(row): tạo bộ so khớp mẫu TIMED_LINE với dòng row.
+        - matcher.matches(): true nếu CẢ dòng khớp mẫu.
+        - matcher.group(n): phần chữ khớp với nhóm thứ n (đếm dấu ngoặc tròn mở từ trái sang,
+          không tính nhóm (?: ...)). Nhóm không xuất hiện (VD dòng không có phần lẻ) → null.
+        - Integer.parseInt("08") → 8: đổi chuỗi chữ số thành số.
+        - Dòng không khớp mẫu → coi là dòng không có thời gian, cả dòng là chữ (timeMs = null).
     */
     private List<LyricLine> parseLyrics(String content, Song song) {
         /*

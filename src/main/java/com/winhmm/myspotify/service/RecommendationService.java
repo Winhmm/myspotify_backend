@@ -55,6 +55,8 @@ import java.util.function.Supplier;
     =====================================================================
 
     1. Hỏi Python → nhận danh sách id bài hát, VD [7, 22, 3, 41].
+       Python chạy ở địa chỉ app.recommend.base-url
+       (không cấu hình thì mặc định http://127.0.0.1:8000, tức cùng máy với backend, xem RecommendClient).
 
     2. Hỏi MySQL thông tin các bài đó (1 câu truy vấn cho cả danh sách).
        Dùng findPublishedByIds có sẵn → chỉ lấy bài đã phát hành.
@@ -73,7 +75,8 @@ import java.util.function.Supplier;
     Gợi ý bài hát là tính năng phụ. Python lỗi thì không được làm hỏng trang nghe nhạc.
 
     Khi nào dùng dự phòng?
-    - Python đang tắt, bị lỗi, hoặc trả lời chậm quá thời gian chờ (mặc định 3 giây).
+    - Python đang tắt, bị lỗi, hoặc trả lời chậm quá thời gian chờ
+      (cấu hình app.recommend.timeout-ms, không đặt thì mặc định 3000 ms = 3 giây).
     - Python trả lời được, nhưng sau khi lọc ở bước 2 không còn bài nào
       (VD toàn gợi ý bài đã bị ẩn).
 

@@ -237,6 +237,9 @@ public class UserService {
         Xóa sau thì trường hợp xấu nhất chỉ là còn sót 1 file cũ trên ổ đĩa.
 
         fileStorageService.delete(null) không làm gì, nên người chưa có ảnh cũ vẫn chạy bình thường.
+
+        catch (RuntimeException e) { ...; throw e; }: bắt lỗi để dọn file, rồi ném lại ĐÚNG lỗi cũ
+        → GlobalExceptionHandler vẫn trả đúng mã lỗi như khi không có try/catch.
     */
     public User updateAvatar(Long userId, MultipartFile file) {
         User user = getProfile(userId);
@@ -392,6 +395,10 @@ public class UserService {
 
         Bước tiếp theo: Admin duyệt (AdminService.approveArtistRequest)
         hoặc từ chối (AdminService.rejectArtistRequest).
+
+        Điều kiện báo lỗi ở bước 3: KHÁC NONE và KHÁC REJECTED (dùng &&).
+        Dùng || thì điều kiện luôn đúng (1 giá trị không thể vừa bằng NONE vừa bằng REJECTED)
+        → không ai gửi được yêu cầu. Cùng lý do với removeSong trong AdminSongService.
     */
     public void requestBecomeArtist(Long userId, String artistName, String bio) {
         User user = getProfile(userId);
