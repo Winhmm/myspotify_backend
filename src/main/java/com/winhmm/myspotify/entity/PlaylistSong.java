@@ -1,5 +1,15 @@
 package com.winhmm.myspotify.entity;
 
+/*
+    -----------------------------------------------------
+    Các dòng import
+    -----------------------------------------------------
+    (Entity là gì, các annotation cơ bản: xem User. @ManyToOne và LAZY: xem OtpVerification.
+     @ManyToMany: xem Song. Thứ tự đọc package entity: xem User.)
+
+    - jakarta.persistence.*: mượn tất cả annotation của JPA.
+    - LocalDateTime        : kiểu ngày giờ của Java, dùng cho addedAt.
+*/
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
@@ -25,6 +35,9 @@ import java.time.LocalDateTime;
         │ 11 │ 3           │ 7       │ 2026-10-27 22:35:00 │
         └────┴─────────────┴─────────┴─────────────────────┘
 
+    Thứ tự bài trong playlist = thứ tự thêm vào: sắp xếp theo added_at, rồi tới id
+    (2 bài thêm cùng 1 thời điểm thì bài có id nhỏ hơn đứng trước).
+
     =====================================================================
     VÌ SAO KHÔNG DÙNG @ManyToMany NHƯ BẢNG song_featured_artists?
     =====================================================================
@@ -35,6 +48,11 @@ import java.time.LocalDateTime;
     @ManyToMany chỉ tạo được bảng trung gian có đúng 2 cột (playlist_id, song_id).
     Ở đây cần thêm cột added_at để sắp xếp bài theo thời gian thêm vào,
     nên phải viết bảng trung gian thành 1 entity riêng, gồm 2 quan hệ @ManyToOne.
+
+        playlists              playlist_songs (entity này)           songs
+        ┌────┐   1      nhiều  ┌─────────────┬─────────┬──────────┐  nhiều  1   ┌────┐
+        │ id │◄────────────────│ playlist_id │ song_id │ added_at │────────────►│ id │
+        └────┘                 └─────────────┴─────────┴──────────┘             └────┘
 
     =====================================================================
     UNIQUE (playlist_id, song_id)
@@ -47,6 +65,12 @@ import java.time.LocalDateTime;
       → DataIntegrityViolationException → GlobalExceptionHandler trả 409 "Data already exists".
     - Ràng buộc này cũng tự tạo index bắt đầu bằng playlist_id
       → lấy bài của 1 playlist (WHERE playlist_id = ?) rất nhanh.
+
+    @UniqueConstraint(name = ..., columnNames = {"playlist_id", "song_id"}):
+    - Là UNIQUE trên cặp 2 cột cùng lúc (không phải từng cột riêng lẻ).
+      Bài 15 vẫn nằm được trong playlist 3 và playlist 4; chỉ cặp (3, 15) không được lặp lại.
+    - columnNames ghi tên cột trong database (playlist_id), không phải tên thuộc tính Java (playlist).
+    - name: đặt tên rõ ràng cho ràng buộc, khớp với bảng đã tạo trên VPS.
 
     =====================================================================
     BÀI HÁT BỊ ẨN HOẶC BỊ GỠ THÌ SAO?
@@ -67,12 +91,18 @@ import java.time.LocalDateTime;
         }
 )
 public class PlaylistSong {
+    /*
+        id: khóa chính riêng, MySQL tự tăng (xem User).
+        Dù cặp (playlist_id, song_id) đã không trùng, vẫn dùng 1 cột id đơn giản làm khóa chính:
+        Repository chỉ cần JpaRepository<PlaylistSong, Long>, không phải viết class khóa ghép.
+    */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     /*
         Quan hệ nhiều - một: 1 playlist có nhiều dòng PlaylistSong.
+        Cột playlist_id trỏ tới playlists.id, bắt buộc. LAZY: xem OtpVerification.
     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "playlist_id", nullable = false)
@@ -80,19 +110,48 @@ public class PlaylistSong {
 
     /*
         Quan hệ nhiều - một: 1 bài hát có thể nằm trong nhiều playlist (nhiều dòng PlaylistSong).
+        Cột song_id trỏ tới songs.id, bắt buộc.
+        Khi xem playlist, PlaylistSongRepository dùng "JOIN FETCH ps.song" để lấy luôn bài hát
+        trong cùng 1 câu SQL (tránh mỗi bài 1 câu SQL riêng).
     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "song_id", nullable = false)
     private Song song;
 
+    /*
+        addedAt: thời điểm thêm bài vào playlist.
+        updatable = false: chỉ ghi 1 lần lúc INSERT. Do onCreate() bên dưới tự gán.
+    */
     @Column(name = "added_at", nullable = false, updatable = false)
     private LocalDateTime addedAt;
 
+    /*
+        @PrePersist: Hibernate tự gọi ngay trước khi INSERT (xem Song).
+    */
     @PrePersist
     protected void onCreate() {
         addedAt = LocalDateTime.now();
     }
 
+    /*
+        -----------------------------------------------------
+        2 constructor
+        -----------------------------------------------------
+        1. protected PlaylistSong() {}: constructor rỗng, dành cho Hibernate.
+           Hibernate bắt buộc phải có constructor không tham số để tạo đối tượng khi đọc từ database.
+           Vì class đã tự viết constructor có tham số (số 2), Java không tự tạo constructor rỗng nữa
+           → phải tự viết. Để protected: Hibernate dùng được, còn code của mình
+           (ở package khác như service) không gọi được new PlaylistSong() rỗng.
+
+        2. public PlaylistSong(Playlist playlist, Song song): constructor để code dùng:
+               playlistSongRepository.save(new PlaylistSong(playlist, song));
+           Bắt buộc truyền đủ playlist và bài hát → không thể tạo ra 1 dòng thiếu thông tin.
+           Không cần truyền id (MySQL cấp) và addedAt (onCreate() gán).
+
+        Vì sao không có setter?
+        1 dòng PlaylistSong không bao giờ bị sửa: muốn "đổi" thì xóa dòng cũ, thêm dòng mới.
+        Bớt bài khỏi playlist = xóa dòng (playlistSongRepository.delete(...)).
+    */
     protected PlaylistSong() {}
 
     public PlaylistSong(Playlist playlist, Song song) {
@@ -100,6 +159,9 @@ public class PlaylistSong {
         this.song = song;
     }
 
+    /*
+        Getter: Service đọc bài hát (getSong()), thời điểm thêm (getAddedAt())...
+    */
     public Long getId() { return id; }
     public Playlist getPlaylist() { return playlist; }
     public Song getSong() { return song; }
