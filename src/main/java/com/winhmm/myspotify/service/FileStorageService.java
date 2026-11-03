@@ -78,6 +78,13 @@ import java.util.UUID;
 */
 @Service
 public class FileStorageService {
+    /*
+        Giới hạn dung lượng, tính bằng byte:
+            1 KB = 1024 byte, 1 MB = 1024 KB → 20 MB = 20 * 1024 * 1024 byte.
+        Chữ L sau số 20 (20L): tính bằng kiểu long ngay từ đầu.
+        Nếu tính bằng int, số lớn sẽ bị tràn (int chỉ tới khoảng 2,1 tỷ),
+        VD 3000 * 1024 * 1024 = 3,1 tỷ → ra số âm sai bét. Với long thì không lo.
+    */
     private static final long MAX_MP3_SIZE = 20L * 1024 * 1024;
     private static final long MAX_WAV_SIZE = 100L * 1024 * 1024;
     private static final long MAX_IMAGE_SIZE = 2L * 1024 * 1024;
@@ -89,6 +96,11 @@ public class FileStorageService {
     private static final String URL_PREFIX = "/uploads/";
     private static final String AUDIO_FOLDER = "songs/audio";
 
+    /*
+        Thư mục gốc chứa file upload, đọc từ application.properties (theo tài liệu song.md):
+            Local: app.upload-dir=uploads                  (thư mục uploads ngay trong project)
+            VPS  : app.upload-dir=/home/myspotify/uploads
+    */
     @Value("${app.upload-dir}")
     private String uploadDir;
 
@@ -198,6 +210,17 @@ public class FileStorageService {
         return seconds;
     }
 
+    /*
+        2 hàm đọc thời lượng:
+        - MP3: Mp3File đọc file, đếm các khung âm thanh (frame) rồi tính ra số giây.
+          File không phải MP3 thật → thư viện ném lỗi.
+          (int): ép kiểu long (getLengthInSeconds trả long) sang int.
+        - WAV: số khung (frame) chia cho số khung mỗi giây (frame rate).
+          VD 9.555.000 khung / 44.100 khung mỗi giây = 216,6 → (int) bỏ phần lẻ → 216 giây.
+          try (...) { } (try-with-resources): tự đóng file sau khi đọc xong, kể cả khi có lỗi.
+        throws Exception: khai báo hàm có thể ném lỗi,
+        để getAudioDuration bắt chung trong 1 khối catch rồi đổi thành message dễ hiểu.
+    */
     private int getMp3Duration(Path path) throws Exception {
         Mp3File mp3File = new Mp3File(path.toString());
         return (int) mp3File.getLengthInSeconds();
@@ -256,6 +279,45 @@ public class FileStorageService {
         ---------------------------------------------------------------
         Đọc thời lượng video MP4 từ đường dẫn đã lưu (đơn vị mili giây)
         ---------------------------------------------------------------
+
+        -----------------------------------------------------
+        File MP4 được tổ chức thế nào?
+        -----------------------------------------------------
+        File MP4 gồm nhiều "hộp" (box) nối tiếp nhau, hộp lớn chứa hộp nhỏ bên trong:
+            [ftyp]  loại file (chữ ký "ftyp" mà isRealMp4 kiểm tra)
+            [moov]  thông tin về video
+                [mvhd]  thông tin chung, có timescale và duration   ← cần đọc hộp này
+                [trak]  ...
+            [mdat]  dữ liệu hình và tiếng thật
+        Mỗi hộp bắt đầu bằng 8 byte: 4 byte kích thước (của cả hộp) + 4 byte tên hộp (VD "moov").
+
+        Các bước:
+        1. Tìm hộp moov trong cả file.
+        2. Tìm hộp mvhd bên trong moov.
+        3. Đọc mvhd:
+               1 byte version, 3 byte flags (bỏ qua)
+               version 0: 4 byte thời điểm tạo + 4 byte thời điểm sửa (bỏ qua 8 byte),
+                          rồi 4 byte timescale, 4 byte duration
+               version 1: 2 trường thời gian dài 8 byte (bỏ qua 16 byte),
+                          rồi 4 byte timescale, 8 byte duration
+        4. Thời lượng (ms) = duration * 1000 / timescale.
+           timescale = số "nhịp" trong 1 giây. VD timescale = 1000, duration = 8500 → 8500 ms = 8,5 giây.
+
+        Vì sao tự đọc, không dùng thư viện? Chỉ cần đúng 2 con số, vài chục dòng là đủ,
+        không phải thêm thư viện xử lý video nặng vào dự án.
+
+        -----------------------------------------------------
+        Cú pháp đọc byte
+        -----------------------------------------------------
+        - new RandomAccessFile(file, "r"): mở file để đọc ("r" = read), nhảy được tới vị trí bất kỳ.
+          Đặt trong try (...) → tự đóng file khi xong.
+        - seek(vịTrí): nhảy tới byte thứ vịTrí (đếm từ 0).
+        - readUnsignedByte(): đọc 1 byte, trả số từ 0 đến 255.
+        - skipBytes(n): bỏ qua n byte.
+        - readInt(): đọc 4 byte thành int. readLong(): đọc 8 byte thành long.
+        - readInt() & 0xFFFFFFFFL: int của Java có dấu (lớn hơn khoảng 2,1 tỷ thì thành số âm).
+          "& 0xFFFFFFFFL" đổi sang long và giữ nguyên 32 bit → luôn ra số dương (0 đến khoảng 4,2 tỷ).
+        - Lỗi đọc file (IOException) → đổi thành IllegalArgumentException → 400 "Invalid or corrupted video file".
     */
     public long getVideoDurationMs(String videoUrl) {
         try(RandomAccessFile file = new RandomAccessFile(toPath(videoUrl).toFile(), "r")) {
@@ -300,6 +362,16 @@ public class FileStorageService {
         ---------------------------------------------------------------
         Hàm hỗ trợ: tìm 1 hộp theo tên trong đoạn [start, end) của file MP4
         ---------------------------------------------------------------
+        [start, end): từ vị trí start (tính cả) tới vị trí end (không tính).
+        Trả về mảng 2 số { vị trí bắt đầu nội dung hộp, vị trí kết thúc hộp }. Không tìm thấy → null.
+
+        Duyệt lần lượt từng hộp:
+        - Đọc 4 byte kích thước + 4 byte tên.
+          new String(typeBytes, US_ASCII): đổi 4 byte thành chuỗi, VD 4 byte 6D 6F 6F 76 → "moov".
+        - size == 1: hộp quá lớn, kích thước thật nằm ở 8 byte tiếp theo (phần đầu hộp dài 16 byte).
+        - size == 0: hộp kéo dài tới hết đoạn đang tìm.
+        - Kích thước vô lý (nhỏ hơn phần đầu hộp, hoặc vượt ra ngoài đoạn) → file hỏng → null.
+        - Đúng tên cần tìm → trả vị trí. Không đúng → nhảy qua cả hộp (position += size), xét hộp kế tiếp.
     */
     private long[] findBox(RandomAccessFile file, long start, long end, String wantedType) throws IOException {
         long position = start;
@@ -338,6 +410,11 @@ public class FileStorageService {
         ---------------------------------------------------------------
         Xóa file theo đường dẫn đã lưu
         ---------------------------------------------------------------
+        - url null (VD bài không có ảnh bìa) → không làm gì.
+        - Chỉ xóa đường dẫn bắt đầu bằng /uploads/ → không bao giờ lỡ tay xóa file ngoài thư mục upload.
+        - Files.deleteIfExists: file không tồn tại cũng không báo lỗi.
+        - Xóa lỗi (IOException) → bỏ qua (catch rỗng): sót 1 file rác trên ổ đĩa
+          không ảnh hưởng người dùng, không đáng làm hỏng cả request.
     */
     public void delete(String url) {
         if(url == null || !url.startsWith(URL_PREFIX)) {
@@ -353,6 +430,18 @@ public class FileStorageService {
         ---------------------------------------------------------------
         Hàm hỗ trợ: lưu file xuống ổ đĩa
         ---------------------------------------------------------------
+        1. Tên file = UUID ngẫu nhiên + đuôi, VD "3f2a9c1e-8b7d-4e21-9c3a-1f5b6d7e8a90.mp3".
+        2. Paths.get(uploadDir, folder): ghép đường dẫn thư mục, VD uploads/songs/audio.
+           Files.createDirectories: tạo thư mục (cả các thư mục cha) nếu chưa có, có rồi thì thôi.
+        3. Files.copy(...): chép dữ liệu file upload xuống ổ đĩa tại thư mục đó.
+           dir.resolve(fileName): ghép thư mục với tên file → đường dẫn đầy đủ.
+           REPLACE_EXISTING: trùng tên thì ghi đè (với UUID thì gần như không bao giờ trùng).
+        4. Lỗi ổ đĩa (đầy, không có quyền ghi...) → RuntimeException → 500 (lỗi phía server).
+        5. Trả đường dẫn dạng URL để lưu database: /uploads/songs/audio/<uuid>.mp3
+
+        Ghi chú: file.getInputStream() mở 1 luồng đọc, nhưng Files.copy không tự đóng luồng đó.
+        Vẫn chạy đúng (Java tự dọn khi luồng không còn được dùng), nhưng chuẩn hơn là bọc trong try (...) { }
+        giống isRealImage bên dưới.
     */
     private String saveFile(MultipartFile file, String folder, String extension) {
         String fileName = UUID.randomUUID() + extension;
@@ -373,6 +462,9 @@ public class FileStorageService {
         ---------------------------------------------------------------
         Hàm hỗ trợ: đổi đường dẫn URL thành đường dẫn thật trên ổ đĩa
         ---------------------------------------------------------------
+        VD url = "/uploads/songs/audio/x.mp3":
+            url.substring(URL_PREFIX.length()) → bỏ 9 ký tự "/uploads/" ở đầu → "songs/audio/x.mp3"
+            Paths.get(uploadDir, ...)          → "/home/myspotify/uploads/songs/audio/x.mp3" (trên VPS)
     */
     private Path toPath(String url) {
         return Paths.get(uploadDir, url.substring(URL_PREFIX.length()));
@@ -382,6 +474,9 @@ public class FileStorageService {
         ---------------------------------------------------------------
         Hàm hỗ trợ: lấy đuôi file (chữ thường)
         ---------------------------------------------------------------
+        lastIndexOf("."): vị trí dấu chấm CUỐI CÙNG trong tên.
+            "my.song.MP3" → substring từ dấu chấm cuối → ".MP3" → toLowerCase() → ".mp3"
+        Không có tên hoặc không có dấu chấm → "" → saveAudio báo "Only MP3 or WAV files are allowed".
     */
     private String getExtension(String fileName) {
         if(fileName == null || !fileName.contains(".")) {
@@ -395,6 +490,18 @@ public class FileStorageService {
         ---------------------------------------------------------------
         Hàm hỗ trợ: kiểm tra file có thật sự là ảnh (chữ ký file)
         ---------------------------------------------------------------
+        Mỗi loại file có vài byte đầu cố định (chữ ký, magic number), đổi đuôi file không đổi được:
+            JPG : FF D8 FF
+            PNG : 89 50 4E 47 0D 0A 1A 0A   (50 4E 47 là chữ "PNG")
+            WEBP: "RIFF" ở byte 0 đến 3, "WEBP" ở byte 8 đến 11
+
+        - in.readNBytes(12): đọc tối đa 12 byte đầu (file ngắn hơn thì đọc được ít hơn,
+          nên mới kiểm tra head.length trước khi lấy từng byte).
+        - (head[0] & 0xFF) == 0xFF: byte của Java có dấu (từ -128 đến 127), byte FF đọc ra là -1.
+          "& 0xFF" đổi về số 0 đến 255 để so được với 0xFF (255).
+        - Arrays.copyOf(head, 8): lấy 8 byte đầu. Arrays.equals: so 2 mảng từng phần tử.
+        - head[0] == 'R': so byte với mã ASCII của chữ 'R' (82).
+        Lỗi đọc → coi như không phải ảnh (false).
     */
     private boolean isRealImage(MultipartFile file, String extension) {
         try(InputStream in = file.getInputStream()) {
@@ -428,6 +535,8 @@ public class FileStorageService {
         ---------------------------------------------------------------
         Hàm hỗ trợ: kiểm tra chữ ký file MP4
         ---------------------------------------------------------------
+        File MP4 luôn mở đầu bằng hộp ftyp: 4 byte kích thước, rồi 4 byte chữ "ftyp" (byte thứ 4 đến 7).
+        Chỉ cần đọc 8 byte đầu, so 4 byte cuối với 'f', 't', 'y', 'p'.
     */
     private boolean isRealMp4(MultipartFile file) {
         try(InputStream in = file.getInputStream()) {

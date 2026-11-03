@@ -55,6 +55,12 @@ public class RateLimitService {
     private final int userRequests;
     private final int authRequests;
 
+    /*
+        Constructor: Spring truyền StringRedisTemplate (xem SessionService)
+        và 3 con số đọc từ application.properties.
+        @Value("${app.rate-limit.window-seconds}"): đọc giá trị của key đó trong file cấu hình,
+        tự đổi chuỗi "60" thành số int 60. Thiếu key → ứng dụng báo lỗi ngay lúc khởi động.
+    */
     public RateLimitService (
             StringRedisTemplate redisTemplate,
             @Value("${app.rate-limit.window-seconds}") int windowSeconds,
@@ -78,9 +84,27 @@ public class RateLimitService {
         2. Giá trị = 1 → request đầu tiên của cửa sổ → đặt thời hạn windowSeconds.
         3. Giá trị nhỏ hơn hoặc bằng limit → cho qua (true), ngược lại → chặn (false).
 
-        Redis không phản hồi (count == null) → trả false.
-        RateLimitFilter có xử lý riêng khi Redis lỗi (cho request đi qua),
+        Redis mất kết nối → lệnh INCR ném lỗi (VD RedisConnectionFailureException), không trả null.
+        Lỗi đó bay ra ngoài, RateLimitFilter bắt lại và cho request đi qua (fail-open),
         để Redis sập không làm cả hệ thống ngừng hoạt động.
+        count == null chỉ xảy ra ở vài chế độ đặc biệt của Redis (pipeline, transaction)
+        mà dự án không dùng → kiểm tra null chỉ để phòng hờ, khi đó trả false (chặn).
+
+        -----------------------------------------------------
+        Cú pháp
+        -----------------------------------------------------
+        redisTemplate.opsForValue().increment(key)                    ~ INCR key, trả về số mới
+        redisTemplate.expire(key, Duration.ofSeconds(windowSeconds))  ~ EXPIRE key 60
+        Long (chữ L hoa) chứ không phải long: kiểu object, có thể null
+        → phải kiểm tra count != null trước, rồi mới so count == 1 hay count <= limit.
+
+        -----------------------------------------------------
+        Giới hạn đã biết (rất hiếm)
+        -----------------------------------------------------
+        INCR và EXPIRE là 2 lệnh riêng. Nếu server tắt đột ngột (hoặc mất mạng) đúng giữa 2 lệnh,
+        key có số đếm nhưng KHÔNG có thời hạn → không bao giờ tự xóa
+        → đếm vượt giới hạn rồi thì người đó bị chặn mãi.
+        Gặp trường hợp này: vào Redis xóa tay key đó, VD DEL rate:user:<email>.
     */
     public boolean tryAcquire(String key, int limit) {
         Long count = redisTemplate.opsForValue().increment(key);
@@ -101,6 +125,7 @@ public class RateLimitService {
         Giá trị này được gửi về frontend trong header Retry-After của response 429,
         để frontend hiện "Vui lòng thử lại sau 35 giây".
 
+        getExpire trả về: số giây còn lại; -1 nếu key không có thời hạn; -2 nếu key không tồn tại.
         ttl null hoặc nhỏ hơn 1 (key vừa hết hạn, hoặc không có thời hạn) → trả 1 giây.
     */
     public long getRetryAfterSeconds(String key) {
@@ -112,6 +137,10 @@ public class RateLimitService {
         }
     }
 
+    /*
+        Getter: RateLimitFilter đọc 2 giới hạn này để chọn giới hạn cho từng loại request
+        (filter không tự đọc application.properties).
+    */
     public int getUserRequests() { return userRequests; }
     public int getAuthRequests() { return authRequests; }
 }
