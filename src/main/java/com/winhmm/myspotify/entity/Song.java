@@ -1,5 +1,18 @@
 package com.winhmm.myspotify.entity;
 
+/*
+    -----------------------------------------------------
+    Các dòng import
+    -----------------------------------------------------
+    (Entity là gì, các annotation @Entity, @Id, @Column, @Enumerated: xem giải thích chi tiết trong User.
+     @ManyToOne và LAZY: xem OtpVerification. Thứ tự đọc package entity: xem User.)
+
+    - SongStatus           : enum trạng thái bài hát (PENDING, APPROVED, REJECTED, HIDDEN, DELETED).
+    - jakarta.persistence.*: mượn tất cả annotation của JPA.
+    - LocalDateTime        : kiểu ngày giờ của Java.
+    - HashSet, Set         : tập hợp của Java (giống List nhưng không chứa phần tử trùng),
+                             dùng cho danh sách Artist feat.
+*/
 import com.winhmm.myspotify.enums.SongStatus;
 import jakarta.persistence.*;
 
@@ -9,17 +22,23 @@ import java.util.Set;
 
 /*
     =====================================================================
-    Song - ENTITY ÁNH XẠ BẢNG songs (MYSQL)
+    SONG - ENTITY ÁNH XẠ BẢNG songs (MYSQL)
     =====================================================================
 
-    Các cột chính:
-                id, artist_id, genre_id, title, audio_url, cover_url, canvas_url, duration_seconds, play_count,
+    Các cột:
+        id, artist_id, genre_id, title, audio_url, cover_url, canvas_url, duration_seconds, play_count,
         status, release_at, reject_reason, created_at, updated_at, version
 
     Bảng phụ: song_featured_artists (danh sách Artist feat của mỗi bài).
 
+    Đây là entity quan trọng và phức tạp nhất project. Các phần mới so với User:
+    - 3 kiểu quan hệ: @ManyToOne (artist, genre), @ManyToMany (featuredArtists).
+    - @Version: chống 2 người ghi đè lên nhau.
+    - @PrePersist, @PreUpdate: hàm Hibernate tự gọi trước khi lưu.
+    - updatable = false: cột chỉ được ghi lúc tạo (play_count, created_at).
+
     =====================================================================
-    ENTITY LÀ GÌ?
+    ENTITY LÀ GÌ? (NHẮC LẠI)
     =====================================================================
 
     Entity là class Java đại diện cho 1 bảng trong database.
@@ -37,11 +56,14 @@ import java.util.Set;
     TỰ TẠO BẢNG
     =====================================================================
 
-    application.properties có spring.jpa.hibernate.ddl-auto=update
+    Máy local: application.properties có spring.jpa.hibernate.ddl-auto=update
     → Khi ứng dụng khởi động, Hibernate đọc các annotation trong class này
       rồi tự tạo bảng songs (nếu chưa có) hoặc thêm cột mới (VD cột version).
     → "update" không xóa cột cũ, không đổi kiểu cột đã có.
       Đổi tên thuộc tính → Hibernate tạo cột mới, cột cũ vẫn nằm đó (phải tự xóa bằng SQL).
+
+    VPS: ddl-auto=validate → Hibernate chỉ kiểm tra bảng có khớp không, không tự sửa.
+    Thêm thuộc tính mới ở đây thì phải tự ALTER TABLE trên VPS trước khi deploy (xem User).
 
     =====================================================================
     CÁC ANNOTATION Ở ĐẦU CLASS
@@ -84,6 +106,16 @@ import java.util.Set;
     nên chỉ tạo index cho những truy vấn thật sự dùng nhiều.
 
     Kiểm tra index trong MySQL: SHOW INDEX FROM songs;
+
+    =====================================================================
+    KHI NÀO 1 BÀI ĐƯỢC NGƯỜI NGHE THẤY?
+    =====================================================================
+
+    Đủ cả 4 điều kiện (hằng PUBLISHED_CONDITION trong SongRepository):
+    1. status = APPROVED (Admin đã duyệt, không bị ẩn, không bị gỡ, không bị xóa).
+    2. release_at <= bây giờ (đã tới giờ phát hành).
+    3. Artist chính đang ACTIVE (không bị khóa, không tự xóa tài khoản).
+    4. Artist chính vẫn có role ARTIST (không bị Admin hạ quyền).
 */
 @Entity
 @Table(
@@ -94,14 +126,17 @@ import java.util.Set;
         }
 )
 public class Song {
+    /*
+        id: khóa chính, MySQL tự tăng (giải thích @Id, @GeneratedValue: xem User).
+    */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     /*
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Artist chính (người đăng bài)
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Quan hệ nhiều - một (@ManyToOne):
         - Nhiều bài hát thuộc về 1 Artist.
         - Trong database: bảng songs có cột artist_id trỏ tới users.id (khóa ngoại).
@@ -129,9 +164,9 @@ public class Song {
     private User artist;
 
     /*
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Các Artist feat
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Quan hệ nhiều - nhiều (@ManyToMany):
         - 1 bài hát có thể có nhiều Artist feat (tối đa 5, kiểm tra trong Service).
         - 1 Artist có thể được feat trong nhiều bài hát.
@@ -151,6 +186,20 @@ public class Song {
         - name = "song_featured_artists" : tên bảng trung gian (Hibernate tự tạo).
         - joinColumns = song_id          : cột trỏ về bảng songs (phía class này).
         - inverseJoinColumns = artist_id : cột trỏ về bảng users (phía bên kia).
+        Cú pháp joinColumns = @JoinColumn(name = "song_id"): giá trị của joinColumns là
+        1 annotation @JoinColumn (annotation lồng trong annotation, giống @Index trong @Table của User).
+        "inverse" nghĩa là "phía ngược lại": cột trỏ sang entity ở đầu kia của quan hệ (User).
+
+        Không có class entity riêng cho bảng song_featured_artists, vì bảng chỉ có đúng 2 cột.
+        Bảng trung gian cần thêm cột (VD thời điểm thêm) thì phải viết thành entity riêng (xem PlaylistSong).
+
+        Set<User> thay vì List<User>:
+        - Set không chứa phần tử trùng → 1 người không thể bị feat 2 lần trong cùng 1 bài.
+        - Với Hibernate, sửa 1 Set chỉ thêm hoặc xóa đúng những dòng thay đổi trong bảng trung gian.
+        = new HashSet<>(): bài mới có danh sách feat rỗng (không phải null) → gọi .add() không lỗi.
+
+        Đổi danh sách feat: Service gọi setFeaturedArtists(tập mới) rồi save(),
+        Hibernate tự xóa dòng cũ, thêm dòng mới trong song_featured_artists.
     */
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
@@ -161,26 +210,35 @@ public class Song {
     private Set<User> featuredArtists = new HashSet<>();
 
     /*
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Thể loại nhạc
-        ---------------------------------------------------------------
+        -----------------------------------------------------
+        Quan hệ nhiều - một với Genre: nhiều bài cùng 1 thể loại.
+        Cột genre_id trỏ tới genres.id.
+
+        Không có nullable = false → cột cho phép NULL, vì thể loại được thêm vào sau,
+        các bài đăng trước đó chưa có thể loại (genreId, genreName trả về null).
+        Bài mới thì luôn có thể loại (UploadSongRequest bắt buộc genreId).
     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "genre_id")
     private Genre genre;
 
     /*
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Tên bài hát
-        ---------------------------------------------------------------
+        -----------------------------------------------------
+        VARCHAR(150), bắt buộc. Khớp @Size(max = 150) trong UploadSongRequest, UpdateSongRequest.
     */
     @Column(nullable = false, length = 150)
     private String title;
 
     /*
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Đường dẫn file nhạc
-        ---------------------------------------------------------------
+        -----------------------------------------------------
+        VD "/uploads/songs/audio/3f2a9c1e.mp3". Database chỉ lưu đường dẫn,
+        file thật nằm trên ổ đĩa server. Tên file là chuỗi ngẫu nhiên (UUID) để không trùng, không đoán được.
 
         Giới hạn: .mp3 tối đa 20MB, .wav tối đa 100MB (kiểm tra trong FileStorageService).
     */
@@ -188,9 +246,9 @@ public class Song {
     private String audioUrl;
 
     /*
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Đường dẫn ảnh bìa
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Không bắt buộc (không có nullable = false → cho phép NULL).
         JPG, PNG, WEBP, tối đa 2MB.
     */
@@ -198,9 +256,9 @@ public class Song {
     private String coverUrl;
 
     /*
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Đường dẫn video lặp (Canvas)
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Giống Spotify Canvas: video ngắn chạy lặp liên tục, không tiếng,
         hiện ở khung "Đang phát" thay cho ảnh bìa.
 
@@ -215,58 +273,94 @@ public class Song {
     private String canvasUrl;
 
     /*
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Thời lượng bài hát (giây)
-        ---------------------------------------------------------------
+        -----------------------------------------------------
+        Backend tự đọc từ file nhạc lúc đăng bài (Artist không phải nhập).
+        VD 215 → frontend hiển thị "3:35".
+        Integer (đối tượng) thay vì int (nguyên thủy): bài mới tạo bằng new Song() có giá trị null
+        cho tới khi Service gán; nullable = false đảm bảo không bao giờ lưu NULL vào database.
     */
     @Column(name = "duration_seconds", nullable = false)
     private Integer durationSeconds;
 
     /*
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Lượt nghe, mặc định 0
-        ---------------------------------------------------------------
+        -----------------------------------------------------
+        updatable = false: Hibernate không bao giờ đưa cột này vào câu UPDATE khi save(song).
+        Vì sao? Tránh ghi đè lượt nghe:
+            t1  Artist mở trang sửa bài: Hibernate đọc bài, playCount = 100
+            t2  20 người nghe bài → playCount trong database thành 120
+            t3  Artist bấm lưu tên mới → save(song)
+                Nếu cột được UPDATE: ghi lại playCount = 100 (số cũ trong bộ nhớ) → mất 20 lượt nghe.
+                Nhờ updatable = false: câu UPDATE không có play_count → database giữ nguyên 120.
+
+        Vậy lượt nghe tăng bằng cách nào?
+        Bằng 1 câu UPDATE riêng viết tay trong SongRepository.incrementPlayCount:
+            UPDATE Song s SET s.playCount = s.playCount + 1 WHERE s.id = :songId
+        Câu này cộng thẳng trong database (không đọc lên rồi ghi lại),
+        nên 2 người nghe cùng lúc vẫn đếm đủ 2 lượt.
+
+        Không có setter: code Java không có cách nào đổi lượt nghe ngoài câu UPDATE ở trên.
+
+        = 0L: chữ L ở cuối nghĩa là số này kiểu long (số nguyên lớn).
+        Viết = 0 (không có L) thì Java hiểu là int, không gán thẳng vào Long được → lỗi biên dịch.
+        Lúc INSERT bài mới, cột play_count nhận giá trị 0 này (updatable = false chỉ chặn UPDATE, không chặn INSERT).
     */
     @Column(name = "play_count", nullable = false, updatable = false)
     private Long playCount = 0L;
 
     /*
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Trạng thái bài hát, mặc định PENDING (chờ Admin duyệt)
-        ---------------------------------------------------------------
+        -----------------------------------------------------
+        PENDING  → chờ duyệt
+        APPROVED → đã duyệt (phát hành khi tới release_at)
+        REJECTED → bị từ chối (kèm reject_reason), Artist sửa lại thì về PENDING
+        HIDDEN   → Artist tự ẩn
+        DELETED  → đã xóa (xóa mềm, dòng vẫn còn trong bảng)
+        Lưu dạng chữ (EnumType.STRING, xem User).
     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private SongStatus status = SongStatus.PENDING;
 
     /*
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Thời điểm phát hành
-        ---------------------------------------------------------------
+        -----------------------------------------------------
+        - NULL: bài chưa được duyệt và Artist không đặt lịch → phát hành ngay khi Admin duyệt.
+        - Có giá trị: bài chỉ hiện với người nghe từ thời điểm này (theo giờ máy chủ).
+        Xem UpdateReleaseRequest (dto.song).
     */
     @Column(name = "release_at")
     private LocalDateTime releaseAt;
 
     /*
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Lý do bị từ chối (UC35) hoặc bị gỡ (UC36)
-        ---------------------------------------------------------------
+        -----------------------------------------------------
+        VARCHAR(255), khớp @Size(max = 255) trong RejectSongRequest. NULL nếu không bị từ chối.
     */
     @Column(name = "reject_reason", length = 255)
     private String rejectReason;
 
     /*
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Thời điểm tải lên
-        ---------------------------------------------------------------
+        -----------------------------------------------------
+        updatable = false: chỉ ghi 1 lần lúc INSERT, mọi câu UPDATE sau đó không đụng tới
+        → ngày tạo không bao giờ bị đổi nhầm. Giá trị do hàm onCreate() bên dưới gán.
     */
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     /*
-        ---------------------------------------------------------------
+        -----------------------------------------------------
         Thời điểm sửa gần nhất
-        ---------------------------------------------------------------
+        -----------------------------------------------------
+        Giá trị do hàm onCreate() và onUpdate() bên dưới gán.
     */
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
@@ -310,9 +404,9 @@ public class Song {
           nếu version là Long và đang null → coi là bài mới → chạy INSERT.
           Dùng long → Spring Data chuyển sang dựa vào id (id null mới là bài mới) → luôn đoán đúng.
 
-        Cột version được thêm sau khi bảng songs đã có dữ liệu:
-        ddl-auto=update thêm cột mới với giá trị NULL cho mọi bài cũ, mà kiểu long
-        không nhận được NULL → đọc bài cũ sẽ lỗi. Vì vậy đã chạy 1 lần (cả local và VPS):
+        Cột version được thêm sau khi bảng songs đã có dữ liệu.
+        Kiểu long không nhận được NULL, nên bài cũ nào có version NULL sẽ bị lỗi khi đọc.
+        Để chắc chắn, đã chạy 1 lần (cả local và VPS):
             UPDATE songs SET version = 0 WHERE version IS NULL;
 
         Không có setter: chỉ Hibernate được đổi version.
@@ -342,12 +436,26 @@ public class Song {
     /*
         @PreUpdate: Hibernate tự gọi ngay trước khi UPDATE bài hát (qua save()).
         → Gán updatedAt bằng thời điểm hiện tại.
+        Câu UPDATE viết tay (incrementPlayCount) không đi qua đây → nghe nhạc không đổi updatedAt.
     */
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
 
+    /*
+        -----------------------------------------------------
+        Getter và setter
+        -----------------------------------------------------
+        Có setter: những gì Service được phép đổi (artist, feat, thể loại, tên, đường dẫn file,
+        trạng thái, lịch, lý do từ chối).
+        Không có setter, cố ý:
+        - id        : MySQL tự cấp.
+        - playCount : chỉ tăng bằng incrementPlayCount (xem thuộc tính playCount).
+        - createdAt, updatedAt: do onCreate(), onUpdate() tự gán.
+        - version   : chỉ Hibernate được đổi.
+        Thiếu setter = không có cách nào gán nhầm từ code.
+    */
     public Long getId() { return id; }
 
     public User getArtist() { return artist; }
