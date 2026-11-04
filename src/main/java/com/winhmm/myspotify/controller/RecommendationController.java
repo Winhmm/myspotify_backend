@@ -7,7 +7,7 @@ package com.winhmm.myspotify.controller;
     (package, import, annotation là gì: xem giải thích chi tiết trong GenreController.)
 
     - SongResponse         : DTO bài hát trả cho frontend.
-    - RecommendationService: Service gợi ý bài hát bằng AI.
+    - RecommendationService: Service gợi ý bài hát.
     - ResponseEntity       : toàn bộ response HTTP (mã trạng thái, header, body).
     - GetMapping, PathVariable, RequestParam, RestController: annotation của Spring MVC.
     - List                 : kiểu danh sách của Java.
@@ -24,13 +24,16 @@ import java.util.List;
 
 /*
     =====================================================================
-    RECOMMENDATIONCONTROLLER - API GỢI Ý BÀI HÁT BẰNG AI
+    RECOMMENDATIONCONTROLLER - API GỢI Ý BÀI HÁT
     =====================================================================
 
     Các API trong class:
-        GET /api/songs/{songId}/recommendations          → bài hát tương tự 1 bài
-        GET /api/songs/{songId}/recommendations/artist   → bài liên quan nghệ sĩ của 1 bài
-        GET /api/recommendations/genres?genreIds=1,24    → bài theo danh sách thể loại
+        GET /api/songs/{songId}/recommendations          → bài đề xuất sau 1 bài (danh sách phát tiếp)
+        GET /api/songs/{songId}/recommendations/artist   → bài của cùng nghệ sĩ
+        GET /api/recommendations/genres?genreIds=1,24    → bài theo danh sách thể loại (AI Python)
+
+    2 API đầu tính thẳng từ MySQL, API thứ 3 hỏi dịch vụ AI Python
+    (lý do: xem phần đầu file RecommendationService).
 
     Mỗi request đi qua đầy đủ các bước bảo mật (JWT, Redis, rate limit...)
     như mô tả trong comment đầu file AdminSongController.
@@ -46,6 +49,8 @@ import java.util.List;
     =====================================================================
     FRONTEND KHÔNG GỌI THẲNG PYTHON
     =====================================================================
+
+    Áp dụng cho API gợi ý theo thể loại (API duy nhất còn hỏi Python):
 
         React ──GET──► Spring Boot (8080) ──POST──► Python AI (127.0.0.1:8000)
 
@@ -81,8 +86,8 @@ import java.util.List;
         ]
     → Frontend dùng lại được component hiển thị bài hát đã có.
 
-    - Mảng rỗng [] là bình thường (VD hệ thống chưa có bài nào khác cùng thể loại).
-    - Dịch vụ AI tạm lỗi → backend tự dùng phương án dự phòng (bài nhiều lượt nghe nhất),
+    - Mảng rỗng [] là bình thường (VD hệ thống chưa có bài nào khác).
+    - Dịch vụ AI tạm lỗi → API thể loại tự dùng phương án dự phòng (bài nhiều lượt nghe nhất),
       frontend vẫn nhận mảng bài hát như bình thường, không có lỗi.
 */
 /*
@@ -106,19 +111,31 @@ public class RecommendationController {
 
     /*
         ---------------------------------------------------------------
-        Bài hát tương tự 1 bài
+        Bài đề xuất sau 1 bài (danh sách phát tiếp)
         ---------------------------------------------------------------
         Ví dụ gọi:
-            GET /api/songs/15/recommendations             → 5 bài (mặc định)
-            GET /api/songs/15/recommendations?limit=10    → 10 bài
+            GET /api/songs/15/recommendations                          → 5 bài (mặc định)
+            GET /api/songs/15/recommendations?limit=10                 → 10 bài
+            GET /api/songs/15/recommendations?limit=10&excludeIds=7,22 → 10 bài, không có bài 7 và 22
 
-        Dùng cho mục "Bài hát tương tự" dưới trình phát nhạc.
+        Dùng cho:
+        - Mục "Bài hát đề xuất" trên trang chi tiết bài hát (limit=5).
+        - Danh sách phát tiếp khi nghe hết bài (limit=10).
+
+        Thứ tự kết quả (chi tiết: xem phần đầu file RecommendationService):
+            tối đa 3 bài của cùng nghệ sĩ (ưu tiên cùng thể loại)
+            → bài cùng thể loại của nghệ sĩ khác
+            → bài nhiều lượt nghe nhất của nghệ sĩ khác (khi vẫn còn thiếu).
 
         Tham số:
         - @PathVariable Long songId: id bài đang nghe, lấy từ đường dẫn (/api/songs/15/... → 15).
           Gửi chữ, VD /api/songs/abc/recommendations → 400 "Invalid parameter: songId".
         - @RequestParam(defaultValue = "5") int limit: số bài muốn lấy.
           Không gửi → 5. Tự giới hạn trong khoảng 1 đến 20.
+        - @RequestParam(required = false) List<Long> excludeIds: các bài không muốn nhận lại,
+          VD các bài vừa phát xong. Không bắt buộc.
+          Spring tự tách "7,22" theo dấu phẩy thành [7, 22] (giống genreIds ở API thể loại).
+          Gửi chữ, VD excludeIds=abc → 400 "Invalid parameter: excludeIds".
 
         Không bao giờ có chính bài đang nghe trong kết quả.
 
@@ -127,19 +144,23 @@ public class RecommendationController {
     */
     @GetMapping("/api/songs/{songId}/recommendations")
     public ResponseEntity<List<SongResponse>> getSimilarSongs(@PathVariable Long songId,
-                                                              @RequestParam(defaultValue = "5") int limit) {
-        return ResponseEntity.ok(recommendationService.getSimilarSongs(songId, limit));
+                                                              @RequestParam(defaultValue = "5") int limit,
+                                                              @RequestParam(required = false) List<Long> excludeIds) {
+        return ResponseEntity.ok(recommendationService.getSimilarSongs(songId, limit, excludeIds));
     }
 
     /*
         ---------------------------------------------------------------
-        Bài liên quan tới nghệ sĩ của 1 bài
+        Bài của cùng nghệ sĩ
         ---------------------------------------------------------------
         Ví dụ gọi:
             GET /api/songs/15/recommendations/artist?limit=5
 
-        Dùng cho mục "Cùng nghệ sĩ" trên trang chi tiết bài hát.
-        Tham số và lỗi giống API bài hát tương tự ở trên.
+        Các bài khác của nghệ sĩ (tính cả bài được feat), bài cùng thể loại xếp trước.
+        Nghệ sĩ không có bài nào khác → bài cùng thể loại, nhiều lượt nghe nhất.
+        API "Bài đề xuất" ở trên đã gồm bài của cùng nghệ sĩ, nên frontend có thể không cần API này nữa.
+        Vẫn giữ lại để không làm hỏng chỗ nào còn gọi tới.
+        Tham số songId, limit và lỗi giống API ở trên (không có excludeIds).
     */
     @GetMapping("/api/songs/{songId}/recommendations/artist")
     public ResponseEntity<List<SongResponse>> getArtistSongs(@PathVariable Long songId,

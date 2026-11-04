@@ -4,7 +4,7 @@ package com.winhmm.myspotify.service;
     -----------------------------------------------------
     Các dòng import
     -----------------------------------------------------
-    - RecommendClient : gọi sang dịch vụ AI (Python).
+    - RecommendClient : gọi sang dịch vụ AI (Python), giờ chỉ còn dùng cho gợi ý theo thể loại.
     - SongResponse    : DTO bài hát trả cho frontend (cùng cấu trúc với GET /api/songs).
     - Song            : entity bài hát.
     - SongMapper      : đổi Song sang SongResponse.
@@ -34,42 +34,93 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /*
     =====================================================================
-    RECOMMENDATIONSERVICE - GỢI Ý BÀI HÁT BẰNG AI
+    RECOMMENDATIONSERVICE - GỢI Ý BÀI HÁT
     =====================================================================
 
     Các chức năng:
-        getSimilarSongs(...) → bài hát tương tự 1 bài     (Python: /recommend)
-        getArtistSongs(...)  → bài liên quan nghệ sĩ      (Python: /recommend/artist)
-        getGenreSongs(...)   → bài theo danh sách thể loại (Python: /recommend/genres)
+        getSimilarSongs(...) → bài đề xuất sau 1 bài, dùng làm danh sách phát tiếp   (tính từ MySQL)
+        getArtistSongs(...)  → bài của cùng nghệ sĩ                                  (tính từ MySQL)
+        getGenreSongs(...)   → bài theo danh sách thể loại                           (Python: /recommend/genres)
 
     =====================================================================
-    CÁC BƯỚC CHUNG CỦA MỌI CHỨC NĂNG
+    VÌ SAO 2 CHỨC NĂNG ĐẦU KHÔNG HỎI PYTHON NỮA?
     =====================================================================
 
-    1. Hỏi Python → nhận danh sách id bài hát, VD [7, 22, 3, 41].
-       Python chạy ở địa chỉ app.recommend.base-url
-       (không cấu hình thì mặc định http://127.0.0.1:8000, tức cùng máy với backend, xem RecommendClient).
+    Trước đây getSimilarSongs hỏi Python POST /recommend, getArtistSongs hỏi POST /recommend/artist.
+    Nhưng 2 API đó của Python tính từ 1 file CSV riêng (so theo genre, energy, tempo trong file),
+    không xét nghệ sĩ của bài trong MySQL → kết quả không theo đúng nghệ sĩ và thể loại.
+    Backend chỉ dùng phương án dự phòng khi Python trả danh sách rỗng,
+    nên Python trả id nào (miễn bài đó có trong MySQL) là hiện bài đó, dù sai nghệ sĩ.
 
-    2. Hỏi MySQL thông tin các bài đó (1 câu truy vấn cho cả danh sách).
-       Dùng findPublishedByIds có sẵn → chỉ lấy bài đã phát hành.
-       Vì sao phải lọc lại? Python đọc thẳng bảng songs nên có thể gợi ý cả bài
-       đang chờ duyệt, bị ẩn, bị gỡ, hoặc của Artist bị khóa. Người nghe không được thấy các bài đó.
-
-    3. Sắp xếp đúng thứ tự Python gợi ý (MySQL trả về không theo thứ tự đó),
-       bỏ bài trùng, bỏ chính bài đang nghe, lấy đủ số lượng yêu cầu.
-
-    4. Đổi sang SongResponse rồi trả về.
+    Giờ 2 chức năng này tính thẳng từ MySQL theo quy tắc ở phần dưới.
+    - Không gọi Python, nên Python tắt cũng không ảnh hưởng.
+    - RecommendClient vẫn giữ nguyên các hàm similarSongs, artistSongs
+      (không ai gọi tới, để dành nếu sau này bên Python sửa lại).
+    - getGenreSongs vẫn hỏi Python như cũ.
 
     =====================================================================
-    PHƯƠNG ÁN DỰ PHÒNG (FALLBACK)
+    QUY TẮC ĐỀ XUẤT PHÁT TIẾP (GETSIMILARSONGS)
+    =====================================================================
+
+    Mục tiêu: nghe hết 1 bài thì phát tiếp bài liên quan:
+    vài bài của cùng nghệ sĩ trước, rồi chuyển sang nghệ sĩ khác cùng thể loại.
+
+    Ví dụ: đang nghe "Chiều Mưa" của Mây Chiều, thể loại Chill, xin 6 bài (limit = 6).
+
+    Bước 1. Tối đa 3 bài khác của Mây Chiều.
+            - Tính cả bài Mây Chiều chỉ được feat.
+            - Bài cùng thể loại Chill xếp trước, rồi tới bài thể loại khác.
+              Trong mỗi nhóm, bài nhiều lượt nghe hơn xếp trước.
+            - Mây Chiều có 10 bài thì cũng chỉ lấy 3 (đủ 3 bài là chuyển sang bước 2).
+            - Mây Chiều chỉ có 1 bài khác thì lấy 1 bài đó rồi chuyển luôn sang bước 2.
+
+    Bước 2. Còn thiếu thì lấy bài Chill của nghệ sĩ khác, nhiều lượt nghe nhất trước.
+            Không lấy thêm bài nào của Mây Chiều (kể cả bài có feat Mây Chiều),
+            để giữ đúng giới hạn tối đa 3 bài của cùng nghệ sĩ.
+
+    Bước 3. Vẫn còn thiếu (thể loại Chill ít bài) thì lấy bài nhiều lượt nghe nhất
+            của nghệ sĩ khác, thể loại nào cũng được.
+            Có bước này để danh sách phát tiếp không bị hết giữa chừng.
+
+    Kết quả: [Mây Chiều 1, Mây Chiều 2, Mây Chiều 3, Chill A, Chill B, Chill C]
+
+    Bài cũ chưa có thể loại (genre = null): bỏ qua bước 2 (không biết thể loại nào là "tương tự"),
+    bước 1 không có bài nào được ưu tiên, bước 3 vẫn chạy bình thường.
+
+    Kết quả luôn cố định với cùng dữ liệu (không chọn ngẫu nhiên), nên dễ kiểm tra bằng Postman.
+
+    -----------------------------------------------------
+    Frontend dùng kết quả này thế nào khi phát hết bài?
+    -----------------------------------------------------
+    1. Người dùng bấm phát bài X → gọi GET /api/songs/X/recommendations?limit=10,
+       lưu kết quả làm "danh sách chờ".
+    2. Bài đang phát kết thúc → phát bài đầu tiên của danh sách chờ, rồi bỏ nó khỏi danh sách.
+       Không gọi lại API cho từng bài, nếu không thì bài nào cũng được thêm 3 bài
+       của nghệ sĩ đó và giới hạn 3 bài mất tác dụng.
+    3. Danh sách chờ hết → gọi lại API với bài vừa phát xong,
+       kèm excludeIds là các bài đã phát để không bị lặp lại.
+
+    =====================================================================
+    "ỨNG VIÊN" LÀ GÌ?
+    =====================================================================
+
+    Mỗi bước hỏi MySQL tối đa 50 bài nhiều lượt nghe nhất (CANDIDATE_POOL) làm ứng viên,
+    rồi lọc tiếp bằng Java (bỏ bài đã có, bài cần loại, bài của cùng nghệ sĩ...).
+    Vì sao không hỏi đúng số bài cần? Vì 1 phần ứng viên sẽ bị lọc bỏ,
+    hỏi dư ra để sau khi lọc vẫn còn đủ bài.
+
+    =====================================================================
+    PHƯƠNG ÁN DỰ PHÒNG CỦA GỢI Ý THEO THỂ LOẠI (GETGENRESONGS)
     =====================================================================
 
     Gợi ý bài hát là tính năng phụ. Python lỗi thì không được làm hỏng trang nghe nhạc.
@@ -77,13 +128,10 @@ import java.util.function.Supplier;
     Khi nào dùng dự phòng?
     - Python đang tắt, bị lỗi, hoặc trả lời chậm quá thời gian chờ
       (cấu hình app.recommend.timeout-ms, không đặt thì mặc định 3000 ms = 3 giây).
-    - Python trả lời được, nhưng sau khi lọc ở bước 2 không còn bài nào
+    - Python trả lời được, nhưng sau khi lọc không còn bài nào
       (VD toàn gợi ý bài đã bị ẩn).
 
-    Dự phòng trả gì? Các bài nhiều lượt nghe nhất, đã phát hành:
-    - Bài tương tự  → cùng thể loại với bài đang nghe.
-    - Theo nghệ sĩ  → của cùng nghệ sĩ (nếu không có thì cùng thể loại).
-    - Theo thể loại → thuộc các thể loại được yêu cầu.
+    Dự phòng trả gì? Các bài nhiều lượt nghe nhất, đã phát hành, thuộc các thể loại được yêu cầu.
 
     Frontend không phân biệt được kết quả từ AI hay từ dự phòng: cấu trúc JSON giống hệt.
     Khi Python lỗi, app.log có dòng cảnh báo bắt đầu bằng "Recommend service error"
@@ -108,6 +156,16 @@ public class RecommendationService {
     */
     private static final int MAX_GENRES = 10;
 
+    /*
+        Số bài tối đa của cùng nghệ sĩ trong danh sách đề xuất phát tiếp (bước 1).
+    */
+    private static final int SAME_ARTIST_LIMIT = 3;
+
+    /*
+        Số ứng viên tối đa mỗi lần hỏi MySQL (xem phần "Ứng viên là gì?" ở đầu file).
+    */
+    private static final int CANDIDATE_POOL = 50;
+
     private final RecommendClient recommendClient;
     private final SongRepository songRepository;
 
@@ -122,61 +180,128 @@ public class RecommendationService {
 
     /*
         =====================================================================
-        BÀI HÁT TƯƠNG TỰ 1 BÀI
+        BÀI ĐỀ XUẤT SAU 1 BÀI (DANH SÁCH PHÁT TIẾP)
         =====================================================================
-        Dùng cho mục "Bài hát tương tự" dưới trình phát nhạc.
+        Dùng cho mục "Bài hát đề xuất" trên trang chi tiết bài hát,
+        và cho danh sách phát tiếp khi nghe hết 1 bài.
+        Quy tắc 3 bước: xem phần "Quy tắc đề xuất phát tiếp" ở đầu file.
 
+        Tham số:
+        - songId    : bài đang nghe (bài gốc).
+        - limit     : số bài muốn lấy (tự giới hạn trong khoảng 1 đến 20).
+        - excludeIds: các bài không muốn nhận lại (VD các bài vừa phát xong), có thể null.
+
+        -----------------------------------------------------
+        skipIds: tập các id "không được chọn nữa"
+        -----------------------------------------------------
+        Set (tập hợp) không chứa phần tử trùng, và contains(id) kiểm tra rất nhanh.
+        Ban đầu gồm: chính bài đang nghe + các id trong excludeIds.
+        Mỗi khi chọn được 1 bài, id bài đó cũng được thêm vào → không bao giờ chọn trùng.
+
+        -----------------------------------------------------
+        Đọc từng bước trong code
+        -----------------------------------------------------
         1. Bài gốc phải đã phát hành, nếu không → 400 "Song does not exist".
-        2. Hỏi Python POST /recommend.
-           Xin gấp đôi số bài cần (askCount), vì 1 phần có thể bị lọc ở bước tiếp theo
-           (bài chưa phát hành, trùng chính bài đang nghe).
-        3. Lọc, sắp xếp, lấy đủ limit bài (loadPublishedInOrder).
-        4. Không còn bài nào → dự phòng: bài cùng thể loại, nhiều lượt nghe nhất.
+        2. Bước 1: lấy ứng viên là các bài của nghệ sĩ (findPublishedByArtist có sẵn,
+           tính cả bài được feat), xếp bài cùng thể loại lên trước (sameGenreFirst),
+           rồi chọn tối đa 3 bài.
+           Math.min(SAME_ARTIST_LIMIT, safeLimit): frontend chỉ xin 2 bài thì chỉ lấy 2, không lấy 3.
+        3. Cho tất cả ứng viên của nghệ sĩ vào skipIds (kể cả bài không được chọn),
+           để bước 2, 3 không chọn thêm bài nào của nghệ sĩ này.
+           Nhờ vậy bài "nghệ sĩ khác feat Mây Chiều" cũng bị loại ở bước 2, 3.
+        4. Bước 2: còn thiếu và bài gốc có thể loại → bài cùng thể loại, khác nghệ sĩ.
+        5. Bước 3: vẫn còn thiếu → bài nhiều lượt nghe nhất toàn hệ thống, khác nghệ sĩ.
+        6. Đổi sang SongResponse rồi trả về.
+
+        song.getArtist().getId(), song.getGenre().getId(): artist và genre là quan hệ LAZY,
+        nhưng lấy id thì Hibernate không cần tải thêm dữ liệu
+        (id đã có sẵn trong cột artist_id, genre_id của bảng songs).
     */
-    public List<SongResponse> getSimilarSongs(Long songId, int limit) {
+    public List<SongResponse> getSimilarSongs(Long songId, int limit, List<Long> excludeIds) {
         Song song = findPublishedSong(songId);
         int safeLimit = safeLimit(limit);
-        int askCount = safeLimit * 2;
+        LocalDateTime now = LocalDateTime.now();
+        Long artistId = song.getArtist().getId();
+
+        Set<Long> skipIds = new HashSet<>();
+        skipIds.add(songId);
+        if (excludeIds != null) {
+            for (Long excludeId : excludeIds) {
+                if (excludeId != null) {
+                    skipIds.add(excludeId);
+                }
+            }
+        }
+
+        List<Song> result = new ArrayList<>();
 
         /*
-            () -> recommendClient.similarSongs(songId, askCount) là 1 lambda:
-            "đoạn code gọi Python", được truyền vào askPython để chạy bên trong try-catch.
+            Bước 1: tối đa 3 bài của cùng nghệ sĩ.
+            Tham số skipArtistId = null: không loại nghệ sĩ nào (đang cần chính bài của nghệ sĩ này).
         */
-        List<Long> ids = askPython("similar", () -> recommendClient.similarSongs(songId, askCount));
-        List<Song> songs = loadPublishedInOrder(ids, songId, safeLimit);
+        List<Song> artistSongs = songRepository.findPublishedByArtist(
+                artistId, now, topByPlayCount(CANDIDATE_POOL)).getContent();
+        int sameArtistLimit = Math.min(SAME_ARTIST_LIMIT, safeLimit);
+        addSongs(result, sameGenreFirst(artistSongs, song), skipIds, null, sameArtistLimit);
 
-        if (songs.isEmpty()) {
-            songs = topSongsSameGenre(song, safeLimit);
+        for (Song artistSong : artistSongs) {
+            skipIds.add(artistSong.getId());
         }
-        return toResponses(songs);
+
+        /*
+            Bước 2: bài cùng thể loại của nghệ sĩ khác.
+            result.size() < safeLimit: chỉ chạy khi danh sách còn thiếu.
+        */
+        if (result.size() < safeLimit && song.getGenre() != null) {
+            List<Song> genreSongs = songRepository.findPublishedByGenre(
+                    song.getGenre().getId(), now, topByPlayCount(CANDIDATE_POOL)).getContent();
+            addSongs(result, genreSongs, skipIds, artistId, safeLimit);
+        }
+
+        /*
+            Bước 3: bài nhiều lượt nghe nhất của nghệ sĩ khác, thể loại nào cũng được.
+        */
+        if (result.size() < safeLimit) {
+            List<Song> popularSongs = songRepository.findPublished(
+                    now, topByPlayCount(CANDIDATE_POOL)).getContent();
+            addSongs(result, popularSongs, skipIds, artistId, safeLimit);
+        }
+
+        return toResponses(result);
     }
 
     /*
         =====================================================================
-        BÀI LIÊN QUAN TỚI NGHỆ SĨ CỦA 1 BÀI
+        BÀI CỦA CÙNG NGHỆ SĨ
         =====================================================================
-        Dùng cho mục "Cùng nghệ sĩ" trên trang chi tiết bài hát.
+        API GET /api/songs/{songId}/recommendations/artist.
+        Mục "Bài hát đề xuất" (getSimilarSongs) đã gồm bài của cùng nghệ sĩ,
+        nên frontend có thể không cần API này nữa. Vẫn giữ lại để không làm hỏng chỗ nào còn gọi tới.
 
-        Các bước giống getSimilarSongs, chỉ khác:
-        - Gọi Python POST /recommend/artist.
-        - Dự phòng: bài nhiều lượt nghe nhất của cùng nghệ sĩ.
-          Nghệ sĩ chỉ có đúng 1 bài (chính bài đang nghe) → dùng tiếp dự phòng cùng thể loại.
+        1. Bài gốc phải đã phát hành, nếu không → 400 "Song does not exist".
+        2. Các bài khác của cùng nghệ sĩ (tính cả bài được feat),
+           bài cùng thể loại xếp trước, rồi tới bài nhiều lượt nghe. Lấy tối đa limit bài.
+           Ở đây không giới hạn 3 bài, vì API này chỉ để xem bài của nghệ sĩ.
+        3. Nghệ sĩ chỉ có đúng 1 bài (chính bài đang nghe)
+           → dự phòng: bài cùng thể loại, nhiều lượt nghe nhất.
     */
     public List<SongResponse> getArtistSongs(Long songId, int limit) {
         Song song = findPublishedSong(songId);
         int safeLimit = safeLimit(limit);
-        int askCount = safeLimit * 2;
 
-        List<Long> ids = askPython("artist", () -> recommendClient.artistSongs(songId, askCount));
-        List<Song> songs = loadPublishedInOrder(ids, songId, safeLimit);
+        List<Song> artistSongs = songRepository.findPublishedByArtist(
+                song.getArtist().getId(), LocalDateTime.now(), topByPlayCount(CANDIDATE_POOL)).getContent();
 
-        if (songs.isEmpty()) {
-            songs = topSongsSameArtist(song, safeLimit);
+        Set<Long> skipIds = new HashSet<>();
+        skipIds.add(songId);
+
+        List<Song> result = new ArrayList<>();
+        addSongs(result, sameGenreFirst(artistSongs, song), skipIds, null, safeLimit);
+
+        if (result.isEmpty()) {
+            result = topSongsSameGenre(song, safeLimit);
         }
-        if (songs.isEmpty()) {
-            songs = topSongsSameGenre(song, safeLimit);
-        }
-        return toResponses(songs);
+        return toResponses(result);
     }
 
     /*
@@ -190,7 +315,9 @@ public class RecommendationService {
            - Bỏ phần tử null và id trùng (VD [1, 1, 24] → [1, 24]).
            - Quá 10 thể loại → 400 "At most 10 genres are allowed".
         2. Hỏi Python POST /recommend/genres.
-        3. Lọc, sắp xếp, lấy đủ limit bài. Không loại bài nào (không có "bài đang nghe").
+           Xin gấp đôi số bài cần (askCount), vì 1 phần có thể bị lọc ở bước tiếp theo.
+        3. Lọc, sắp xếp, lấy đủ limit bài (loadPublishedInOrder).
+           Không loại bài nào (không có "bài đang nghe").
         4. Không còn bài nào → dự phòng: bài nhiều lượt nghe nhất thuộc các thể loại đó.
 
         Id thể loại không tồn tại thì không báo lỗi, chỉ đơn giản là không có bài nào thuộc thể loại đó.
@@ -222,6 +349,10 @@ public class RecommendationService {
         int safeLimit = safeLimit(limit);
         int askCount = safeLimit * 2;
 
+        /*
+            () -> recommendClient.genreSongs(cleanGenreIds, askCount) là 1 lambda:
+            "đoạn code gọi Python", được truyền vào askPython để chạy bên trong try-catch.
+        */
         List<Long> ids = askPython("genres", () -> recommendClient.genreSongs(cleanGenreIds, askCount));
 
         /*
@@ -243,17 +374,104 @@ public class RecommendationService {
 
     /*
         -----------------------------------------------------
+        Thêm ứng viên vào kết quả cho tới khi đủ số bài
+        -----------------------------------------------------
+        Tham số:
+        - result      : danh sách kết quả đang dựng dần (hàm này thêm bài vào thẳng danh sách đó).
+        - candidates  : các ứng viên, đã xếp theo thứ tự ưu tiên.
+        - skipIds     : các id không được chọn (xem getSimilarSongs).
+        - skipArtistId: bỏ qua bài có Artist chính là người này. null = không bỏ qua nghệ sĩ nào.
+        - maxSize     : kết quả đủ bao nhiêu bài thì dừng.
+
+        Duyệt từng ứng viên theo thứ tự:
+        - Kết quả đã đủ maxSize bài → dừng hẳn (break).
+        - Id nằm trong skipIds → bỏ qua (continue: chuyển sang ứng viên tiếp theo).
+        - Artist chính là skipArtistId → bỏ qua.
+          candidate.getArtist().getId().equals(null) luôn trả false → skipArtistId = null thì không bỏ bài nào.
+        - Còn lại → thêm vào kết quả, và thêm id vào skipIds để không bị chọn lại ở bước sau.
+
+        Hàm trả về void (không trả gì), vì nó thêm thẳng vào danh sách result được truyền vào:
+        result ở đây và result trong getSimilarSongs là cùng 1 danh sách
+        (Java truyền "địa chỉ" của object List, không sao chép ra danh sách mới).
+    */
+    private void addSongs(List<Song> result, List<Song> candidates, Set<Long> skipIds,
+                          Long skipArtistId, int maxSize) {
+        for (Song candidate : candidates) {
+            if (result.size() >= maxSize) {
+                break;
+            }
+            if (skipIds.contains(candidate.getId())) {
+                continue;
+            }
+            if (candidate.getArtist().getId().equals(skipArtistId)) {
+                continue;
+            }
+            result.add(candidate);
+            skipIds.add(candidate.getId());
+        }
+    }
+
+    /*
+        -----------------------------------------------------
+        Xếp bài cùng thể loại với bài gốc lên trước
+        -----------------------------------------------------
+        Ví dụ bài gốc thể loại Chill, songs (đã xếp theo lượt nghe giảm dần):
+            [Rap 900 lượt, Chill 500 lượt, Pop 300 lượt, Chill 100 lượt]
+        Kết quả:
+            [Chill 500 lượt, Chill 100 lượt, Rap 900 lượt, Pop 300 lượt]
+        Trong mỗi nhóm vẫn giữ nguyên thứ tự lượt nghe như ban đầu.
+
+        Cách làm: chia làm 2 danh sách (cùng thể loại, khác thể loại),
+        rồi nối danh sách khác thể loại vào cuối danh sách cùng thể loại (addAll).
+    */
+    private List<Song> sameGenreFirst(List<Song> songs, Song seed) {
+        List<Song> sameGenre = new ArrayList<>();
+        List<Song> otherGenre = new ArrayList<>();
+
+        for (Song song : songs) {
+            if (isSameGenre(song, seed)) {
+                sameGenre.add(song);
+            } else {
+                otherGenre.add(song);
+            }
+        }
+
+        sameGenre.addAll(otherGenre);
+        return sameGenre;
+    }
+
+    /*
+        -----------------------------------------------------
+        2 bài có cùng thể loại không?
+        -----------------------------------------------------
+        Bài nào chưa có thể loại (genre = null) → coi như không cùng thể loại với bài nào.
+        Phải kiểm tra null trước khi gọi getGenre().getId(),
+        nếu không sẽ lỗi NullPointerException (gọi hàm trên 1 thứ không tồn tại).
+        So 2 id kiểu Long bằng equals, không dùng ==:
+        Long là object, == so 2 object có phải cùng 1 object trong bộ nhớ không,
+        với số từ 128 trở lên có thể ra false dù cùng giá trị. equals so giá trị → luôn đúng.
+    */
+    private boolean isSameGenre(Song a, Song b) {
+        if (a.getGenre() == null || b.getGenre() == null) {
+            return false;
+        }
+        return a.getGenre().getId().equals(b.getGenre().getId());
+    }
+
+    /*
+        -----------------------------------------------------
         Hỏi Python, lỗi thì trả danh sách rỗng thay vì ném lỗi ra ngoài
         -----------------------------------------------------
         Tham số:
-        - apiName: tên ngắn của API ("similar", "artist", "genres"), chỉ dùng để ghi log.
+        - apiName: tên ngắn của API (VD "genres"), chỉ dùng để ghi log.
         - call   : đoạn code gọi Python, kiểu Supplier<List<Long>>.
 
         Supplier<List<Long>> là gì?
         - Là 1 "đoạn code chưa chạy", khi gọi call.get() thì đoạn code đó mới chạy
           và trả về List<Long>.
-        - Nhờ vậy 3 chức năng ở trên dùng chung 1 khối try-catch này, mỗi chức năng chỉ truyền vào
-          đoạn code gọi Python của mình, không phải viết lại try-catch 3 lần.
+        - Nhờ vậy khối try-catch này dùng chung được cho mọi API của Python,
+          mỗi chỗ gọi chỉ truyền vào đoạn code gọi Python của mình.
+          Hiện chỉ còn getGenreSongs dùng, sau này gợi ý cho playlist cũng dùng lại được.
 
         try-catch:
         - try  : chạy thử call.get() (gọi Python).
@@ -263,7 +481,7 @@ public class RecommendationService {
 
         log.warn("... ({}): {}", apiName, e.getMessage()):
         Mỗi cặp {} được thay lần lượt bằng các giá trị phía sau, VD:
-            Recommend service error (similar): I/O error on POST request ... Connection refused
+            Recommend service error (genres): I/O error on POST request ... Connection refused
     */
     private List<Long> askPython(String apiName, Supplier<List<Long>> call) {
         try {
@@ -302,7 +520,7 @@ public class RecommendationService {
         Đổi danh sách id thành danh sách bài đã phát hành, giữ đúng thứ tự
         -----------------------------------------------------
         Ví dụ:
-            ids từ Python   : [22, 15, 7, 22, 41]       (15 là bài đang nghe, 41 đang bị ẩn)
+            ids từ Python   : [22, 15, 7, 22, 41]       (15 là bài cần loại, 41 đang bị ẩn)
             MySQL trả về    : bài 7, bài 15, bài 22     (không có 41 vì chưa phát hành,
                                                          thứ tự có thể khác thứ tự trong ids)
             Kết quả         : [bài 22, bài 7]           (giữ thứ tự Python, bỏ 15, bỏ 22 lặp lại,
@@ -310,7 +528,7 @@ public class RecommendationService {
 
         Tham số:
         - ids      : danh sách id Python gợi ý.
-        - excludeId: id bài cần loại ra (bài đang nghe). null = không loại bài nào.
+        - excludeId: id bài cần loại ra. null = không loại bài nào.
         - limit    : số bài tối đa trong kết quả.
 
         Các bước:
@@ -320,7 +538,7 @@ public class RecommendationService {
         3. Duyệt ids theo đúng thứ tự Python:
            - new LinkedHashSet<>(ids): bỏ id trùng nhưng vẫn giữ thứ tự xuất hiện
              (HashSet thường thì làm mất thứ tự).
-           - id.equals(excludeId): là bài đang nghe → bỏ qua (continue: chuyển sang id tiếp theo).
+           - id.equals(excludeId): là bài cần loại → bỏ qua (continue: chuyển sang id tiếp theo).
            - songsById.get(id) == null: bài không có trong kết quả MySQL (chưa phát hành) → bỏ qua.
            - Đủ limit bài → dừng (break).
     */
@@ -355,13 +573,12 @@ public class RecommendationService {
         -----------------------------------------------------
         Dự phòng: bài cùng thể loại, nhiều lượt nghe nhất
         -----------------------------------------------------
+        Dùng trong getArtistSongs khi nghệ sĩ không có bài nào khác.
+
         - Lấy trang đầu, limit + 1 bài (dư 1 bài, phòng trường hợp chính bài đang nghe
           nằm trong danh sách và bị loại ra).
         - Bài cũ chưa có thể loại (genre = null) → lấy bài nhiều lượt nghe nhất trong toàn hệ thống.
         - Loại chính bài đang nghe, rồi cắt còn đúng limit bài.
-
-        song.getGenre().getId(): genre là quan hệ LAZY, nhưng lấy id thì Hibernate
-        không cần tải thêm dữ liệu (id đã có sẵn trong cột genre_id của bảng songs).
     */
     private List<Song> topSongsSameGenre(Song song, int limit) {
         Pageable top = topByPlayCount(limit + 1);
@@ -373,18 +590,6 @@ public class RecommendationService {
         } else {
             candidates = songRepository.findPublished(now, top).getContent();
         }
-        return excludeAndLimit(candidates, song.getId(), limit);
-    }
-
-    /*
-        -----------------------------------------------------
-        Dự phòng: bài của cùng nghệ sĩ, nhiều lượt nghe nhất
-        -----------------------------------------------------
-        findPublishedByArtist có sẵn: bài nghệ sĩ đó là Artist chính hoặc được feat.
-    */
-    private List<Song> topSongsSameArtist(Song song, int limit) {
-        List<Song> candidates = songRepository.findPublishedByArtist(
-                song.getArtist().getId(), LocalDateTime.now(), topByPlayCount(limit + 1)).getContent();
         return excludeAndLimit(candidates, song.getId(), limit);
     }
 
@@ -421,11 +626,15 @@ public class RecommendationService {
         PageRequest.of(0, size, Sort...):
         - 0   : trang đầu tiên (đánh số từ 0).
         - size: số bài.
-        - Sort.by(Sort.Direction.DESC, "playCount"): ORDER BY play_count DESC.
-          "playCount" là tên thuộc tính Java trong entity Song, không phải tên cột MySQL.
+        - Sort.by(Sort.Order.desc("playCount"), Sort.Order.desc("id")):
+          ORDER BY play_count DESC, id DESC.
+          "playCount", "id" là tên thuộc tính Java trong entity Song, không phải tên cột MySQL.
+        - Vì sao thêm id DESC? Nhiều bài có cùng lượt nghe (VD bài mới đều 0 lượt)
+          thì MySQL không hứa trả theo thứ tự nào, mỗi lần gọi có thể khác nhau.
+          Thêm id: cùng lượt nghe thì bài mới hơn (id lớn hơn) đứng trước → kết quả luôn cố định.
     */
     private Pageable topByPlayCount(int size) {
-        return PageRequest.of(0, size, Sort.by(Sort.Direction.DESC, "playCount"));
+        return PageRequest.of(0, size, Sort.by(Sort.Order.desc("playCount"), Sort.Order.desc("id")));
     }
 
     /*
