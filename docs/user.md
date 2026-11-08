@@ -1,21 +1,26 @@
 # MODULE USER — TÀI LIỆU NGHIỆP VỤ VÀ LUỒNG XỬ LÝ
 
-> Dự án: **MySpotify Backend** (Spring Boot 4, Java 25, MySQL, Redis)
+> Dự án: **MySpotify Backend** (Spring Boot 4.1, Java 17 trong `pom.xml` — VPS chạy JDK 25, MySQL, Redis)
 > Package gốc: `com.winhmm.myspotify`
+> Cập nhật lần cuối: **08/11/2026** — khớp với code trên nhánh `main` sau Pull Request #11.
 > Đối tượng đọc: thành viên mới trong nhóm (backend, frontend, tester), **không cần biết trước Spring Boot**.
-> Tài liệu liên quan: `docs/SONG_MODULE.md` (module bài hát), `docs/TEST_SONG_POSTMAN.md`.
+> Tài liệu liên quan:
+> - `docs/SONG_MODULE.md` — module bài hát (nghe nhạc, đăng nhạc, thể loại, lời bài hát, gợi ý).
+> - `docs/PLAYLIST_MODULE.md` — module Playlist (mỗi tài khoản tự tạo playlist).
+> - `docs/TEST_SONG_POSTMAN.md` — test module Song bằng Postman.
 
 ---
 
 ## MỤC LỤC
 
+0. [Có gì mới trong bản cập nhật này](#0-có-gì-mới-trong-bản-cập-nhật-này)
 1. [Cách đọc tài liệu này](#1-cách-đọc-tài-liệu-này)
 2. [Module User giải quyết bài toán gì?](#2-module-user-giải-quyết-bài-toán-gì)
 3. [Từ điển thuật ngữ](#3-từ-điển-thuật-ngữ)
 4. [Danh sách chức năng](#4-danh-sách-chức-năng)
 5. [Kiến trúc và vị trí các file](#5-kiến-trúc-và-vị-trí-các-file)
 6. [Dữ liệu: MySQL và Redis](#6-dữ-liệu-mysql-và-redis)
-7. [Ba "trục trạng thái" của 1 tài khoản](#7-ba-trục-trạng-thái-của-1-tài-khoản)
+7. [Bốn "trục trạng thái" của 1 tài khoản](#7-bốn-trục-trạng-thái-của-1-tài-khoản)
 8. [Mã OTP — trái tim của module](#8-mã-otp--trái-tim-của-module)
 9. [Đăng nhập, JWT và phiên đăng nhập](#9-đăng-nhập-jwt-và-phiên-đăng-nhập)
 10. [Hành trình của 1 request đã đăng nhập](#10-hành-trình-của-1-request-đã-đăng-nhập)
@@ -26,13 +31,30 @@
 15. [Giới hạn tần suất (rate limit)](#15-giới-hạn-tần-suất-rate-limit)
 16. [Bảo mật — tổng hợp](#16-bảo-mật--tổng-hợp)
 17. [Xử lý lỗi](#17-xử-lý-lỗi)
-18. [Ảnh hưởng của module User lên module Song](#18-ảnh-hưởng-của-module-user-lên-module-song)
+18. [Ảnh hưởng của module User lên module Song và Playlist](#18-ảnh-hưởng-của-module-user-lên-module-song-và-playlist)
 19. [Hướng dẫn riêng cho Frontend](#19-hướng-dẫn-riêng-cho-frontend)
 20. [Hướng dẫn test nhanh bằng Postman](#20-hướng-dẫn-test-nhanh-bằng-postman)
-21. [Cấu hình và môi trường](#21-cấu-hình-và-môi-trường)
+21. [Cấu hình, môi trường và deploy](#21-cấu-hình-môi-trường-và-deploy)
 22. [Giới hạn đã biết và hướng phát triển](#22-giới-hạn-đã-biết-và-hướng-phát-triển)
 23. [Câu hỏi thường gặp](#23-câu-hỏi-thường-gặp)
 24. [Phụ lục](#24-phụ-lục)
+
+---
+
+## 0. CÓ GÌ MỚI TRONG BẢN CẬP NHẬT NÀY
+
+Bản trước viết ngày 18/10/2026. Từ đó tới nay code module User **chỉ có 1 thay đổi nghiệp vụ**, nhưng thay đổi này ảnh hưởng tới cả luồng đăng ký → đăng nhập:
+
+| # | Thay đổi | Ảnh hưởng | Đọc ở mục |
+|---|---|---|---|
+| 1 | **Quyền vào web** (`accessStatus`): trục trạng thái thứ 4 của tài khoản. Tài khoản mới mặc định `REFUSE`; chủ dự án đổi sang `ACCEPT` bằng SQL thì mới đăng nhập được | Sau khi nhập OTP, đăng nhập báo `Account has not been approved yet` cho tới khi được cho phép. Thu hồi quyền → request tiếp theo bị 401 | 7.3a, 9.4, 11, 19.3, 20 |
+| 2 | Sửa message lỗi gửi email cho đúng code: `Could not send OTP email, please try again later` (503) | Frontend so sánh đúng chuỗi | 8.4, 17.2 |
+| 3 | Module **Playlist** mới: khóa / vô hiệu hóa / xóa tài khoản làm playlist công khai của người đó bị ẩn | | 18 |
+| 4 | Module Song có thêm thể loại, canvas, lời bài hát, gợi ý; tài liệu Song đánh số lại (mục xử lý lỗi giờ là 22) | Sửa tham chiếu sang `SONG_MODULE.md` | 18 |
+| 5 | **Deploy tự động** bằng GitHub Actions khi merge Pull Request vào `main` | | 21.5 |
+| 6 | Sửa ví dụ file cấu hình: file `.properties` không cho ghi chú ở cuối dòng | Chép ví dụ cũ sẽ làm ứng dụng không khởi động được | 21.1 |
+
+Số API của module User **không đổi** (vẫn 24 API).
 
 ---
 
@@ -40,15 +62,17 @@
 
 | Bạn là | Đọc theo thứ tự | Có thể bỏ qua |
 |---|---|---|
-| **Người mới hoàn toàn** | 2 → 3 → 4 → 7 → 8 → 9 → 11 → 12 → 13 → 14 | 10, 21 |
-| **Frontend** | 2 → 4 → 7 → 9 → 19 → 11 → 12 → 13 → 17 | 5, 6, 10, 21 |
-| **Tester** | 2 → 4 → 7 → 8 → 9 → 11 → 12 → 13 → 14 → 15 → 20 | 5, 21 |
-| **Backend sắp sửa code** | Đọc hết, đặc biệt 5, 6, 8, 9, 10, 16 | |
+| **Người mới hoàn toàn** | 0 → 2 → 3 → 4 → 7 → 8 → 9 → 11 → 12 → 13 → 14 | 10, 21 |
+| **Frontend** | 0 → 2 → 4 → 7 → 9 → 19 → 11 → 12 → 13 → 17 | 5, 6, 10, 21 |
+| **Tester** | 0 → 2 → 4 → 7 → 8 → 9 → 11 → 12 → 13 → 14 → 15 → 20 | 5, 21 |
+| **Backend sắp sửa code** | Đọc hết, đặc biệt 5, 6, 7.3a, 8, 9, 10, 16 | |
 
 Quy ước:
 - `chữ như thế này` là tên trong code: class, method, cột database, trường JSON.
 - **400 `"Email already exists"`** = server trả mã HTTP 400 kèm `{ "message": "Email already exists" }`.
 - "Tài khoản đang hoạt động" = `accountStatus = ACTIVE`.
+- "Được phép vào web" = `accessStatus = ACCEPT`.
+- "Chủ dự án" = người quản lý server và database (khác với tài khoản ADMIN trong app).
 
 ---
 
@@ -63,14 +87,15 @@ Quy ước:
 1. **Lan** tải app MySpotify, điền username `lan.nguyen`, email, mật khẩu → bấm Đăng ký.
 2. Server tạo tài khoản ở trạng thái **chưa xác thực** và gửi **mã OTP 6 số** vào email của Lan.
 3. Lan nhập mã → tài khoản được **kích hoạt**.
-4. Lan đăng nhập, nhận về 1 **token**. Từ giờ mọi thao tác app gửi kèm token này.
-5. Lan đăng nhập thêm trên laptop → điện thoại bị **đăng xuất tự động** (mỗi tài khoản chỉ được dùng ở 1 nơi).
-6. Lan cập nhật họ tên, ảnh đại diện. Muốn đổi mật khẩu → nhập mật khẩu cũ → nhận OTP qua email → nhập OTP + mật khẩu mới.
-7. Lan quên mật khẩu → bấm "Quên mật khẩu" → nhận OTP → đặt mật khẩu mới.
-8. Lan là ca sĩ nghiệp dư → gửi **yêu cầu trở thành nghệ sĩ** với nghệ danh "Mây Chiều".
-9. **Admin** xem danh sách yêu cầu, **duyệt** → Lan trở thành **ARTIST**, có thể đăng nhạc (module Song).
-10. Một tài khoản khác spam bình luận xấu → Admin **khóa** tài khoản đó. Người đó lập tức bị đăng xuất và không đăng nhập lại được.
-11. Lan muốn nghỉ dùng app → **xóa tài khoản** (cần nhập mật khẩu để xác nhận).
+4. Lan thử đăng nhập → server báo **"tài khoản chưa được cho phép"**. Web chỉ dành cho người được chủ dự án mời (liên quan bản quyền nhạc). Lan nhắn chủ dự án; chủ dự án chạy 1 câu SQL đổi quyền vào web của Lan thành `ACCEPT`.
+5. Lan đăng nhập lại, nhận về 1 **token**. Từ giờ mọi thao tác app gửi kèm token này.
+6. Lan đăng nhập thêm trên laptop → điện thoại bị **đăng xuất tự động** (mỗi tài khoản chỉ được dùng ở 1 nơi).
+7. Lan cập nhật họ tên, ảnh đại diện. Muốn đổi mật khẩu → nhập mật khẩu cũ → nhận OTP qua email → nhập OTP + mật khẩu mới.
+8. Lan quên mật khẩu → bấm "Quên mật khẩu" → nhận OTP → đặt mật khẩu mới.
+9. Lan là ca sĩ nghiệp dư → gửi **yêu cầu trở thành nghệ sĩ** với nghệ danh "Mây Chiều".
+10. **Admin** xem danh sách yêu cầu, **duyệt** → Lan trở thành **ARTIST**, có thể đăng nhạc (module Song).
+11. Một tài khoản khác đặt tên playlist công khai phản cảm → Admin **khóa** tài khoản đó. Người đó lập tức bị đăng xuất, không đăng nhập lại được, playlist công khai của họ tự ẩn với mọi người.
+12. Lan muốn nghỉ dùng app → **xóa tài khoản** (cần nhập mật khẩu để xác nhận).
 
 ### 2.3. Ba vai trò (`Role`)
 
@@ -80,7 +105,7 @@ Quy ước:
 | **ARTIST** | **Chỉ** qua: gửi yêu cầu → Admin duyệt | Mọi thứ của USER + đăng và quản lý bài hát |
 | **ADMIN** | Admin khác gán, hoặc tạo trực tiếp trong database | Quản lý người dùng, duyệt nghệ sĩ, duyệt bài hát |
 
-### 2.4. Bảy quy tắc nghiệp vụ cốt lõi
+### 2.4. Tám quy tắc nghiệp vụ cốt lõi
 
 1. **Email phải được xác thực bằng OTP** trước khi đăng nhập được.
 2. **Mọi thao tác nhạy cảm** (đổi mật khẩu, đổi email, quên mật khẩu) đều cần **OTP gửi qua email**.
@@ -89,6 +114,7 @@ Quy ước:
 5. **ARTIST không được Admin gán thẳng**, chỉ có qua quy trình "gửi yêu cầu → duyệt".
 6. **Không ai đụng được vào tài khoản ADMIN** (không khóa, không đổi role được).
 7. **Không xóa cứng**: tài khoản bị xóa chỉ được đánh dấu `DELETED`.
+8. **Chỉ người được chủ dự án cho phép (`accessStatus = ACCEPT`) mới đăng nhập được** (MỚI). Không có API nào cấp quyền này, kể cả API của Admin.
 
 ---
 
@@ -109,6 +135,7 @@ Quy ước:
 | **Băm (hash)** | Biến dữ liệu thành chuỗi khác, **không đảo ngược được**. Khác với mã hóa (có thể giải mã) |
 | **Rate limit** | Giới hạn số request trong 1 khoảng thời gian |
 | **Brute force** | Thử đoán liên tục (mật khẩu, mã OTP...). Rate limit và giới hạn số lần nhập OTP để chống việc này |
+| **Quyền vào web (`accessStatus`)** | (MỚI) Cờ `ACCEPT` / `REFUSE` do **chủ dự án** đặt bằng SQL, quyết định ai được dùng web. Độc lập với `accountStatus` (mục 7.3a) |
 
 ### 3.2. Spring Boot
 
@@ -178,6 +205,19 @@ Quy ước:
 | AD6 | Từ chối yêu cầu làm nghệ sĩ | `PUT /api/admin/artist-requests/{userId}/reject` |
 | AD7 | Đổi role (USER ↔ ADMIN) | `PUT /api/admin/users/{userId}/role` |
 
+**Không có API** nào đổi quyền vào web (`accessStatus`) — chỉ chủ dự án đổi bằng SQL (mục 7.3a).
+
+### 4.4. API của module khác có dùng tới tài khoản
+
+Không thuộc module User nhưng nằm dưới đường dẫn có chữ `users` hoặc gắn với từng tài khoản, để khỏi tìm nhầm chỗ:
+
+| API | Thuộc module | Tài liệu |
+|---|---|---|
+| `GET /api/users/me/history` (lịch sử nghe gần đây) | Song | `SONG_MODULE.md` mục 12 |
+| `GET /api/playlists/me` (playlist của tôi) | Playlist | `PLAYLIST_MODULE.md` mục 8.2 |
+| `GET /api/playlists/users/{userId}` (playlist công khai của 1 người) | Playlist | `PLAYLIST_MODULE.md` mục 8.3 |
+| `GET /api/songs/artists/{artistId}` (trang nghệ sĩ: nghệ danh, bio, ảnh đại diện, bài hát) | Song | `SONG_MODULE.md` mục 11.6 |
+
 ---
 
 ## 5. KIẾN TRÚC VÀ VỊ TRÍ CÁC FILE
@@ -235,13 +275,15 @@ src/main/java/com/winhmm/myspotify/
 │   ├── Role.java                   ← USER, ARTIST, ADMIN
 │   ├── AccountStatus.java          ← UNVERIFIED, ACTIVE, DISABLED, DELETED
 │   ├── ArtistRequestStatus.java    ← NONE, PENDING, APPROVED, REJECTED
-│   └── OtpPurpose.java             ← REGISTER, RESET_PASSWORD, CHANGE_PASSWORD, CHANGE_EMAIL
+│   ├── OtpPurpose.java             ← REGISTER, RESET_PASSWORD, CHANGE_PASSWORD, CHANGE_EMAIL
+│   └── AccessStatus.java           ← ACCEPT, REFUSE (MỚI — quyền vào web)
 ├── repository/
 │   ├── UserRepository.java
 │   └── OtpVerificationRepository.java
 ├── dto/  (request + response, xem Phụ lục 24.2)
 └── exception/
-    └── GlobalExceptionHandler.java ← Chuyển mọi lỗi thành JSON
+    ├── GlobalExceptionHandler.java ← Chuyển mọi lỗi thành JSON
+    └── EmailSendException.java     ← Lỗi gửi email OTP → 503 + hoàn tác thay đổi database
 ```
 
 ### 5.3. Ai gọi ai
@@ -283,6 +325,7 @@ AdminController ─► AdminService ─┬──► UserRepository
 | `artist_request_status` | ENUM | Có | `NONE` / `PENDING` / `APPROVED` / `REJECTED`. Mặc định `NONE` |
 | `artist_name` | VARCHAR(100) | Không | Nghệ danh (điền khi gửi yêu cầu làm nghệ sĩ) |
 | `bio` | VARCHAR(255) | Không | Giới thiệu nghệ sĩ |
+| `access_status` | ENUM | Có | (MỚI) `ACCEPT` / `REFUSE`. Mặc định `REFUSE`. **Chỉ chủ dự án đổi bằng SQL**, không API nào đổi được, **không trả ra API** (mục 7.3a) |
 
 Index: `idx_users_artist_request_status` trên `artist_request_status` → Admin lấy nhanh danh sách yêu cầu đang chờ.
 
@@ -318,11 +361,14 @@ Mọi mã OTP **được giữ lại** trong bảng (kể cả đã dùng) để
 │ role                 │              │ expired_at             │
 │ artist_request_status│              │ verified               │
 │ artist_name, bio     │              └────────────────────────┘
+│ access_status (MỚI)  │
 └──────────────────────┘
          │ 1
          │        (module Song)
          ├──────N── songs.artist_id               (bài mình là Artist chính)
-         └──────N── song_featured_artists.artist_id (bài mình được feat)
+         ├──────N── song_featured_artists.artist_id (bài mình được feat)
+         │        (module Playlist)
+         └──────N── playlists.user_id             (playlist mình tạo)
 ```
 
 ### 6.4. Redis
@@ -339,13 +385,14 @@ Redis bị xóa sạch (khởi động lại không lưu) → mọi người b�
 
 ---
 
-## 7. BA "TRỤC TRẠNG THÁI" CỦA 1 TÀI KHOẢN
+## 7. BỐN "TRỤC TRẠNG THÁI" CỦA 1 TÀI KHOẢN
 
-Mỗi tài khoản có **3 thuộc tính trạng thái độc lập**. Hiểu 3 trục này là hiểu 80% module.
+Mỗi tài khoản có **4 thuộc tính trạng thái độc lập**. Hiểu 4 trục này là hiểu 80% module.
 
 ```
- Trục 1: account_status          Trục 2: role          Trục 3: artist_request_status
- (tài khoản có dùng được?)       (được làm gì?)        (yêu cầu làm nghệ sĩ tới đâu?)
+ Trục 1: account_status       Trục 2: role       Trục 3: artist_request_status       Trục 4: access_status (MỚI)
+ (tài khoản có dùng được?)    (được làm gì?)     (yêu cầu làm nghệ sĩ tới đâu?)      (chủ dự án có cho vào web?)
+ do HỆ THỐNG quản lý          do ADMIN quản lý   do người dùng + ADMIN               do CHỦ DỰ ÁN quản lý (SQL)
 ```
 
 ### 7.1. Trục 1 — `AccountStatus`
@@ -420,16 +467,59 @@ Mỗi tài khoản có **3 thuộc tính trạng thái độc lập**. Hiểu 3 
                        REJECTED
 ```
 
-### 7.4. Kết hợp 3 trục — ví dụ
+### 7.3a. Trục 4 — `AccessStatus` (quyền vào web) — MỚI
 
-| Tài khoản | account_status | role | artist_request_status | Giải thích |
-|---|---|---|---|---|
-| Lan vừa đăng ký | UNVERIFIED | USER | NONE | Chưa nhập OTP |
-| Lan dùng bình thường | ACTIVE | USER | NONE | |
-| Lan chờ duyệt nghệ sĩ | ACTIVE | USER | PENDING | Vẫn là USER cho tới khi được duyệt |
-| Lan là nghệ sĩ | ACTIVE | ARTIST | APPROVED | |
-| Nghệ sĩ bị khóa | DISABLED | ARTIST | APPROVED | Role giữ nguyên, nhưng không đăng nhập được, bài hát bị ẩn khỏi người nghe |
-| Minh bị từ chối | ACTIVE | USER | REJECTED | Có thể gửi lại |
+| Giá trị | Nghĩa | Đăng nhập được? |
+|---|---|---|
+| `REFUSE` | Chưa được chủ dự án cho phép. **Mặc định** của mọi tài khoản mới đăng ký | ✘ `Account has not been approved yet` |
+| `ACCEPT` | Được phép dùng web | ✔ (nếu `accountStatus` cũng là `ACTIVE`) |
+
+**Vì sao có trục này?** Web phát nhạc liên quan bản quyền, chỉ dành cho những người chủ dự án mời. Đây là "lớp cửa" thứ hai, **độc lập** với `accountStatus`:
+- `accountStatus`: tài khoản đã xác thực email chưa, có bị khóa, bị xóa không → **hệ thống** tự quản lý (OTP, Admin khóa...).
+- `accessStatus`: chủ dự án có cho người này vào web không → **chủ dự án** tự quyết.
+
+Đăng nhập được khi **đủ cả 2**: `ACTIVE` **và** `ACCEPT`.
+
+**Chỉ đổi được bằng SQL** (không có API nào, kể cả API của Admin — Admin cũng phải `ACCEPT` mới vào được):
+```sql
+-- Cho phép
+UPDATE users SET access_status = 'ACCEPT' WHERE email = 'lan@gmail.com';
+-- Thu hồi
+UPDATE users SET access_status = 'REFUSE' WHERE email = 'lan@gmail.com';
+-- Xem ai đang chờ được cho phép (đã xác thực OTP nhưng chưa ACCEPT)
+SELECT id, username, email FROM users WHERE account_status = 'ACTIVE' AND access_status = 'REFUSE';
+```
+
+```
+ Đăng ký ──► REFUSE ──(chủ dự án chạy SQL)──► ACCEPT
+               ▲                                │
+               └──────(chủ dự án thu hồi)───────┘
+```
+
+Hệ quả:
+| Tình huống | Kết quả |
+|---|---|
+| Đăng ký, nhận OTP, nhập OTP | **Bình thường** (không bị chặn) |
+| Đăng nhập khi đang `REFUSE` | 400 `Account has not been approved yet` (chỉ báo **sau khi** mật khẩu đúng và tài khoản ACTIVE) |
+| Quên mật khẩu khi đang `REFUSE` | Vẫn đặt lại được mật khẩu, nhưng đăng nhập vẫn bị chặn |
+| Đang đăng nhập thì bị đổi sang `REFUSE` | Request **tiếp theo** bị 401 `Unauthorized, please login` (phiên trong Redis không bị xóa, nhưng `CustomUserDetailsService` coi tài khoản là "disabled") |
+| Được đổi lại `ACCEPT` | Token cũ (nếu còn hạn và phiên còn trong Redis) dùng lại được ngay; không thì đăng nhập lại |
+| Đăng ký lại cùng email khi chưa xác thực | `accessStatus` giữ nguyên giá trị cũ |
+
+`accessStatus` **không** có trong `UserProfileResponse` → frontend và Admin không xem được qua API. Đây là thông tin quản trị nội bộ.
+
+### 7.4. Kết hợp 4 trục — ví dụ
+
+| Tài khoản | account_status | role | artist_request_status | access_status | Giải thích |
+|---|---|---|---|---|---|
+| Lan vừa đăng ký | UNVERIFIED | USER | NONE | REFUSE | Chưa nhập OTP |
+| Lan đã nhập OTP | ACTIVE | USER | NONE | REFUSE | Chờ chủ dự án cho phép, chưa đăng nhập được |
+| Lan dùng bình thường | ACTIVE | USER | NONE | ACCEPT | |
+| Lan chờ duyệt nghệ sĩ | ACTIVE | USER | PENDING | ACCEPT | Vẫn là USER cho tới khi được duyệt |
+| Lan là nghệ sĩ | ACTIVE | ARTIST | APPROVED | ACCEPT | |
+| Nghệ sĩ bị khóa | DISABLED | ARTIST | APPROVED | ACCEPT | Role giữ nguyên, nhưng không đăng nhập được, bài hát và playlist công khai bị ẩn |
+| Nghệ sĩ bị thu hồi quyền vào web | ACTIVE | ARTIST | APPROVED | REFUSE | Không đăng nhập được, nhưng **bài hát vẫn hiển thị** với người nghe (điều kiện "đã phát hành" chỉ xét `accountStatus` và `role`) |
+| Minh bị từ chối | ACTIVE | USER | REJECTED | ACCEPT | Có thể gửi lại |
 
 ---
 
@@ -503,7 +593,24 @@ Nếu bạn không yêu cầu mã này, hãy bỏ qua email.
 MySpotify
 ```
 
-Gửi email thất bại (Gmail lỗi, sai mật khẩu ứng dụng, mất mạng) → **503** `"Could not send email, please try again later"`. Vì các luồng gọi OTP đều có `@Transactional`, mọi thay đổi trong database ở lần đó (VD tài khoản vừa tạo) được **hoàn tác** → người dùng chỉ cần thử lại.
+Gửi email thất bại (Gmail lỗi, sai mật khẩu ứng dụng, mất mạng, quá 5 giây) → **503** `"Could not send OTP email, please try again later"`.
+
+Cách hoạt động:
+```
+EmailService.sendOtp
+    try { gửi mail qua Gmail SMTP }
+    catch (bất kỳ lỗi nào) {
+        ghi log ERROR "Could not send OTP email to <email>: <lý do>"
+        ném EmailSendException("Could not send OTP email, please try again later")
+    }
+        │
+        ▼ (EmailSendException là RuntimeException)
+@Transactional của luồng đang chạy (đăng ký, quên mật khẩu...) → HOÀN TÁC mọi thay đổi database lần đó
+        │                                     (VD tài khoản vừa tạo, mã OTP vừa lưu)
+        ▼
+GlobalExceptionHandler → 503 { "message": "Could not send OTP email, please try again later" }
+```
+→ Người dùng chỉ cần thử lại, không bị "kẹt" tài khoản hay mã OTP dở dang. Lý do lỗi thật (sai App Password, Gmail chặn...) chỉ nằm trong log server, không trả về frontend.
 
 ---
 
@@ -562,6 +669,8 @@ Lan đăng nhập trên laptop
 | Tự vô hiệu hóa / xóa tài khoản | Tài khoản không còn dùng được |
 | Admin khóa tài khoản | Người bị khóa phải mất quyền truy cập **ngay**, không đợi token hết hạn |
 
+Riêng **chủ dự án thu hồi quyền vào web** (`REFUSE` bằng SQL) **không** xóa phiên (SQL không đi qua code Java). Người đó vẫn bị chặn ngay từ request tiếp theo, vì mỗi request filter đều đọc lại `accessStatus` từ MySQL (mục 10), nhưng message là `Unauthorized, please login`.
+
 ### 9.4. Đăng nhập (`AuthService.login`)
 
 ```
@@ -571,10 +680,14 @@ Lan đăng nhập trên laptop
         UNVERIFIED → "Account is not verified yet"
         DISABLED   → "Account has been disabled"
         DELETED    → "Account has been deleted"
-4. Tạo sessionId mới, ghi vào Redis (ghi đè phiên cũ)
-5. Tạo JWT chứa email + sessionId
-6. Trả { token, userId, username, role }
+4. Kiểm tra quyền vào web (MỚI):
+        accessStatus ≠ ACCEPT → "Account has not been approved yet"
+5. Tạo sessionId mới, ghi vào Redis (ghi đè phiên cũ)
+6. Tạo JWT chứa email + sessionId
+7. Trả { token, userId, username, role }
 ```
+
+Bước 4 dùng `!= ACCEPT` (không dùng `== REFUSE`) để an toàn: nếu cột này vì lý do nào đó bị `NULL` thì cũng bị chặn. Bước 4 nằm **sau** bước 3 → người chưa xác thực OTP luôn thấy `Account is not verified yet` trước (đúng thứ tự họ cần làm).
 
 **Vì sao sai email và sai mật khẩu trả cùng 1 message?** Nếu trả "Email không tồn tại", kẻ xấu biết được email nào đã đăng ký → đi dò mật khẩu đúng email đó.
 **Vì sao kiểm tra trạng thái sau mật khẩu?** Để người không biết mật khẩu không dò được "tài khoản này đang bị khóa".
@@ -605,7 +718,7 @@ Ví dụ: `PUT /api/admin/users/42/lock` do Admin gửi.
    ├─ Redis: session:{email} có đúng bằng sessionId không?
    │     Không → đánh dấu lỗi "Your session has ended..." → coi như khách
    ├─ Đọc user từ MySQL (CustomUserDetailsService)
-   │     accountStatus ≠ ACTIVE → coi như khách
+   │     accountStatus ≠ ACTIVE hoặc accessStatus ≠ ACCEPT → coi như khách
    └─ Hợp lệ → ghi nhận: "người gọi là admin@gmail.com, quyền ROLE_ADMIN"
 
 ③ RateLimitFilter
@@ -630,7 +743,7 @@ Ví dụ: `PUT /api/admin/users/42/lock` do Admin gửi.
 
 **Hai thông báo 401:**
 - Phiên trong Redis không khớp (đăng nhập nơi khác, đã đăng xuất, bị khóa, đổi mật khẩu / email, vô hiệu hóa, xóa tài khoản — mọi trường hợp xóa phiên ở mục 9.3): `"Your session has ended. Your account may have been logged in on another device"`
-- Mọi trường hợp khác (không token, token sai chữ ký, token hết hạn...): `"Unauthorized, please login"`
+- Mọi trường hợp khác (không token, token sai chữ ký, token hết hạn, bị chủ dự án thu hồi quyền vào web...): `"Unauthorized, please login"`
 
 > Vì message phiên hết hạn dùng chung cho nhiều tình huống, frontend nên hiển thị câu trung tính như "Phiên đăng nhập đã kết thúc, vui lòng đăng nhập lại".
 
@@ -668,7 +781,7 @@ Email đã tồn tại?
 │     └─ Gửi OTP mới (phải cách lần trước ≥ 60 giây)
 └─ KHÔNG
       ├─ Username đã có người dùng → "Username already exists"
-      ├─ Tạo user: UNVERIFIED, role USER, mật khẩu băm BCrypt
+      ├─ Tạo user: UNVERIFIED, role USER, accessStatus REFUSE (MỚI), mật khẩu băm BCrypt
       └─ Gửi OTP (REGISTER)
 → 200 "Registration successful, the account is awaiting OTP verification"
 ```
@@ -693,13 +806,15 @@ Email đã tồn tại?
 
 **Nhận lại mã:** gọi lại A1 (đăng ký) với cùng email. Không có API "gửi lại OTP" riêng.
 
+⚠️ **Xác thực OTP xong chưa đăng nhập được ngay** (MỚI): tài khoản đã `ACTIVE` nhưng `accessStatus` vẫn là `REFUSE`. Người dùng phải chờ chủ dự án cho phép (mục 7.3a). Message thành công vẫn là `Verification successful, the account has been activated` → frontend nên hiện thêm câu "Tài khoản sẽ dùng được sau khi được quản trị cho phép".
+
 ### 11.3. A3 — Đăng nhập
 
 **API:** `POST /api/auth/login`
 ```json
 { "email": "lan@gmail.com", "password": "matkhau123" }
 ```
-Chi tiết ở mục 9.4.
+Chi tiết ở mục 9.4. Thêm lỗi mới: 400 `Account has not been approved yet` (chưa được chủ dự án cho phép vào web).
 
 ### 11.4. A4 + A5 — Quên mật khẩu
 
@@ -730,16 +845,20 @@ Chi tiết ở mục 9.4.
 
 ```
            ┌──────────┐  OTP qua email  ┌────────────┐
- Đăng ký ─►│UNVERIFIED│────────────────►│ verify-otp │──► ACTIVE
-           └──────────┘                 └────────────┘
-                                                          │
-                                                          ▼
-                     ┌───────────────────── login ◄───────┘
+ Đăng ký ─►│UNVERIFIED│────────────────►│ verify-otp │──► ACTIVE (accessStatus vẫn REFUSE)
+           └──────────┘                 └────────────┘                 │
+                                                                       │ Chủ dự án chạy SQL
+                                                                       ▼ access_status = 'ACCEPT'   (MỚI)
+                                                              ACTIVE + ACCEPT
+                                                                       │
+                     ┌───────────────────── login ◄────────────────────┘
                      │                      ▲
                      ▼                      │
                  có token ──► dùng app      │ mật khẩu mới
                                             │
  Quên mật khẩu ──► forgot-password ──OTP──► reset-password
+
+ (login khi còn REFUSE → 400 "Account has not been approved yet")
 ```
 
 ---
@@ -881,6 +1000,8 @@ Trả hồ sơ mới. Ảnh xem được tại `http://<server>/uploads/avatars/
 ```
 Muốn dùng lại → **liên hệ Admin mở khóa** (mục 14.3).
 
+Trong thời gian vô hiệu hóa: bài hát (nếu là ARTIST) và playlist công khai của người đó bị ẩn với người khác, mở khóa thì hiện lại.
+
 ### 12.8. U10 — Xóa tài khoản
 
 **API:** `PUT /api/users/me/delete` (dùng PUT vì chỉ đổi trạng thái, không xóa dữ liệu thật)
@@ -896,6 +1017,7 @@ Muốn dùng lại → **liên hệ Admin mở khóa** (mục 14.3).
 - **Không khôi phục được** qua API.
 - Email và username **vẫn bị giữ** (không đăng ký lại được bằng email đó — `Email already exists`).
 - Nếu là ARTIST: mọi bài hát biến mất khỏi người nghe (xem mục 18).
+- Mọi playlist công khai của người đó **tự ẩn** với người khác (dữ liệu playlist vẫn còn trong database).
 
 **Vì sao xóa mềm?** Giữ toàn vẹn dữ liệu liên quan (bài hát, OTP, lịch sử), tránh người khác đăng ký lại đúng email/username để mạo danh.
 
@@ -1006,6 +1128,17 @@ Trả **mảng** `UserProfileResponse` của **mọi** tài khoản (mọi trạ
 5. Xóa phiên → người bị khóa bị đá ra NGAY LẬP TỨC
 → 200 "Account has been locked"
 ```
+Hệ quả ở module khác: nếu là ARTIST thì mọi bài hát bị ẩn; mọi playlist công khai của người đó bị ẩn với người khác (mục 18). Mở khóa → tất cả hiện lại.
+
+Khóa (Admin) khác thu hồi quyền vào web (chủ dự án) thế nào?
+
+| | Admin khóa (`DISABLED`) | Chủ dự án thu hồi (`REFUSE`) |
+|---|---|---|
+| Ai làm | Tài khoản ADMIN, qua API | Chủ dự án, bằng SQL |
+| Bị đá ra | Ngay (xóa phiên), message `Your session has ended...` | Từ request tiếp theo, message `Unauthorized, please login` |
+| Đăng nhập lại | `Account has been disabled` | `Account has not been approved yet` |
+| Bài hát (nếu là ARTIST), playlist công khai | **Bị ẩn** | **Vẫn hiển thị** |
+| Khóa được ADMIN không | Không | Có (chủ dự án quản lý cả Admin) |
 
 ### 14.3. AD3 — Mở khóa
 
@@ -1051,9 +1184,9 @@ Các chuyển đổi hợp lệ:
 
 Không có API đăng ký Admin. Admin đầu tiên được tạo bằng cách:
 1. Đăng ký + xác thực 1 tài khoản bình thường.
-2. Sửa trực tiếp trong MySQL:
+2. Sửa trực tiếp trong MySQL (nhớ cho phép vào web luôn, nếu không Admin cũng không đăng nhập được):
    ```sql
-   UPDATE users SET role = 'ADMIN' WHERE email = 'admin@gmail.com';
+   UPDATE users SET role = 'ADMIN', access_status = 'ACCEPT' WHERE email = 'admin@gmail.com';
    ```
 Các Admin sau có thể được Admin này nâng quyền qua AD7.
 
@@ -1104,6 +1237,7 @@ Cách đếm: "cửa sổ cố định" — request đầu tiên tạo bộ đ�
 | Token bị đánh cắp | Hết hạn 24 giờ; bị vô hiệu ngay khi đăng nhập lại, đổi mật khẩu, đăng xuất |
 | Chia sẻ tài khoản | Phiên đơn |
 | Tài khoản bị khóa vẫn dùng token cũ | Khóa → xóa phiên; filter còn kiểm tra `accountStatus` mỗi request |
+| Người lạ tự đăng ký để dùng web | (MỚI) Tài khoản mới mặc định `accessStatus = REFUSE`, chỉ chủ dự án cho phép bằng SQL; filter kiểm tra `accessStatus` mỗi request |
 | Sửa tài khoản người khác | Mọi API `/me/...` lấy id từ token, không nhận userId |
 | Đổi email sang email không phải của mình | OTP gửi tới email mới, email mới lưu cùng OTP |
 | Người mượn máy xóa / đổi mật khẩu | Cần mật khẩu hiện tại |
@@ -1131,13 +1265,13 @@ Mọi lỗi trả JSON:
 | JSON sai cú pháp / sai kiểu / role không tồn tại | 400 | `Invalid request data` |
 | Thiếu key file (avatar) | 400 | `File is required` |
 | Tham số URL sai kiểu (`/users/abc/lock`) | 400 | `Invalid parameter: userId` |
-| Chưa đăng nhập / token sai / hết hạn | 401 | `Unauthorized, please login` |
+| Chưa đăng nhập / token sai / hết hạn / bị chủ dự án thu hồi quyền vào web | 401 | `Unauthorized, please login` |
 | Phiên đã bị xóa: đăng nhập nơi khác, đã đăng xuất, bị khóa, đổi mật khẩu / email, vô hiệu hóa, xóa tài khoản | 401 | `Your session has ended. Your account may have been logged in on another device` |
 | Sai role | 403 | `You do not have permission to access this resource` |
 | Trùng dữ liệu ở database (2 người đăng ký cùng username cùng lúc) | 409 | `Data already exists` |
 | Ảnh vượt giới hạn upload tổng | 413 | `File is too large` |
 | Rate limit | 429 | `Too many requests. Please try again in X seconds` |
-| Gửi email thất bại | 503 | `Could not send email, please try again later` |
+| Gửi email OTP thất bại | 503 | `Could not send OTP email, please try again later` |
 | Lỗi không lường trước | 500 | `Internal server error` — **là bug** |
 
 ### 17.3. Vì sao có lỗi 409 dù đã kiểm tra "Username already exists"?
@@ -1152,19 +1286,36 @@ Kiểm tra bằng code chỉ là lớp 1. Ràng buộc `UNIQUE` trong database l
 
 ---
 
-## 18. ẢNH HƯỞNG CỦA MODULE USER LÊN MODULE SONG
+## 18. ẢNH HƯỞNG CỦA MODULE USER LÊN MODULE SONG VÀ PLAYLIST
+
+### 18.1. Lên module Song
 
 | Sự kiện ở module User | Hệ quả ở module Song |
 |---|---|
-| Admin duyệt yêu cầu nghệ sĩ | Người đó dùng được `/api/artist/**`: đăng bài, quản lý bài |
-| Admin **khóa** Artist | Mọi bài của Artist **biến mất** khỏi người nghe (danh sách, tìm kiếm, chi tiết, trang nghệ sĩ, lịch sử nghe). Bài mới của họ không duyệt được (`Artist account is not active`). Không feat được họ |
+| Admin duyệt yêu cầu nghệ sĩ | Người đó dùng được `/api/artist/**`: đăng bài, quản lý bài, canvas, lời bài hát |
+| Admin **khóa** Artist | Mọi bài của Artist **biến mất** khỏi người nghe ở **mọi nơi**: danh sách, tìm kiếm, thể loại, chi tiết, trang nghệ sĩ, lời bài hát, gợi ý, lịch sử nghe, playlist của người khác. Bài mới của họ không duyệt được (`Artist account is not active`). Không feat được họ |
 | Admin **mở khóa** | Mọi bài **xuất hiện lại**, lượt nghe giữ nguyên |
 | Artist tự vô hiệu hóa / xóa tài khoản | Như bị khóa (vĩnh viễn nếu xóa) |
 | Admin đổi ARTIST → USER / ADMIN | Như bị khóa: bài không còn hiển thị vì điều kiện "Artist chính phải là ARTIST". Mất nghệ danh. Đổi lại ARTIST phải gửi yêu cầu mới |
 | Artist đổi nghệ danh | Mọi bài (kể cả bài được feat) hiện nghệ danh mới ngay |
 | Artist được feat bị khóa | Bài **vẫn hiển thị**, nhưng tên người đó bị ẩn khỏi `featuredArtists` |
+| Chủ dự án thu hồi quyền vào web của Artist (`REFUSE`) | Artist không đăng nhập được, nhưng bài **vẫn hiển thị** với người nghe (điều kiện "đã phát hành" không xét `accessStatus`) |
 
-Chi tiết xem `docs/SONG_MODULE.md` mục 8.4 và 18.
+Chi tiết xem `docs/SONG_MODULE.md` mục 8.4 (điều kiện "đã phát hành") và mục 22 (xử lý lỗi).
+
+### 18.2. Lên module Playlist (MỚI)
+
+Mọi tài khoản (USER, ARTIST, ADMIN) đều tạo được playlist (`docs/PLAYLIST_MODULE.md`).
+
+| Sự kiện ở module User | Hệ quả ở module Playlist |
+|---|---|
+| Admin **khóa** / người dùng **tự vô hiệu hóa** / **xóa** tài khoản | Mọi playlist công khai của người đó **tự ẩn** với người khác: không có trong `GET /api/playlists/users/{userId}`, mở thẳng bằng id → `Playlist does not exist`. Dữ liệu playlist **không bị xóa** |
+| Admin **mở khóa** | Playlist công khai **hiện lại** |
+| Artist bị khóa | Bài của Artist đó tự biến mất khỏi **mọi playlist** của mọi người; mở khóa thì hiện lại đúng vị trí cũ |
+| Chủ dự án thu hồi quyền vào web | Người đó không đăng nhập được, nhưng playlist công khai **vẫn hiển thị** với người khác |
+| Sửa họ tên (`fullName`) | Không ảnh hưởng: playlist hiển thị `username` của chủ (`ownerName`), không hiển thị họ tên |
+
+Khi xóa **hẳn** 1 tài khoản bằng SQL (không qua API): phải xóa `playlist_songs` của các playlist của họ → `playlists` → rồi mới xóa `users`, nếu không MySQL báo lỗi khóa ngoại (xem `PLAYLIST_MODULE.md` mục 15.3).
 
 ---
 
@@ -1202,6 +1353,8 @@ axios.interceptors.response.use(
                 // Có thể do: đăng nhập nơi khác, bị khóa, vừa đổi mật khẩu...
                 alert("Phiên đăng nhập đã kết thúc, vui lòng đăng nhập lại.");
             }
+            // "Unauthorized, please login": token hết hạn, token sai,
+            // hoặc bị chủ dự án thu hồi quyền vào web → cứ về trang đăng nhập
             window.location.href = "/login";
         }
         return Promise.reject(err);
@@ -1217,8 +1370,24 @@ axios.interceptors.response.use(
                               ├─ Nút "Gửi lại mã" (ẩn 60 giây đầu)
                               │     → gọi lại /api/auth/register với cùng dữ liệu
                               │
-                              └─ Nhập 6 số → /api/auth/verify-otp ──200──► [Đăng nhập]
+                              └─ Nhập 6 số → /api/auth/verify-otp ──200──► [Màn "Chờ cho phép"] ──► [Đăng nhập]
 ```
+
+Màn **"Chờ cho phép"** (MỚI): sau khi xác thực OTP thành công, tài khoản vẫn chưa đăng nhập được cho tới khi chủ dự án cho phép (mục 7.3a). Nên hiện:
+> "Xác thực email thành công! Tài khoản của bạn sẽ dùng được sau khi được quản trị viên cho phép. Vui lòng liên hệ quản trị viên."
+
+Kèm nút "Đến trang đăng nhập" để người dùng thử lại sau.
+
+Hiển thị lỗi đăng nhập:
+
+| message | Hiển thị gợi ý |
+|---|---|
+| `Email or password is incorrect` | Email hoặc mật khẩu không đúng |
+| `Account is not verified yet` | Tài khoản chưa xác thực email → chuyển sang màn nhập OTP (gọi lại đăng ký để nhận mã mới) |
+| `Account has not been approved yet` | (MỚI) Tài khoản chưa được quản trị viên cho phép sử dụng. Vui lòng liên hệ quản trị viên |
+| `Account has been disabled` | Tài khoản đã bị khóa hoặc vô hiệu hóa. Liên hệ quản trị viên để mở lại |
+| `Account has been deleted` | Tài khoản đã bị xóa |
+| `Could not send OTP email, please try again later` | Không gửi được email, vui lòng thử lại sau (dùng ở màn đăng ký, quên mật khẩu, đổi mật khẩu, đổi email) |
 
 Hiển thị lỗi OTP:
 
@@ -1272,21 +1441,26 @@ Base URL: `http://157.66.100.87:8080`. Dùng email thật để nhận OTP (mẹ
 | 3 | `POST /api/auth/verify-otp` mã sai | 400 `Otp code does not match` |
 | 4 | `POST /api/auth/verify-otp` mã đúng | 200 |
 | 5 | `POST /api/auth/verify-otp` lần nữa | 400 `Account is already verified` |
-| 6 | `POST /api/auth/login` | 200, lưu token |
-| 7 | `GET /api/users/me/profile` | 200, `accountStatus: ACTIVE`, không có `password` |
-| 8 | `PUT /api/users/me/profile` | 200, `fullName` mới |
-| 9 | `POST /api/users/me/avatar` (key `file`) | 200, có `avatarUrl` |
-| 10 | Login lại → dùng token cũ của bước 6 | 401 `Your session has ended...` |
-| 11 | `POST /api/users/me/artist-request` | 200 |
-| 12 | Gửi lại yêu cầu | 400 `An artist request already exists or has been approved` |
-| 13 | Admin: `GET /api/admin/artist-requests` | Có user ở bước 11 |
-| 14 | Admin: `PUT /api/admin/artist-requests/{id}/approve` | 200 |
-| 15 | User: `GET /api/users/me/profile` (không cần login lại) | `role: ARTIST`, `artistRequestStatus: APPROVED` |
-| 16 | Admin: `PUT /api/admin/users/{id}/lock` | 200 |
-| 17 | User: gọi bất kỳ API nào | 401 `Your session has ended...` |
-| 18 | User: login | 400 `Account has been disabled` |
-| 19 | Admin: `PUT /api/admin/users/{id}/unlock` | 200, user login lại được |
-| 20 | `POST /api/users/logout` → dùng lại token | 401 |
+| 6 | `POST /api/auth/login` (chưa được cho phép) | 400 `Account has not been approved yet` (MỚI) |
+| 7 | Chủ dự án chạy SQL: `UPDATE users SET access_status = 'ACCEPT' WHERE email = '...';` | 1 dòng được cập nhật |
+| 8 | `POST /api/auth/login` | 200, lưu token |
+| 9 | `GET /api/users/me/profile` | 200, `accountStatus: ACTIVE`, không có `password`, không có `accessStatus` |
+| 10 | `PUT /api/users/me/profile` | 200, `fullName` mới |
+| 11 | `POST /api/users/me/avatar` (key `file`) | 200, có `avatarUrl` |
+| 12 | Login lại → dùng token cũ của bước 8 | 401 `Your session has ended...` |
+| 13 | `POST /api/users/me/artist-request` | 200 |
+| 14 | Gửi lại yêu cầu | 400 `An artist request already exists or has been approved` |
+| 15 | Admin: `GET /api/admin/artist-requests` | Có user ở bước 13 |
+| 16 | Admin: `PUT /api/admin/artist-requests/{id}/approve` | 200 |
+| 17 | User: `GET /api/users/me/profile` (không cần login lại) | `role: ARTIST`, `artistRequestStatus: APPROVED` |
+| 18 | Admin: `PUT /api/admin/users/{id}/lock` | 200 |
+| 19 | User: gọi bất kỳ API nào | 401 `Your session has ended...` |
+| 20 | User: login | 400 `Account has been disabled` |
+| 21 | Admin: `PUT /api/admin/users/{id}/unlock` | 200, user login lại được |
+| 22 | Chủ dự án chạy SQL đổi user về `REFUSE`, user gọi `GET /api/users/me/profile` bằng token đang dùng | 401 `Unauthorized, please login` (MỚI) |
+| 23 | User: login | 400 `Account has not been approved yet` |
+| 24 | Chủ dự án đổi lại `ACCEPT`, user login | 200 |
+| 25 | `POST /api/users/logout` → dùng lại token | 401 |
 
 ### 20.2. Các trường hợp lỗi nên thử
 
@@ -1311,17 +1485,21 @@ Base URL: `http://157.66.100.87:8080`. Dùng email thật để nhận OTP (mẹ
 | Admin đổi role của Admin khác | `Cannot change role of an admin account` |
 | USER gọi `PUT /api/users/me/artist-profile` | `Only artists can update artist profile` |
 | Token bị sửa 1 ký tự | 401 `Unauthorized, please login` |
+| Tài khoản mới (chưa ACCEPT) gọi `POST /api/auth/forgot-password` | 200, đặt lại mật khẩu được, nhưng đăng nhập vẫn `Account has not been approved yet` |
+| Gmail sai App Password rồi đăng ký | 503 `Could not send OTP email, please try again later`, tài khoản **không** được tạo (kiểm tra bằng SQL) |
 
 ---
 
-## 21. CẤU HÌNH VÀ MÔI TRƯỜNG
+## 21. CẤU HÌNH, MÔI TRƯỜNG VÀ DEPLOY
 
 ### 21.1. Khóa cấu hình liên quan
 
 ```properties
 # JWT
-app.jwt.secret=<chuỗi bí mật dài ≥ 64 ký tự, KHÁC nhau giữa local và VPS>
-app.jwt.expiration-ms=86400000        # 24 giờ
+# secret: chuỗi bí mật dài ≥ 64 ký tự, KHÁC nhau giữa local và VPS
+app.jwt.secret=<chuỗi bí mật>
+# expiration-ms: 86400000 ms = 24 giờ
+app.jwt.expiration-ms=86400000
 
 # Redis
 spring.data.redis.host=localhost
@@ -1331,7 +1509,8 @@ spring.data.redis.port=6379
 spring.mail.host=smtp.gmail.com
 spring.mail.port=587
 spring.mail.username=<gmail gửi OTP>
-spring.mail.password=<App Password 16 ký tự của Gmail, KHÔNG phải mật khẩu Gmail>
+# password: App Password 16 ký tự của Gmail (KHÔNG phải mật khẩu Gmail), viết liền không dấu cách
+spring.mail.password=<App Password>
 spring.mail.properties.mail.smtp.auth=true
 spring.mail.properties.mail.smtp.starttls.enable=true
 spring.mail.properties.mail.smtp.connectiontimeout=5000
@@ -1346,6 +1525,8 @@ app.rate-limit.auth-requests=10
 # Thư mục ảnh đại diện (chung với module Song)
 app.upload-dir=uploads
 ```
+
+⚠️ File `.properties` **không cho ghi chú ở cuối dòng**: viết `app.jwt.expiration-ms=86400000   # 24 giờ` thì giá trị đọc được là cả chuỗi `86400000   # 24 giờ` → ứng dụng không khởi động được. Ghi chú phải nằm trên **1 dòng riêng** bắt đầu bằng `#` (bản tài liệu cũ có ví dụ ghi sai kiểu này, đã sửa).
 
 ⚠️ File cấu hình **không đưa lên GitHub** (có trong `.gitignore`). Ai có `app.jwt.secret` có thể tự tạo token của bất kỳ ai → tuyệt đối không chia sẻ.
 
@@ -1368,7 +1549,30 @@ Nếu không đặt timeout, Gmail chậm có thể làm request đăng ký "tre
 | `app.jwt.secret` | Chuỗi riêng | Chuỗi riêng khác (token local không dùng được trên VPS) |
 | `ddl-auto` | `update` | `validate` |
 
-Thêm giá trị mới vào `AccountStatus`, `Role`, `ArtistRequestStatus`, `OtpPurpose` → cột tương ứng là ENUM của MySQL → phải chạy `ALTER TABLE ... MODIFY COLUMN ... ENUM(...)` liệt kê **đủ mọi giá trị** trên cả local và VPS.
+Thêm giá trị mới vào `AccountStatus`, `Role`, `ArtistRequestStatus`, `OtpPurpose`, `AccessStatus` → cột tương ứng là ENUM của MySQL → phải chạy `ALTER TABLE ... MODIFY COLUMN ... ENUM(...)` liệt kê **đủ mọi giá trị** trên cả local và VPS.
+
+### 21.5. Deploy (MỚI: tự động bằng GitHub Actions)
+
+```
+1. Làm tính năng trên nhánh riêng → push → tạo Pull Request vào main
+2. GitHub Actions build bằng Maven (CI)
+3. Merge Pull Request → GitHub Actions SSH vào VPS chạy deploy.sh
+       (kéo code → build → tắt bản cũ → chạy bản mới với profile prod → kiểm tra sức khỏe)
+4. Xem log trên VPS: tail -f /home/myspotify/app.log
+```
+- **Không** push thẳng lên `main`: mọi thứ lên `main` đều được deploy ngay.
+- VPS dùng `ddl-auto=validate` → thêm cột / bảng mới phải tự chạy SQL trên VPS **trước** khi merge.
+
+### 21.6. Cột `access_status` trên môi trường mới (MỚI)
+
+Máy local (`ddl-auto=update`) Hibernate tự thêm cột. Trên database mới hoặc VPS (`validate`), câu SQL tương đương (tham khảo):
+```sql
+ALTER TABLE users ADD COLUMN access_status ENUM('ACCEPT','REFUSE') NOT NULL DEFAULT 'REFUSE';
+```
+⚠️ Sau khi thêm cột, **mọi tài khoản cũ đều là `REFUSE`** → không ai đăng nhập được, kể cả Admin. Phải cho phép lại những tài khoản cần dùng:
+```sql
+UPDATE users SET access_status = 'ACCEPT' WHERE email IN ('admin@gmail.com', 'lan@gmail.com');
+```
 
 ---
 
@@ -1389,6 +1593,11 @@ Thêm giá trị mới vào `AccountStatus`, `Role`, `ArtistRequestStatus`, `Otp
 | 11 | OTP gửi đồng bộ trong request | Gmail chậm → request chậm (tối đa ~5 giây) | Gửi email bất đồng bộ (`@Async` / hàng đợi) |
 | 12 | Đổi email không thông báo về email cũ | Bị chiếm tài khoản khó phát hiện | Gửi email cảnh báo tới địa chỉ cũ |
 | 13 | Mỗi request đọc user từ MySQL | Thêm 1 truy vấn mỗi request | Cache thông tin user trong Redis |
+| 14 | (MỚI) Quyền vào web chỉ đổi được bằng SQL | Chủ dự án phải vào MySQL mỗi lần cho phép 1 người; Admin không xem được ai đang chờ | API riêng cho chủ dự án (hoặc Admin) + trang "Chờ cho phép" |
+| 15 | (MỚI) Lúc đăng ký / xác thực OTP không báo trước là cần được cho phép | Người dùng chỉ biết khi đăng nhập bị chặn | Thêm câu thông báo vào message sau khi xác thực OTP |
+| 16 | (MỚI) Thu hồi quyền vào web không xóa phiên trong Redis | Token cũ dùng lại được ngay nếu được `ACCEPT` lại trong lúc token còn hạn | Xóa phiên khi thu hồi (cần API để có chỗ gọi `SessionService`) |
+| 17 | (MỚI) Bài hát, playlist công khai của người bị thu hồi quyền vào web vẫn hiển thị | Khác với khi bị Admin khóa | Tùy nghiệp vụ: thêm `accessStatus` vào điều kiện hiển thị nếu muốn ẩn |
+| 18 | (MỚI) Admin không có công cụ xử lý playlist công khai có tên phản cảm | Chỉ có cách khóa cả tài khoản | API Admin ẩn / xóa playlist |
 
 ---
 
@@ -1401,7 +1610,7 @@ Thêm giá trị mới vào `AccountStatus`, `Role`, `ArtistRequestStatus`, `Otp
 Đ: Có thể bạn đã xin mã mới → mã cũ trong email trước đã bị vô hiệu. Luôn dùng mã trong **email mới nhất**.
 
 **H: Đang dùng bình thường tự nhiên bị 401?**
-Đ: Tài khoản vừa đăng nhập ở nơi khác (message `Your session has ended...`), hoặc token hết hạn 24 giờ, hoặc bị Admin khóa, hoặc vừa đổi mật khẩu / email.
+Đ: Tài khoản vừa đăng nhập ở nơi khác (message `Your session has ended...`), hoặc token hết hạn 24 giờ, hoặc bị Admin khóa, hoặc vừa đổi mật khẩu / email, hoặc bị chủ dự án thu hồi quyền vào web (message `Unauthorized, please login`).
 
 **H: Admin vừa duyệt nghệ sĩ, tôi có phải đăng nhập lại không?**
 Đ: Không. Role được đọc từ database mỗi request. Chỉ cần gọi lại `GET /api/users/me/profile` để cập nhật giao diện. (Trường `role` trong kết quả đăng nhập cũ sẽ không tự đổi.)
@@ -1429,6 +1638,24 @@ Thêm giá trị mới vào `AccountStatus`, `Role`, `ArtistRequestStatus`, `Otp
 
 **H: Token đặt ở đâu trong Postman?**
 Đ: Tab Authorization → Bearer Token → dán token (không cần gõ chữ "Bearer").
+
+**H: Đã nhập OTP thành công mà đăng nhập báo `Account has not been approved yet`?**
+Đ: Đúng thiết kế (MỚI). Tài khoản mới phải được chủ dự án cho phép vào web (`access_status = 'ACCEPT'`, mục 7.3a). Liên hệ chủ dự án.
+
+**H: Tôi là Admin mà cũng bị `Account has not been approved yet`?**
+Đ: Quyền vào web độc lập với role. Admin cũng phải `ACCEPT`. Chủ dự án chạy: `UPDATE users SET access_status = 'ACCEPT' WHERE email = '...';`
+
+**H: Admin có cho người khác vào web được không?**
+Đ: Không. Không có API nào đổi `accessStatus`, chỉ chủ dự án đổi bằng SQL.
+
+**H: Đang dùng bình thường bị 401 `Unauthorized, please login`, đăng nhập lại thì báo `Account has not been approved yet`?**
+Đ: Chủ dự án vừa thu hồi quyền vào web của tài khoản.
+
+**H: Thêm cột `access_status` xong không ai đăng nhập được?**
+Đ: Mọi tài khoản cũ nhận giá trị mặc định `REFUSE`. Chạy `UPDATE` cho các tài khoản cần dùng (mục 21.6).
+
+**H: Đăng ký báo 503 `Could not send OTP email...`, tài khoản có bị tạo dở không?**
+Đ: Không. Đăng ký có `@Transactional`, gửi mail lỗi thì mọi thay đổi bị hoàn tác. Sửa cấu hình Gmail (mục 21.2) rồi đăng ký lại. Lý do lỗi thật nằm trong log server (`Could not send OTP email to ...`).
 
 ---
 
@@ -1490,6 +1717,8 @@ Thêm giá trị mới vào `AccountStatus`, `Role`, `ArtistRequestStatus`, `Otp
 | `LoginResponse` | `token`, `userId`, `username`, `role` |
 | `UserProfileResponse` | `id`, `username`, `email`, `fullName`, `avatarUrl`, `accountStatus`, `role`, `artistRequestStatus`, `artistName`, `bio` |
 
+Cố ý **không** trả: `password` (bản băm), `accessStatus` (thông tin quản trị nội bộ của chủ dự án).
+
 ### 24.3. Bảng message lỗi nghiệp vụ
 
 | Message | Ở đâu | Nghĩa |
@@ -1502,6 +1731,8 @@ Thêm giá trị mới vào `AccountStatus`, `Role`, `ArtistRequestStatus`, `Otp
 | `Account is not verified yet` | Đăng nhập | Chưa nhập OTP |
 | `Account has been disabled` | Đăng nhập | Bị khóa / tự vô hiệu hóa |
 | `Account has been deleted` | Đăng nhập | Đã xóa |
+| `Account has not been approved yet` | Đăng nhập | (MỚI) Chưa được chủ dự án cho phép vào web (`accessStatus ≠ ACCEPT`) |
+| `Could not send OTP email, please try again later` | Mọi luồng gửi OTP (503) | Gửi email thất bại, thay đổi database bị hoàn tác |
 | `Account is not active` | Quên mật khẩu, vô hiệu hóa, xóa, gửi / duyệt yêu cầu nghệ sĩ | Tài khoản không ở trạng thái ACTIVE |
 | `Password does not match` | Đổi mật khẩu (bước 1), vô hiệu hóa, xóa | Sai mật khẩu hiện tại |
 | `New email must be different from current email` | Đổi email | Trùng email cũ |
@@ -1539,4 +1770,7 @@ Thêm giá trị mới vào `AccountStatus`, `Role`, `ArtistRequestStatus`, `Otp
 | Quy tắc username / mật khẩu | `dto/.../RegisterRequest.java` (+ các DTO đổi / đặt lại mật khẩu) |
 | Quy tắc khóa, đổi role, duyệt nghệ sĩ | `service/AdminService.java` |
 | Quy tắc tự quản lý tài khoản | `service/UserService.java` |
+| Quyền vào web (giá trị mặc định, chỗ kiểm tra) | `enums/AccessStatus.java`, `entity/User.java` (mặc định `REFUSE`), `AuthService.register` / `login`, `security/CustomUserDetailsService.java` |
+| Cho phép / thu hồi quyền vào web 1 người | Không sửa code — chạy SQL `UPDATE users SET access_status = ...` |
+| Message lỗi gửi email | `service/EmailService.java` (`EmailSendException`) + `exception/GlobalExceptionHandler.java` |
 | Thêm trạng thái / role | `enums/*.java` + `ALTER TABLE` trên local và VPS |
