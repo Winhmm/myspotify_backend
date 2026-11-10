@@ -1,53 +1,109 @@
-# MODULE SONG — TÀI LIỆU NGHIỆP VỤ VÀ LUỒNG XỬ LÝ
+# MODULE SONG — TÀI LIỆU NGHIỆP VỤ, LUỒNG XỬ LÝ VÀ GIẢI THÍCH CODE
 
 > Dự án: **MySpotify Backend** (Spring Boot 4.1, Java 17 trong `pom.xml` — VPS chạy JDK 25, MySQL, Redis, MongoDB)
 > Package gốc: `com.winhmm.myspotify`
-> Cập nhật lần cuối: **08/11/2026** — khớp với code trên nhánh `main` sau Pull Request #11.
-> Đối tượng đọc: thành viên mới trong nhóm (backend, frontend, tester), **không cần biết trước Spring Boot**.
+> Cập nhật lần cuối: **10/11/2026** — khớp với code trên nhánh `main` (code module Song không đổi kể từ Pull Request #11).
+> Đối tượng đọc: thành viên mới trong nhóm (backend, frontend, tester), **kể cả người chưa từng học Spring Boot**.
 > Tài liệu đi kèm:
+> - `docs/USER_MODULE.md` — tài khoản, đăng nhập, xin làm Artist. **Phần A của tài liệu đó là kiến thức nền chung, nên đọc trước.**
 > - `docs/TEST_SONG_POSTMAN.md` — hướng dẫn test từng API bằng Postman.
 > - `docs/GENRE_FRONTEND.md` — hướng dẫn riêng cho frontend phần thể loại nhạc.
 > - `docs/PLAYLIST_MODULE.md` — module Playlist (dùng lại bài hát của module này).
-> - `docs/USER_MODULE.md` — tài khoản, đăng nhập, xin làm Artist.
 
 ---
 
 ## MỤC LỤC
 
-0. [Có gì mới trong bản cập nhật này](#0-có-gì-mới-trong-bản-cập-nhật-này)
-1. [Cách đọc tài liệu này](#1-cách-đọc-tài-liệu-này)
-2. [Module Song giải quyết bài toán gì?](#2-module-song-giải-quyết-bài-toán-gì)
-3. [Từ điển thuật ngữ](#3-từ-điển-thuật-ngữ)
-4. [Danh sách use case và API](#4-danh-sách-use-case-và-api)
-5. [Kiến trúc và vị trí các file](#5-kiến-trúc-và-vị-trí-các-file)
-6. [Hành trình của 1 request](#6-hành-trình-của-1-request)
-7. [Dữ liệu: MySQL, MongoDB và ổ đĩa](#7-dữ-liệu-mysql-mongodb-và-ổ-đĩa)
-8. [Trạng thái và vòng đời bài hát](#8-trạng-thái-và-vòng-đời-bài-hát)
-9. [Luồng nghiệp vụ của ARTIST](#9-luồng-nghiệp-vụ-của-artist)
-10. [Luồng nghiệp vụ của ADMIN](#10-luồng-nghiệp-vụ-của-admin)
-11. [Luồng nghiệp vụ của NGƯỜI NGHE](#11-luồng-nghiệp-vụ-của-người-nghe)
-12. [Lịch sử nghe gần đây (MongoDB)](#12-lịch-sử-nghe-gần-đây-mongodb)
-13. [Thể loại nhạc (Genre)](#13-thể-loại-nhạc-genre)
-14. [Canvas — video nền ngắn của bài hát](#14-canvas--video-nền-ngắn-của-bài-hát)
-15. [Lời bài hát (Lyrics)](#15-lời-bài-hát-lyrics)
-16. [Gợi ý bài hát (Recommendation)](#16-gợi-ý-bài-hát-recommendation)
-17. [Lưu trữ file nhạc, ảnh và video](#17-lưu-trữ-file-nhạc-ảnh-và-video)
-18. [Bảo mật và phân quyền](#18-bảo-mật-và-phân-quyền)
-19. [Xử lý đồng thời (nhiều người thao tác cùng lúc)](#19-xử-lý-đồng-thời-nhiều-người-thao-tác-cùng-lúc)
-20. [Thời gian và múi giờ](#20-thời-gian-và-múi-giờ)
-21. [Phân trang](#21-phân-trang)
-22. [Xử lý lỗi](#22-xử-lý-lỗi)
-23. [Hướng dẫn riêng cho Frontend](#23-hướng-dẫn-riêng-cho-frontend)
-24. [Cấu hình, môi trường và deploy](#24-cấu-hình-môi-trường-và-deploy)
-25. [Giới hạn đã biết và hướng phát triển](#25-giới-hạn-đã-biết-và-hướng-phát-triển)
-26. [Câu hỏi thường gặp](#26-câu-hỏi-thường-gặp)
-27. [Phụ lục](#27-phụ-lục)
+**Mở đầu**
+- 0. [Có gì mới trong bản cập nhật này](#0-có-gì-mới-trong-bản-cập-nhật-này)
+- 1. [Cách đọc tài liệu này](#1-cách-đọc-tài-liệu-này)
+
+**PHẦN A — Kiến thức nền riêng cho module Song** (kiến thức chung: `USER_MODULE.md` Phần A)
+- A1. Cần biết gì trước khi đọc tiếp?
+- A2. Quan hệ giữa các bảng: một – một, nhiều – một, nhiều – nhiều
+- A3. Tải lười (LAZY), "giữ phiên tới hết request" và vấn đề N+1
+- A4. JPQL: tự viết câu truy vấn bằng `@Query`
+- A5. Phân trang và sắp xếp
+- A6. Câu lệnh `UPDATE` trực tiếp: `@Modifying`
+- A7. Khóa lạc quan (optimistic locking) — `@Version`
+- A8. Tự động điền thời gian: `@PrePersist`, `@PreUpdate`
+- A9. MongoDB — database dạng "tài liệu"
+- A10. Chạy nền: `@Async`
+- A11. Upload file: form-data, `MultipartFile` và `@ModelAttribute`
+- A12. Phục vụ file và phát nhạc: HTTP Range, mã 206
+- A13. Đọc "ruột" file: chữ ký đầu file và thời lượng
+- A14. Gọi sang 1 service khác: `RestClient`
+- A15. Regex nâng cao: đọc lời bài hát LRC
+- A16. Builder, generic và `Function`
+- A17. Thời gian: `LocalDateTime` không có múi giờ
+- A18. Redis "chỉ ghi nếu chưa có": chống tăng lượt nghe ảo
+
+**PHẦN B — Nghiệp vụ: hệ thống làm gì**
+- 2. [Module Song giải quyết bài toán gì?](#2-module-song-giải-quyết-bài-toán-gì)
+- 3. [Từ điển thuật ngữ](#3-từ-điển-thuật-ngữ)
+- 4. [Danh sách use case và API](#4-danh-sách-use-case-và-api)
+- 5. [Kiến trúc và vị trí các file](#5-kiến-trúc-và-vị-trí-các-file)
+- 6. [Hành trình của 1 request](#6-hành-trình-của-1-request)
+- 7. [Dữ liệu: MySQL, MongoDB và ổ đĩa](#7-dữ-liệu-mysql-mongodb-và-ổ-đĩa)
+- 8. [Trạng thái và vòng đời bài hát](#8-trạng-thái-và-vòng-đời-bài-hát)
+- 9. [Luồng nghiệp vụ của ARTIST](#9-luồng-nghiệp-vụ-của-artist)
+- 10. [Luồng nghiệp vụ của ADMIN](#10-luồng-nghiệp-vụ-của-admin)
+- 11. [Luồng nghiệp vụ của NGƯỜI NGHE](#11-luồng-nghiệp-vụ-của-người-nghe)
+- 12. [Lịch sử nghe gần đây (MongoDB)](#12-lịch-sử-nghe-gần-đây-mongodb)
+- 13. [Thể loại nhạc (Genre)](#13-thể-loại-nhạc-genre)
+- 14. [Canvas — video nền ngắn của bài hát](#14-canvas--video-nền-ngắn-của-bài-hát)
+- 15. [Lời bài hát (Lyrics)](#15-lời-bài-hát-lyrics)
+- 16. [Gợi ý bài hát (Recommendation)](#16-gợi-ý-bài-hát-recommendation)
+- 17. [Lưu trữ file nhạc, ảnh và video](#17-lưu-trữ-file-nhạc-ảnh-và-video)
+- 18. [Bảo mật và phân quyền](#18-bảo-mật-và-phân-quyền)
+- 19. [Xử lý đồng thời (nhiều người thao tác cùng lúc)](#19-xử-lý-đồng-thời-nhiều-người-thao-tác-cùng-lúc)
+- 20. [Thời gian và múi giờ](#20-thời-gian-và-múi-giờ)
+- 21. [Phân trang](#21-phân-trang)
+- 22. [Xử lý lỗi](#22-xử-lý-lỗi)
+
+**PHẦN C — Đọc code từng file**
+- C0. Cách đọc phần này
+- C1. `SongStatus` · C2. `Song` · C3. `Genre`, `SongLyrics` · C4. `ListeningHistory` (MongoDB)
+- C5. `SongRepository` · C6. Ba repository còn lại · C7. DTO request · C8. DTO response · C9. `SongMapper`
+- C10. `FileStorageService` (phần nhạc, video) · C11. `SongService` · C12. `ListeningHistoryService`
+- C13. `ArtistSongService` · C14. `AdminSongService` · C15. `LyricsService`
+- C16. `RecommendClient` · C17. `RecommendationService`
+- C18. `SongController`, `GenreController` · C19. `ArtistSongController` · C20. `AdminSongController`
+- C21. `LyricsController`, `RecommendationController`, `ListeningHistoryController`
+- C22. Theo dấu: đăng bài → duyệt → nghe
+- C23. Ví dụ luyện tập: tự thêm 1 API mới
+- C24. Bài tập tự kiểm tra (có đáp án)
+
+**PHẦN D — Frontend, cấu hình và phụ lục**
+- 23. [Hướng dẫn riêng cho Frontend](#23-hướng-dẫn-riêng-cho-frontend)
+- 24. [Cấu hình, môi trường và deploy](#24-cấu-hình-môi-trường-và-deploy) (mới: 24.5 thử toàn bộ luồng trên máy của bạn)
+- 25. [Giới hạn đã biết và hướng phát triển](#25-giới-hạn-đã-biết-và-hướng-phát-triển)
+- 26. [Câu hỏi thường gặp](#26-câu-hỏi-thường-gặp)
+- 27. [Phụ lục](#27-phụ-lục) (mới: 27.5 bản đồ file → mục giải thích)
 
 ---
 
 ## 0. CÓ GÌ MỚI TRONG BẢN CẬP NHẬT NÀY
 
-Bản trước (15/10/2026) chỉ mô tả phần đăng bài, kiểm duyệt, nghe nhạc và lịch sử nghe. Từ đó tới nay module Song đã có thêm:
+### 0.1. Bản 10/11/2026 (bản này): viết thêm cho người chưa học Spring Boot
+
+Code module Song **không thay đổi**. Bản này chỉ bổ sung phần giải thích:
+
+| # | Bổ sung | Dành cho | Ở đâu |
+|---|---|---|---|
+| 1 | **Phần A — Kiến thức nền riêng cho module Song**: quan hệ nhiều – nhiều, tải lười và N+1, JPQL, phân trang, `@Modifying`, khóa lạc quan, MongoDB, `@Async`, upload file, phát nhạc bằng HTTP Range, đọc thời lượng file, gọi service Python bằng `RestClient`, regex LRC, Builder và generic... Mọi ví dụ lấy từ code thật | Người chưa học Spring Boot | A1 → A18 |
+| 2 | **Phần C — Đọc code từng file**: trích code thật của mọi file module Song (entity, document, repository, DTO, mapper, service, client, controller), giải thích từng dòng và lý do | Người sẽ đọc / sửa code | C0 → C21 |
+| 3 | **Theo dấu** 1 bài hát từ lúc đăng → duyệt → tới giờ phát hành → người nghe mở → bấm phát → lịch sử nghe, kèm câu SQL, lệnh Redis, MongoDB từng bước | Mọi người | C22 |
+| 4 | **Bài luyện tập** tự thêm API "Top bài nghe nhiều nhất" | Người mới tập code | C23 |
+| 5 | **16 câu hỏi tự kiểm tra** có đáp án | Người mới | C24 |
+| 6 | **Thử toàn bộ luồng Song trên máy cá nhân** (từ tạo tài khoản tới nghe nhạc) | Thành viên mới | 24.5 |
+| 7 | Bản đồ "file → mục giải thích" và vài câu hỏi thường gặp | | 26, 27.5 |
+
+Phần B (mục 2 → 22) và Phần D (mục 23 → 27) giữ nguyên nội dung bản 08/11.
+
+### 0.2. Bản 08/11/2026
+
+Bản trước đó (15/10/2026) chỉ mô tả phần đăng bài, kiểm duyệt, nghe nhạc và lịch sử nghe. Bản 08/11 bổ sung:
 
 | # | Thay đổi | API / file liên quan | Đọc ở mục |
 |---|---|---|---|
@@ -57,31 +113,714 @@ Bản trước (15/10/2026) chỉ mô tả phần đăng bài, kiểm duyệt, n
 | 4 | **Gợi ý bài hát**: hàng chờ phát tiếp, bài khác của cùng nghệ sĩ, bài theo thể loại (có service AI viết bằng Python) | `GET /api/songs/{songId}/recommendations`, `.../recommendations/artist`, `GET /api/recommendations/genres` | 16 |
 | 5 | `SongResponse` và `SongManageResponse` có thêm 3 trường: `canvasUrl`, `genreId`, `genreName` | Mọi API trả bài hát | 11, 13, 14 |
 | 6 | **Lịch sử nghe ghi bất đồng bộ** (`@Async`): API `/play` trả kết quả ngay, không chờ MongoDB | `ListeningHistoryService.record` | 12.3 |
-| 7 | **Xung đột khi 2 người cùng sửa 1 bài** giờ trả **409** kèm message rõ ràng (trước đây là việc "cần kiểm tra") | `GlobalExceptionHandler` | 19.1, 22 |
+| 7 | **Xung đột khi 2 người cùng sửa 1 bài** giờ trả **409** kèm message rõ ràng | `GlobalExceptionHandler` | 19.1, 22 |
 | 8 | **Quyền vào web** (`accessStatus`): tài khoản phải được chủ dự án cho phép (`ACCEPT`) mới đăng nhập và gọi API được | `User.accessStatus`, `CustomUserDetailsService` | 6, 18 |
 | 9 | **Liên kết với Playlist**: bài hát được thêm vào playlist; bài bị ẩn/gỡ tự biến mất khỏi playlist | `PLAYLIST_MODULE.md` | 7.7, 9.8 |
 | 10 | **Deploy tự động**: merge Pull Request vào `main` là GitHub Actions tự build và deploy lên VPS | `.github/workflows` | 24.4 |
-
-Số mục cũ **13 → 23** được đánh lại thành **17 → 27** (chèn 4 mục mới 13–16 ở giữa).
 
 ---
 
 ## 1. CÁCH ĐỌC TÀI LIỆU NÀY
 
-Tài liệu dài, không cần đọc hết một lần. Chọn lộ trình theo vai trò:
+Tài liệu chia 4 phần:
+
+| Phần | Trả lời câu hỏi | Độ khó |
+|---|---|---|
+| **A** (A1 → A18) | "JPQL, phân trang, MongoDB, `@Async`... là gì?" | Trung bình, cần đọc Phần A của `USER_MODULE.md` trước |
+| **B** (mục 2 → 22) | "Module Song làm gì, theo luật nào?" | Không cần đọc code |
+| **C** (C0 → C24) | "Code viết ra sao, từng dòng nghĩa là gì?" | Khó nhất |
+| **D** (mục 23 → 27) | "Frontend gọi thế nào, cấu hình ra sao, tra cứu nhanh" | Tra cứu khi cần |
+
+Lộ trình gợi ý:
 
 | Bạn là | Đọc theo thứ tự | Có thể bỏ qua |
 |---|---|---|
-| **Người mới hoàn toàn** | 0 → 2 → 3 → 4 → 8 → 9 → 10 → 11 → 13 → 16 | 19, 24 |
-| **Frontend** | 0 → 2 → 4 → 8 → **23** → 11 → 13 → 14 → 15 → 16 → 9 → 22 | 5, 6, 17, 19, 24 |
-| **Tester** | 0 → 2 → 4 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 22 → rồi mở `TEST_SONG_POSTMAN.md` | 5, 6, 24 |
-| **Backend sắp sửa code** | Đọc hết, đặc biệt 5, 6, 7, 15, 16, 17, 18, 19 | |
+| **Chưa học Spring Boot, muốn hiểu và code được** | `USER_MODULE.md` Phần A → A1 → A18 → 2 → 4 → 8 → 9 → 10 → 11 → C0 → C24 → 24.5 (tự chạy thử) | |
+| **Người mới, chỉ cần hiểu hệ thống** | 0 → 2 → 3 → 4 → 8 → 9 → 10 → 11 → 13 → 16 | Phần C, 19, 24 |
+| **Frontend** | 0 → 2 → 4 → 8 → **23** → 11 → 13 → 14 → 15 → 16 → 9 → 22 (A11, A12 nếu chưa rõ upload, phát nhạc) | Phần C, 5, 6, 17, 19, 24 |
+| **Tester** | 0 → 2 → 4 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 22 → C24 → rồi mở `TEST_SONG_POSTMAN.md` | Phần C (trừ C24) |
+| **Backend sắp sửa code** | Đọc hết, đặc biệt 5, 6, 7, 15, 16, 17, 18, 19 và cả Phần C | |
+
+Mẹo cho người mới:
+- Đọc Phần C thì mở file thật trong IntelliJ bên cạnh (`Ctrl` + bấm vào tên class / method để nhảy tới).
+- Tự đi hết 1 vòng "đăng bài → duyệt → nghe" trên máy (24.5) là cách hiểu nhanh nhất, vừa làm vừa mở MySQL, Redis, MongoDB xem dữ liệu đổi.
 
 Quy ước trong tài liệu:
 - `chữ như thế này` là tên trong code: class, method, cột database, tên trường JSON.
 - **400 `"Song does not exist"`** nghĩa là server trả mã HTTP 400 kèm JSON `{ "message": "Song does not exist" }`.
 - "Người nghe" = bất kỳ ai đã đăng nhập (USER, ARTIST hay ADMIN đều có thể nghe nhạc).
 - Base URL server: `http://157.66.100.87:8080`. Mọi API (trừ file `/uploads/**`) đều cần header `Authorization: Bearer <token>`.
+- Viết "`USER_MODULE.md` C20" nghĩa là mục C20 của tài liệu module User; viết "C20" không kèm tên file là mục của tài liệu này.
+
+---
+
+## PHẦN A — KIẾN THỨC NỀN RIÊNG CHO MODULE SONG
+
+Module Song dùng **mọi** kiến thức nền của module User (HTTP, JSON, bean, các tầng, JPA cơ bản, Redis, Spring Security, JWT...) và **thêm** khá nhiều thứ mới: quan hệ nhiều – nhiều giữa các bảng, câu truy vấn tự viết, phân trang, khóa lạc quan, MongoDB, chạy nền, upload file, phát nhạc, gọi sang 1 service khác...
+
+- Kiến thức chung: đọc **Phần A của `USER_MODULE.md`** (A1 → A16) trước.
+- Phần A ở đây chỉ giải thích những gì **module Song dùng thêm**. Mỗi mục đều lấy ví dụ từ code thật của module.
+
+---
+
+### A1. Cần biết gì trước khi đọc tiếp?
+
+Tự kiểm tra nhanh. Câu nào chưa trả lời được thì đọc lại mục tương ứng trong `USER_MODULE.md`:
+
+| Câu hỏi | Đọc lại |
+|---|---|
+| `GET` khác `POST`, `PUT`, `DELETE` thế nào? Mã 400, 401, 403, 404 nghĩa là gì? | A2 |
+| JSON viết thế nào? form-data dùng khi nào? | A3 |
+| Bean là gì? Vì sao không thấy ai `new SongService(...)`? | A7 |
+| Controller, Service, Repository, Entity, DTO, Mapper làm việc gì? | A8 |
+| `@Entity`, `@Column`, `findByEmail` sinh SQL thế nào? `save()` lúc nào `INSERT`, lúc nào `UPDATE`? | A9 |
+| `@Transactional` để làm gì? | A9.7 |
+| Redis là gì, `INCR` / `TTL` dùng ra sao? | A10 |
+| `@Valid`, `@NotBlank`, `@Size` hoạt động thế nào? | A11 |
+| Lỗi được biến thành JSON `{"message": ...}` ở đâu? | A12 |
+| `@PreAuthorize("hasRole('ARTIST')")` nghĩa là gì? `authentication.getName()` trả về gì? | A13 |
+
+---
+
+### A2. Quan hệ giữa các bảng: một – một, nhiều – một, nhiều – nhiều
+
+Module User chỉ có 1 quan hệ (OTP thuộc về user). Module Song có đủ 3 loại:
+
+| Loại | Ví dụ đời thường | Trong module Song | Nhãn JPA |
+|---|---|---|---|
+| **Nhiều – một** | Nhiều học sinh thuộc 1 lớp | Nhiều bài hát thuộc **1 nghệ sĩ chính**; nhiều bài hát thuộc **1 thể loại** | `@ManyToOne` |
+| **Một – một** | 1 người có 1 căn cước | 1 bài hát có **tối đa 1 bản lời** | `@OneToOne` |
+| **Nhiều – nhiều** | 1 học sinh học nhiều môn, 1 môn có nhiều học sinh | 1 bài có **nhiều nghệ sĩ feat**, 1 nghệ sĩ được feat trong **nhiều bài** | `@ManyToMany` |
+
+#### A2.1. Nhiều – một: chỉ cần 1 cột khóa ngoại
+
+```java
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = "artist_id", nullable = false)
+private User artist;
+```
+Bảng `songs` có cột `artist_id` chứa id của nghệ sĩ. Trong Java là cả object `User`, trong database chỉ là 1 con số.
+
+#### A2.2. Nhiều – nhiều: cần 1 **bảng trung gian**
+
+1 cột không chứa được nhiều id. Nên phải có bảng thứ 3, mỗi dòng là 1 cặp (bài, nghệ sĩ feat):
+
+```java
+@ManyToMany(fetch = FetchType.LAZY)
+@JoinTable(
+        name = "song_featured_artists",                         // tên bảng trung gian
+        joinColumns = @JoinColumn(name = "song_id"),            // cột trỏ về bảng songs
+        inverseJoinColumns = @JoinColumn(name = "artist_id")    // cột trỏ về bảng users
+)
+private Set<User> featuredArtists = new HashSet<>();
+```
+
+Bài "Hẹn Hò" (id 12) của nghệ sĩ A, feat B (id 5) và C (id 9):
+
+```
+songs                         song_featured_artists         users
+┌────┬──────────┬──────────┐  ┌─────────┬───────────┐      ┌────┬─────────────┐
+│ id │ title    │artist_id │  │ song_id │ artist_id │      │ id │ artist_name │
+├────┼──────────┼──────────┤  ├─────────┼───────────┤      ├────┼─────────────┤
+│ 12 │ Hẹn Hò   │ 3 (A)    │  │ 12      │ 5         │ ───► │ 5  │ B           │
+└────┴──────────┴──────────┘  │ 12      │ 9         │ ───► │ 9  │ C           │
+                              └─────────┴───────────┘      └────┴─────────────┘
+```
+- Bạn **không** cần tự `INSERT` vào bảng trung gian. Gán `song.setFeaturedArtists(tậpNghệSĩ)` rồi `save(song)`, Hibernate tự thêm / xóa các dòng cho khớp.
+- Dùng `Set` (tập hợp, không cho trùng) thay vì `List`: 1 nghệ sĩ không thể được feat 2 lần trong cùng 1 bài.
+
+#### A2.3. Một – một
+
+```java
+@OneToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = "song_id", nullable = false, unique = true)
+private Song song;                         // trong SongLyrics
+```
+Giống nhiều – một, nhưng cột `song_id` có thêm `unique = true` → mỗi bài chỉ có đúng 1 dòng lời.
+
+---
+
+### A3. Tải lười (LAZY), "giữ phiên tới hết request" và vấn đề N+1
+
+#### A3.1. LAZY là gì?
+
+Mọi quan hệ trong module Song đều để `fetch = FetchType.LAZY` (tải lười). Đọc 1 bài hát lên thì Hibernate **chỉ** đọc bảng `songs`. Nghệ sĩ, thể loại, danh sách feat **chưa** được đọc. Thay vào đó Hibernate đặt 1 "người giữ chỗ" (proxy). Khi code chạm vào lần đầu, ví dụ `song.getArtist().getArtistName()`, người giữ chỗ mới chạy thêm 1 câu SQL lấy dữ liệu thật.
+
+Lợi ích: chỉ đọc những gì thật sự dùng. Có những API chỉ cần tên bài, không cần nghệ sĩ.
+
+#### A3.2. "Giữ phiên tới hết request" (Open Session In View)
+
+Câu SQL "lấy thêm" chỉ chạy được khi **phiên làm việc với database** còn mở. `SongMapper` (chạy trong Controller, sau khi Service đã xong) vẫn gọi được `song.getArtist()` là nhờ Spring Boot mặc định bật `spring.jpa.open-in-view=true`: giữ phiên mở **suốt cả request**. Lúc khởi động, log có 1 dòng `WARN` nhắc về chế độ này; đó là bình thường.
+
+Nếu ai đó tắt chế độ này (`spring.jpa.open-in-view=false`), mọi chỗ mapper đọc nghệ sĩ / thể loại / feat sẽ lỗi `LazyInitializationException` → phải sửa lại cách truy vấn trước.
+
+#### A3.3. Vấn đề N+1
+
+Trang danh sách 20 bài:
+```
+1 câu:   SELECT ... FROM songs ... LIMIT 20                    ← lấy 20 bài
++ N câu: với mỗi bài, mapper đọc nghệ sĩ, thể loại, danh sách feat → thêm vài câu SQL
+```
+Tổng cộng "1 + N" câu (N = số bài). Hibernate có nhớ tạm trong 1 request, nên nghệ sĩ hay thể loại lặp lại không bị đọc lại, nhưng số câu SQL vẫn tăng theo kích thước trang. Với quy mô dự án học tập thì chấp nhận được; cách cải thiện (`JOIN FETCH`, `@EntityGraph`) ghi ở mục 25.
+
+---
+
+### A4. JPQL: tự viết câu truy vấn bằng `@Query`
+
+Tên method kiểu `findByEmail` (A9.5 của User) chỉ đủ cho điều kiện đơn giản. Điều kiện "bài **đã phát hành**" gồm 4 điều kiện, ghép cả bảng `users` → phải tự viết.
+
+#### A4.1. JPQL khác SQL thế nào?
+
+JPQL (Java Persistence Query Language) trông giống SQL, nhưng viết bằng **tên class và tên field Java**, không phải tên bảng và tên cột:
+
+| | SQL (MySQL hiểu) | JPQL (Hibernate hiểu, rồi tự dịch sang SQL) |
+|---|---|---|
+| Bảng / class | `songs` | `Song` |
+| Cột / field | `release_at` | `releaseAt` |
+| Đi sang bảng khác | `JOIN users u ON u.id = s.artist_id` rồi `u.account_status` | Viết thẳng `s.artist.accountStatus` |
+| Enum | `'APPROVED'` | Tên đầy đủ: `com.winhmm.myspotify.enums.SongStatus.APPROVED` |
+
+```java
+@Query("SELECT s FROM Song s WHERE " + PUBLISHED_CONDITION)
+Page<Song> findPublished(@Param("now") LocalDateTime now, Pageable pageable);
+```
+- `SELECT s FROM Song s`: "lấy các object `Song`, đặt bí danh là `s`".
+- `:now` là **tham số có tên**. `@Param("now")` nối tham số Java `now` vào chỗ `:now`. Giá trị được điền an toàn (không bị SQL injection).
+
+#### A4.2. Ghép chuỗi điều kiện dùng chung
+
+```java
+String PUBLISHED_CONDITION =
+        "s.status = com.winhmm.myspotify.enums.SongStatus.APPROVED "
+                + "AND s.releaseAt <= :now "
+                + "AND s.artist.accountStatus = com.winhmm.myspotify.enums.AccountStatus.ACTIVE "
+                + "AND s.artist.role = com.winhmm.myspotify.enums.Role.ARTIST";
+```
+Điều kiện "đã phát hành" dùng ở 6 câu truy vấn. Viết 1 lần thành hằng số, các câu `@Query` ghép vào bằng dấu `+`. Sửa luật phát hành → sửa đúng 1 chỗ.
+
+⚠️ Khi ghép chuỗi phải để ý **dấu cách**: mỗi đoạn kết thúc bằng 1 dấu cách (`"... APPROVED "`), riêng đoạn cuối (`"... Role.ARTIST"`) không có, nên câu ghép phía sau phải tự bắt đầu bằng dấu cách (`" AND (..."`). Thiếu dấu cách → 2 từ dính vào nhau → ứng dụng **không khởi động được** vì Hibernate kiểm tra cú pháp mọi `@Query` lúc khởi động.
+
+#### A4.3. Các từ khóa gặp trong `SongRepository`
+
+| Từ khóa | Ý nghĩa | Ví dụ |
+|---|---|---|
+| `LEFT JOIN s.featuredArtists f` | Nối thêm danh sách feat, đặt bí danh `f`. `LEFT` = bài **không có feat vẫn được giữ lại** | Tìm kiếm theo tên nghệ sĩ feat |
+| `DISTINCT` | Bỏ dòng trùng. Bài có 3 feat sau khi JOIN thành 3 dòng → gộp lại còn 1 | `SELECT DISTINCT s ...` |
+| `LOWER(...) LIKE LOWER(CONCAT('%', :keyword, '%'))` | "Có chứa từ khóa", không phân biệt hoa thường. `%` = "bao nhiêu ký tự cũng được" | Tìm "tùng" khớp "Sơn Tùng" |
+| `s.id IN :songIds` | id nằm trong 1 danh sách | Lấy nhiều bài theo danh sách id |
+| `countQuery = "SELECT COUNT(DISTINCT s) ..."` | Câu đếm tổng số dòng, dùng cho phân trang (A5). Truy vấn có `JOIN` + `DISTINCT` thì phải tự viết câu đếm cho đúng | `searchPublished`, `findPublishedByArtist` |
+
+---
+
+### A5. Phân trang và sắp xếp
+
+#### A5.1. Vì sao phải phân trang?
+
+Có 10.000 bài mà API trả hết 1 lần → chậm, tốn mạng, điện thoại đơ. Phân trang = mỗi lần chỉ lấy 1 "trang" (ví dụ 20 bài).
+
+#### A5.2. `Pageable`: "tôi muốn trang nào, mỗi trang bao nhiêu, sắp theo gì"
+
+```java
+PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "releaseAt"))
+```
+- `safePage`: số trang, **bắt đầu từ 0**.
+- `safeSize`: số phần tử mỗi trang.
+- `Sort.by(DESC, "releaseAt")`: sắp theo field `releaseAt`, giảm dần (mới phát hành lên đầu).
+
+Truyền `Pageable` làm tham số cuối của method repository, Spring tự thêm vào câu SQL:
+```sql
+... ORDER BY release_at DESC LIMIT 20 OFFSET 40      -- trang 2 (trang thứ 3), mỗi trang 20
+```
+và tự chạy thêm 1 câu `SELECT COUNT(...)` để biết tổng số dòng.
+
+#### A5.3. `Page<Song>`: kết quả
+
+| Method | Trả về |
+|---|---|
+| `getContent()` | `List<Song>` của trang này |
+| `getNumber()` | Số trang hiện tại |
+| `getSize()` | Kích thước trang |
+| `getTotalElements()` | Tổng số phần tử (mọi trang) |
+| `getTotalPages()` | Tổng số trang |
+
+Dự án không trả thẳng `Page` ra JSON (JSON của nó dài và lộ chi tiết nội bộ Spring) mà đổi sang class riêng `PageResponse` gọn hơn (mục 21, C8).
+
+#### A5.4. Chặn tham số xấu
+
+```java
+int safePage = Math.max(page, 0);                               // page âm → 0
+int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);      // size < 1 → 1; size > 50 → 50
+```
+`Math.max(a, b)` lấy số lớn hơn, `Math.min(a, b)` lấy số nhỏ hơn. Kết hợp 2 hàm = "kẹp" giá trị vào khoảng [1, 50]. Không có bước này, ai đó gọi `?size=1000000` là server phải đọc cả bảng.
+
+#### A5.5. Mẹo "lấy top N" bằng phân trang
+
+Muốn "50 bài nghe nhiều nhất" thì không cần câu truy vấn mới: xin **trang đầu tiên**, cỡ 50, sắp theo lượt nghe giảm dần.
+```java
+PageRequest.of(0, size, Sort.by(Sort.Order.desc("playCount"), Sort.Order.desc("id")))
+```
+Sắp thêm theo `id` giảm dần để 2 bài bằng lượt nghe luôn ra **cùng 1 thứ tự** mỗi lần gọi (bài mới hơn trước). `RecommendationService` dùng mẹo này (C17).
+
+---
+
+### A6. Câu lệnh `UPDATE` trực tiếp: `@Modifying`
+
+Cộng 1 lượt nghe kiểu thông thường:
+```
+đọc bài lên (play_count = 100) → cộng 1 trong Java (101) → save (UPDATE ... SET play_count = 101)
+```
+Nếu 2 người nghe **cùng lúc**: cả 2 cùng đọc ra 100, cùng ghi 101 → **mất 1 lượt**.
+
+Dự án cho database tự cộng, trong **1 câu duy nhất**:
+```java
+@Modifying
+@Transactional
+@Query("UPDATE Song s SET s.playCount = s.playCount + 1 WHERE s.id = :songId")
+int incrementPlayCount(@Param("songId") Long songId);
+```
+- MySQL tự đảm bảo 2 câu `UPDATE` cùng lúc trên 1 dòng được xếp hàng lần lượt → 100 → 101 → 102, không mất lượt nào.
+- `@Modifying`: báo cho Spring đây là câu **thay đổi** dữ liệu (không phải `SELECT`). Thiếu nhãn này → lỗi.
+- `@Transactional`: câu thay đổi dữ liệu bắt buộc chạy trong transaction.
+- Trả về `int` = số dòng bị ảnh hưởng (0 nếu không có bài đó).
+
+Kèm theo, field `playCount` trong Entity có `updatable = false`:
+```java
+@Column(name = "play_count", nullable = false, updatable = false)
+private Long playCount = 0L;
+```
+Nghĩa là: khi Hibernate tự sinh câu `UPDATE` (lúc `save(song)` sau khi Artist sửa tên bài...), nó **không bao giờ** đụng tới cột `play_count`. Nếu không có dòng này, Artist sửa tên bài sẽ ghi đè lượt nghe bằng con số cũ đọc lúc trước. Chỉ câu `incrementPlayCount` mới đổi được cột này.
+
+---
+
+### A7. Khóa lạc quan (optimistic locking) — `@Version`
+
+**Tình huống:** Artist mở trang sửa bài ở 2 tab. Admin bấm duyệt bài cùng lúc Artist bấm lưu tên mới. Hai bên cùng đọc bài lúc trạng thái `PENDING`, rồi cùng ghi. Người ghi sau sẽ **đè mất** thay đổi của người ghi trước mà không ai hay.
+
+**Cách giải:** thêm 1 cột số phiên bản:
+```java
+@Version
+@Column(nullable = false)
+private long version;
+```
+Hibernate tự lo hết:
+```
+Đọc bài: version = 7
+Lưu:     UPDATE songs SET ..., version = 8 WHERE id = 12 AND version = 7
+```
+- Nếu không ai sửa chen ngang: câu `UPDATE` khớp 1 dòng → thành công, version lên 8.
+- Nếu người khác đã lưu trước (version giờ là 8): `WHERE ... version = 7` **không khớp dòng nào** → Hibernate biết có xung đột → ném lỗi → `GlobalExceptionHandler` trả **409** `This data was changed by someone else, please reload and try again`.
+
+Gọi là "lạc quan" vì nó **không khóa** gì trước, cứ để mọi người làm, chỉ kiểm tra lúc ghi (giả định xung đột hiếm). Test tự động `SongOptimisticLockTest` kiểm tra đúng tình huống 2 người cùng sửa 1 bài.
+
+Câu `incrementPlayCount` (A6) **không** tăng version: lượt nghe tăng liên tục, nếu nó tăng version thì Artist đang sửa bài sẽ bị 409 suốt.
+
+---
+
+### A8. Tự động điền thời gian: `@PrePersist`, `@PreUpdate`
+
+```java
+@PrePersist
+protected void onCreate() {
+    createdAt = LocalDateTime.now();
+    updatedAt = LocalDateTime.now();
+}
+
+@PreUpdate
+protected void onUpdate() {
+    updatedAt = LocalDateTime.now();
+}
+```
+- `@PrePersist`: Hibernate **tự gọi** method này ngay trước khi `INSERT` lần đầu.
+- `@PreUpdate`: tự gọi ngay trước mỗi lần `UPDATE`.
+
+Nhờ vậy không Service nào phải nhớ gán `createdAt` / `updatedAt`. Cột `created_at` còn có `updatable = false` → sau lần đầu không bao giờ bị sửa.
+
+`SongLyrics` dán **cả 2 nhãn** lên cùng 1 method `onSave()`: lời bài hát chỉ cần 1 mốc "sửa lần cuối".
+
+---
+
+### A9. MongoDB — database dạng "tài liệu"
+
+#### A9.1. Vì sao có thêm 1 database nữa?
+
+Lịch sử nghe: mỗi lượt nghe 1 bản ghi, ghi **rất nhiều**, chỉ cần đọc "10 bài gần nhất của tôi", và sau 90 ngày có thể vứt. MongoDB hợp với kiểu dữ liệu này (mục 12.2 giải thích kỹ).
+
+#### A9.2. Từ vựng MongoDB so với MySQL
+
+| MySQL | MongoDB |
+|---|---|
+| Database | Database |
+| Bảng (table) | **Collection** (`listening_history`) |
+| Dòng (row) | **Document** (1 lượt nghe) |
+| Cột cố định cho mọi dòng | Mỗi document là 1 cục JSON, các trường có thể khác nhau |
+| `id` tự tăng 1, 2, 3 | `_id` là chuỗi ngẫu nhiên 24 ký tự hệ 16 (ObjectId), ví dụ `6731f0c2a1b2c3d4e5f60718` |
+| JOIN giữa các bảng | **Không có JOIN** kiểu MySQL |
+
+1 document trong `listening_history`:
+```json
+{
+  "_id": "6731f0c2a1b2c3d4e5f60718",
+  "userId": 7,
+  "songId": 12,
+  "playedAt": "2026-11-10T21:30:05.123Z",
+  "_class": "com.winhmm.myspotify.document.ListeningHistory"
+}
+```
+(`_class` do Spring tự thêm, ghi tên class Java. MongoDB lưu thời gian dạng chuẩn quốc tế UTC nên có chữ `Z`; đọc ra Java lại là giờ máy chủ.)
+
+#### A9.3. Code Java
+
+```java
+@Document(collection = "listening_history")                      // ≈ @Entity + @Table
+public class ListeningHistory {
+    @Id
+    private String id;                                           // ObjectId → String
+    private Long userId;
+    private Long songId;
+    private LocalDateTime playedAt;
+}
+
+public interface ListeningHistoryRepository extends MongoRepository<ListeningHistory, String> {
+    List<ListeningHistory> findTop100ByUserIdOrderByPlayedAtDesc(Long userId);
+}
+```
+Đặt tên method để Spring tự sinh truy vấn: **giống hệt** JPA (A9.5 của User), chỉ khác là sinh ra truy vấn MongoDB thay vì SQL.
+
+Chú ý: document chỉ lưu `userId` và `songId` là **con số**, không phải object `User` / `Song`. MongoDB và MySQL là 2 hệ khác nhau, không nối thẳng được với nhau.
+
+#### A9.4. Chỉ mục và TTL
+
+```java
+@CompoundIndex(name = "idx_user_played_at", def = "{'userId': 1, 'playedAt': -1}")
+```
+Chỉ mục 2 trường: `userId` tăng dần (1), `playedAt` giảm dần (-1). Khớp đúng truy vấn "lượt nghe của user X, mới nhất trước".
+
+```java
+@Indexed(name = "idx_played_at_ttl", expireAfter = "90d")
+private LocalDateTime playedAt;
+```
+**TTL index**: MongoDB **tự xóa** document khi `playedAt` đã quá 90 ngày. Không cần viết code dọn dẹp. (Việc xóa do MongoDB chạy định kỳ, nên có thể trễ một chút.)
+
+Các chỉ mục này chỉ được tự tạo khi cấu hình có `spring.data.mongodb.auto-index-creation=true` (mục 24.2).
+
+#### A9.5. "Ghép" dữ liệu 2 database bằng code
+
+Muốn hiển thị lịch sử nghe kèm tên bài, ảnh bìa: MongoDB chỉ có `songId`. Nên code làm 2 bước (mục 12.5, C12):
+1. Lấy danh sách `songId` từ MongoDB.
+2. Lấy các bài đó từ MySQL **bằng 1 câu** `WHERE id IN (...)`, rồi ghép trong Java.
+
+---
+
+### A10. Chạy nền: `@Async`
+
+Ghi lịch sử nghe vào MongoDB (có thể ở tận máy chủ Atlas nước ngoài) mất cả trăm mili giây. Không lý do gì bắt người nghe chờ việc đó.
+
+```java
+@Async
+public void record(Long userId, Long songId) { ... }
+```
+- `@Async`: khi method này được gọi **từ 1 bean khác**, Spring giao nó cho 1 **luồng (thread) khác** chạy, còn luồng hiện tại đi tiếp ngay, không chờ.
+- Ví dụ thực tế: gọi điện đặt bánh rồi cúp máy làm việc khác, không đứng chờ tới lúc bánh nướng xong.
+- Phải có `@EnableAsync` trên class khởi động (`MyspotifyApplication`) thì nhãn này mới có tác dụng.
+
+```
+Luồng xử lý request /play:                 Luồng nền:
+  kiểm tra bài, Redis, +1 lượt nghe
+  gọi listeningHistoryService.record() ───► ghi MongoDB (chậm)
+  trả 200 ngay cho người nghe                  lỗi? → chỉ ghi log WARN
+```
+
+Hệ quả cần nhớ:
+- Lỗi trong method `@Async` **không** quay về được người dùng (request đã trả lời xong rồi). Nên trong `record` có `try / catch` ghi log, người nghe vẫn nhận 200.
+- Method `@Async` trả `void`. Nó không có kết quả gì để trả lại.
+- Gọi method `@Async` **từ chính class của nó** (`this.record(...)`) thì **không** chạy nền: Spring chỉ "chen vào" được khi gọi qua bean khác. Dự án gọi từ `SongService` sang `ListeningHistoryService` nên đúng.
+
+---
+
+### A11. Upload file: form-data, `MultipartFile` và `@ModelAttribute`
+
+#### A11.1. Hai cách nhận dữ liệu trong Controller
+
+| | `@RequestBody` | `@ModelAttribute` |
+|---|---|---|
+| Body dạng | JSON | form-data (hoặc tham số trên URL) |
+| Gửi được file? | **Không** | **Có** |
+| Ai điền vào object | Jackson đọc JSON | Spring đọc từng "ngăn" của form, gọi setter theo **tên ngăn** |
+| Dùng ở module Song | Sửa tên bài, đổi lịch, từ chối bài, lưu lời | **Đăng bài** (có file nhạc, ảnh) |
+
+```java
+@PostMapping(value = "/songs", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+public ResponseEntity<SongManageResponse> uploadSong(Authentication authentication,
+                                                     @Valid @ModelAttribute UploadSongRequest request) { ... }
+```
+Form gửi lên có các ngăn `title`, `genreId`, `audio`, `cover`, `featuredArtistIds`, `releaseAt` → Spring gọi `setTitle(...)`, `setGenreId(...)`, `setAudio(...)`... **Tên ngăn phải khớp tên field** (phân biệt hoa thường).
+
+#### A11.2. `MultipartFile` — 1 file gửi lên
+
+| Method | Trả về |
+|---|---|
+| `isEmpty()` | File rỗng (0 byte) hoặc không chọn file |
+| `getSize()` | Dung lượng, tính bằng byte |
+| `getOriginalFilename()` | Tên file gốc trên máy người gửi, ví dụ `bai-hat.mp3` |
+| `getContentType()` | Loại file do trình duyệt / Postman khai, ví dụ `image/png` |
+| `getInputStream()` | "Vòi" để đọc nội dung file từng chút một |
+
+#### A11.3. Gửi danh sách và thời gian qua form-data
+
+Form-data chỉ chứa **chữ** (và file). Spring tự đổi chữ thành kiểu Java:
+
+| Field | Gửi thế nào | Spring đổi thành |
+|---|---|---|
+| `Long genreId` | `genreId = 7` | `7L` |
+| `List<Long> featuredArtistIds` | **Lặp lại** ngăn: `featuredArtistIds = 5`, `featuredArtistIds = 9`. Hoặc 1 ngăn ngăn cách bằng dấu phẩy: `featuredArtistIds = 5,9` | `[5, 9]` |
+| `LocalDateTime releaseAt` có `@DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)` | `releaseAt = 2026-12-24T20:00:00` | Ngày giờ |
+
+Gửi sai kiểu (ví dụ `genreId = abc`, `releaseAt = 24/12/2026`) → Spring không đổi được → **400** `Invalid value for genreId` (hoặc `releaseAt`). Đó là nhánh `isBindingFailure()` trong `GlobalExceptionHandler` (`USER_MODULE.md` C24).
+
+#### A11.4. Hai lớp giới hạn dung lượng
+
+```properties
+spring.servlet.multipart.max-file-size=100MB
+spring.servlet.multipart.max-request-size=110MB
+```
+1. **Cửa ngoài** (Spring, trước khi vào code): 1 file > 100MB hoặc cả request > 110MB → **413** `File is too large`.
+2. **Cửa trong** (`FileStorageService`, đúng từng loại): MP3 ≤ 20MB, WAV ≤ 100MB, ảnh ≤ 2MB, video ≤ 50MB → **400** kèm message cụ thể.
+
+---
+
+### A12. Phục vụ file và phát nhạc: HTTP Range, mã 206
+
+Nghe nhạc **không** đi qua Controller nào. `WebMvcConfig` (`USER_MODULE.md` C14.2) nối đường dẫn `/uploads/**` với thư mục trên ổ đĩa; trình phát nhạc của trình duyệt tải thẳng file.
+
+File nhạc vài MB. Trình duyệt không tải hết rồi mới phát, mà xin **từng đoạn** bằng header `Range`:
+
+```http
+GET /uploads/songs/audio/3f2a9c1e-....mp3
+Range: bytes=1048576-2097151                 ← "cho tôi đoạn từ byte 1.048.576 tới 2.097.151"
+```
+```http
+HTTP/1.1 206 Partial Content                 ← 206 = "đây là 1 phần của file"
+Content-Range: bytes 1048576-2097151/5242880 ← phần nào, trên tổng bao nhiêu byte
+Accept-Ranges: bytes
+```
+Người nghe kéo thanh thời gian tới phút thứ 3 → trình duyệt tính ra byte tương ứng, xin đúng đoạn đó → **tua tức thì**, không phải tải lại từ đầu. Spring tự làm phần này với file tĩnh; dự án không phải viết dòng code nào.
+
+Vì sao `CorsConfig` có `Content-Range`, `Accept-Ranges` trong danh sách "header JavaScript được đọc"? Để các thư viện trình phát nhạc viết bằng JavaScript đọc được thông tin này.
+
+---
+
+### A13. Đọc "ruột" file: chữ ký đầu file và thời lượng
+
+#### A13.1. Chữ ký đầu file (magic bytes)
+
+Đã giải thích ở `USER_MODULE.md` C20 cho ảnh. Video MP4 cũng có chữ ký: byte thứ 4 → 7 luôn là 4 chữ `ftyp`.
+```
+00 00 00 20 66 74 79 70 69 73 6F 6D ...
+└─ 4 byte ─┘ f  t  y  p
+ (kích thước)
+```
+
+#### A13.2. Thời lượng file nhạc
+
+Server **tự đo** thời lượng, không tin con số người dùng gửi:
+- **MP3**: dùng thư viện `mp3agic` (`new Mp3File(...).getLengthInSeconds()`). File hỏng → thư viện ném lỗi → `Invalid or corrupted audio file`.
+- **WAV**: dùng thư viện có sẵn của Java (`AudioSystem`). File WAV chứa **số khung âm thanh** (frame) và **số khung mỗi giây** → thời lượng = số khung ÷ số khung mỗi giây. Ví dụ 9.261.000 khung ÷ 44.100 khung/giây = 210 giây.
+
+#### A13.3. Thời lượng video MP4 (đọc tay, không cần thư viện)
+
+File MP4 được cấu tạo từ các **"hộp"** (box) lồng nhau. Mỗi hộp bắt đầu bằng 8 byte: 4 byte **kích thước** + 4 byte **tên** (4 chữ cái).
+```
+[ftyp: loại file] [moov: thông tin phim [mvhd: thông số chung: timescale, duration] [trak...] ] [mdat: dữ liệu hình và tiếng]
+```
+- `findBox` đi lần lượt từng hộp: đọc kích thước, đọc tên, đúng tên cần tìm thì trả vị trí, không đúng thì **nhảy qua** đúng bằng kích thước hộp.
+- Tìm `moov` ở cấp ngoài cùng, rồi tìm `mvhd` **bên trong** `moov`.
+- Trong `mvhd` có 2 con số: `timescale` (1 giây chia thành bao nhiêu "tích tắc") và `duration` (phim dài bao nhiêu tích tắc). Thời lượng = `duration ÷ timescale` giây. Ví dụ `duration = 8400`, `timescale = 1000` → 8,4 giây.
+- `mvhd` có 2 phiên bản: bản 0 dùng số 4 byte, bản 1 (phim rất dài) dùng số 8 byte, code đọc cả 2.
+
+Không cần nhớ chi tiết này. Ý chính: **server tự đo thời lượng canvas** để chặn video ngoài khoảng 7–10 giây.
+
+---
+
+### A14. Gọi sang 1 service khác: `RestClient`
+
+#### A14.1. Service gợi ý viết bằng Python
+
+Gợi ý bài theo thể loại do **1 chương trình riêng viết bằng Python** đảm nhận, mặc định chạy cùng máy với backend ở cổng 8000 (`http://127.0.0.1:8000`, mục 16.5). Backend Java gọi sang nó **bằng HTTP**, giống hệt cách frontend gọi backend:
+
+```
+Frontend ──HTTP──► Backend Java (:8080) ──HTTP──► Service Python (:8000)
+                         ▲                              │
+                         └──── danh sách id bài ◄───────┘
+```
+
+#### A14.2. `RestClient` — "Postman viết bằng code"
+
+```java
+RecommendApiResponse response = restClient.post()                   // method POST
+        .uri("/recommend/genres")                                    // đường dẫn (nối sau base-url)
+        .contentType(MediaType.APPLICATION_JSON)                     // body là JSON
+        .body(Map.of("genre_ids", genreIds, "top_n", topN))          // body: Map → Jackson → JSON
+        .retrieve()                                                  // gửi đi, nhận về
+        .body(RecommendApiResponse.class);                           // JSON trả về → object Java
+```
+Request thật được gửi sang Python:
+```http
+POST http://127.0.0.1:8000/recommend/genres
+Content-Type: application/json
+
+{"genre_ids": [1, 7], "top_n": 20}
+```
+
+#### A14.3. Thời gian chờ và phương án dự phòng
+
+Service Python có thể **tắt**, **treo** hoặc **lỗi**. Backend không được chết theo:
+- **Timeout 3 giây** (`app.recommend.timeout-ms`): quá 3 giây không kết nối được / không trả lời → bỏ cuộc.
+- **Bắt lỗi**: mọi lỗi gọi HTTP (`RestClientException`: không kết nối được, quá giờ, Python trả 4xx / 5xx) → ghi log `WARN`, coi như Python trả **danh sách rỗng**.
+- **Phương án B**: nhận danh sách rỗng → tự lấy "bài nhiều lượt nghe nhất trong các thể loại đó" từ MySQL.
+
+Người dùng **luôn** nhận được gợi ý, chỉ là kém "thông minh" hơn khi Python tắt. Kỹ thuật này gọi là **xuống cấp nhẹ nhàng** (graceful degradation).
+
+#### A14.4. Tên trường kiểu Python: `@JsonProperty`
+
+Python quen đặt tên `recommended_ids` (chữ thường, gạch dưới), Java quen `recommendedIds`. Nối 2 bên:
+```java
+@JsonProperty("recommended_ids")
+private List<Long> recommendedIds;
+```
+= "trường JSON tên `recommended_ids` thì đổ vào field `recommendedIds`".
+
+```java
+@JsonIgnoreProperties(ignoreUnknown = true)
+```
+= "JSON có thêm trường nào lạ thì bỏ qua, đừng báo lỗi". Bên Python thêm trường mới (ví dụ `scores`) thì Java vẫn chạy bình thường.
+
+---
+
+### A15. Regex nâng cao: đọc lời bài hát LRC
+
+#### A15.1. Định dạng LRC
+
+```
+[ti:Hẹn Hò]                        ← dòng thẻ thông tin (tên bài) → bỏ qua
+[00:12.50]Anh đứng đây từ chiều    ← mốc 0 phút 12,50 giây
+[00:16.30]Mưa rơi ướt vai
+[01:02]Điệp khúc                   ← không có phần lẻ giây cũng được
+```
+
+#### A15.2. Mổ xẻ regex của dòng có mốc thời gian
+
+```java
+Pattern.compile("^\\[(\\d{1,3}):(\\d{2})(?:[.:](\\d{1,3}))?\\](.*)$")
+```
+Trong chuỗi Java, `\\` = 1 dấu `\`. Bỏ bớt cho dễ đọc:
+```
+^\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\](.*)$
+
+^              đầu dòng
+\[             dấu [ thật (phải có \ vì [ là ký tự đặc biệt của regex)
+(\d{1,3})      NHÓM 1: phút, 1–3 chữ số
+:              dấu :
+(\d{2})        NHÓM 2: giây, đúng 2 chữ số
+(?:            mở 1 nhóm KHÔNG đánh số (chỉ để gom lại)
+  [.:]         1 dấu chấm hoặc dấu hai chấm
+  (\d{1,3})    NHÓM 3: phần lẻ giây, 1–3 chữ số
+)?             cả cụm phần lẻ là TÙY CHỌN (có hoặc không)
+\]             dấu ] thật
+(.*)           NHÓM 4: phần chữ còn lại (có thể rỗng)
+$              cuối dòng
+```
+
+Với dòng `[00:12.50]Anh đứng đây từ chiều`: nhóm 1 = `00`, nhóm 2 = `12`, nhóm 3 = `50`, nhóm 4 = `Anh đứng đây từ chiều`.
+
+#### A15.3. `Pattern` và `Matcher` trong Java
+
+```java
+Matcher matcher = TIMED_LINE.matcher(row);       // đem regex áp vào 1 dòng
+if (matcher.matches()) {                         // cả dòng có khớp không?
+    int minutes = Integer.parseInt(matcher.group(1));   // lấy nội dung nhóm 1, đổi chữ thành số
+    // ...
+}
+```
+`Pattern.compile(...)` khá tốn công, nên dự án biên dịch 1 lần thành hằng số `static final` và dùng lại mãi.
+
+---
+
+### A16. Builder, generic và `Function`
+
+#### A16.1. Builder — tạo object nhiều trường cho dễ đọc
+
+`SongResponse` có 13 trường. Dùng constructor 13 tham số thì rất dễ truyền nhầm thứ tự (`USER_MODULE.md` C7.3 có nói rủi ro này). Dự án dùng **Builder**:
+```java
+SongResponse.builder()
+        .id(song.getId())
+        .title(song.getTitle())
+        .audioUrl(song.getAudioUrl())
+        // ...
+        .build();
+```
+Mỗi dòng ghi rõ **tên trường** đang gán → không thể nhầm. Builder là 1 class con nằm **bên trong** `SongResponse` (static nested class), giữ tạm các giá trị; `build()` mới tạo ra `SongResponse` thật. Mỗi method của Builder trả về chính nó (`return this;`) nên viết nối được `.a().b().c()`.
+
+Dự án **tự viết tay** Builder (không dùng thư viện Lombok), để người mới thấy rõ cơ chế (C8).
+
+#### A16.2. Generic `<T>` — 1 class dùng cho nhiều kiểu
+
+```java
+public class PageResponse<T> {
+    private List<T> content;
+    // ...
+}
+```
+`T` là "kiểu sẽ được điền sau". `PageResponse<SongResponse>` cho người nghe, `PageResponse<SongManageResponse>` cho Admin, **cùng 1 class**. Giống cái hộp dán nhãn "hộp đựng ___", tới lúc dùng mới ghi vào chỗ trống.
+
+#### A16.3. `Function<Song, T>` — truyền "cách làm" vào như 1 tham số
+
+```java
+public static <T> PageResponse<T> toPageResponse(Page<Song> page, Function<Song, T> converter)
+```
+`converter` là **1 hàm**: nhận `Song`, trả `T`. Gọi:
+```java
+SongMapper.toPageResponse(page, SongMapper::toSongResponse)      // người nghe
+SongMapper.toPageResponse(page, SongMapper::toManageResponse)    // Admin
+```
+1 method phân trang dùng cho cả 2 cách đổi. Bên trong gọi `converter.apply(song)` để chạy hàm được truyền vào.
+
+---
+
+### A17. Thời gian: `LocalDateTime` không có múi giờ
+
+- `LocalDateTime` = ngày + giờ, **không** kèm múi giờ. `LocalDateTime.now()` lấy giờ **của máy chủ**.
+- Vì vậy server **phải** đặt múi giờ Việt Nam, nếu không lịch phát hành lệch 7 tiếng (mục 20).
+- So sánh: `a.isAfter(b)` (a sau b), `a.isBefore(b)` (a trước b). "Đã tới giờ phát hành" = `!releaseAt.isAfter(now)` = "giờ phát hành **không** ở sau bây giờ" = đã tới hoặc đã qua.
+- Định dạng JSON (chuẩn ISO-8601): `2026-12-24T20:00:00`. Chữ `T` ngăn cách ngày và giờ.
+
+---
+
+### A18. Redis "chỉ ghi nếu chưa có": chống tăng lượt nghe ảo
+
+```java
+Boolean firstTime = redisTemplate.opsForValue()
+        .setIfAbsent("play:" + songId + ":" + email, "1", PLAY_COOLDOWN);
+```
+`setIfAbsent` = lệnh Redis `SET key value NX EX 30`:
+- `NX` = "chỉ ghi nếu khóa **chưa tồn tại**". Ghi được → trả `true`; khóa đã có → không ghi, trả `false`.
+- `EX 30` = khóa sống 30 giây.
+
+```
+21:00:00  Lan nghe bài 12 → khóa play:12:lan@gmail.com chưa có → ghi được (true)  → +1 lượt nghe
+21:00:10  Lan bấm phát lại → khóa còn (sống tới 21:00:30)   → không ghi (false) → không cộng
+21:00:45  Lan nghe lại   → khóa đã hết hạn, tự xóa          → ghi được (true)  → +1 lượt nghe
+```
+Lệnh này **nguyên tử**: 10 request cùng lúc thì đúng 1 request nhận `true`. Bấm phát lại liên tục (hoặc dùng công cụ spam) không làm tăng lượt nghe ảo.
+
+---
+
+**Hết Phần A.** Đọc tiếp Phần B (mục 2 → 22, nghiệp vụ) hoặc nhảy thẳng sang Phần C (đọc code).
+
+---
+
+## PHẦN B — NGHIỆP VỤ: HỆ THỐNG LÀM GÌ
+
+Phần này mô tả **luật nghiệp vụ** và **luồng xử lý** của module Song mà không cần đọc code. Gặp từ lạ → tra Phần A (của tài liệu này hoặc của `USER_MODULE.md`). Muốn xem đoạn code thật tương ứng → Phần C.
 
 ---
 
@@ -2171,6 +2910,2503 @@ Lớp 2 — Service: kiểm tra NGHIỆP VỤ, cần đọc database / file / gi
 
 ---
 
+## PHẦN C — ĐỌC CODE TỪNG FILE CỦA MODULE SONG
+
+### C0. Cách đọc phần này
+
+- Code trích là code thật trên nhánh `main`, đã **bỏ comment** và dòng `import`. File thật trong IntelliJ có comment tiếng Việt rất chi tiết, nên mở song song.
+- `// ...` = đoạn lặp lại hoặc không quan trọng, đã lược. Các chú thích `// ①`, `// BƯỚC ...` do tài liệu thêm cho dễ theo dõi.
+- Getter / setter viết tay đều theo 1 khuôn như module User (`USER_MODULE.md` A5.2), không nhắc lại.
+- Thứ tự đọc **từ dưới lên**: dữ liệu → truy vấn → DTO → mapper → service → controller.
+
+```
+C1  SongStatus                       (5 trạng thái bài)
+C2  Song                             (bảng songs + song_featured_artists)
+C3  Genre, SongLyrics                (bảng genres, song_lyrics)
+C4  ListeningHistory                 (collection MongoDB)
+C5  SongRepository                   (mọi truy vấn bài hát)
+C6  3 repository còn lại
+C7  DTO request                      (dữ liệu nhận vào)
+C8  DTO response                     (dữ liệu trả ra, Builder)
+C9  SongMapper                       (Entity → DTO, lọc feat)
+C10 FileStorageService               (phần nhạc, video)
+C11 SongService                      (người nghe)
+C12 ListeningHistoryService          (lịch sử nghe, chạy nền)
+C13 ArtistSongService                (nghệ sĩ quản lý bài)
+C14 AdminSongService                 (duyệt, từ chối, gỡ)
+C15 LyricsService                    (đọc / kiểm tra lời LRC)
+C16 RecommendClient                  (gọi service Python)
+C17 RecommendationService            (3 kiểu gợi ý)
+C18 SongController, GenreController
+C19 ArtistSongController
+C20 AdminSongController
+C21 LyricsController, RecommendationController, ListeningHistoryController
+C22 Theo dấu: đăng bài → duyệt → nghe
+C23 Ví dụ luyện tập: tự thêm 1 API mới
+C24 Bài tập tự kiểm tra (có đáp án)
+```
+
+---
+
+### C1. `enums/SongStatus.java`
+
+```java
+public enum SongStatus {
+    PENDING,
+    APPROVED,
+    REJECTED,
+    HIDDEN,
+    DELETED
+}
+```
+
+| Giá trị | Nghĩa | Ai đưa bài vào trạng thái này |
+|---|---|---|
+| `PENDING` | Chờ Admin duyệt | Artist đăng bài; Artist sửa bài đang `REJECTED` |
+| `APPROVED` | Đã duyệt | Admin duyệt; Artist hiện lại bài đang ẩn |
+| `REJECTED` | Bị từ chối / bị gỡ | Admin từ chối bài chờ; Admin gỡ bài đã duyệt |
+| `HIDDEN` | Artist tự ẩn | Artist ẩn bài đã duyệt |
+| `DELETED` | Đã xóa (xóa mềm) | Artist xóa bài |
+
+Sơ đồ chuyển trạng thái đầy đủ: mục 8.2. **Chỉ `APPROVED`** mới có thể "đã phát hành" (mục 8.4).
+
+---
+
+### C2. `entity/Song.java` — bảng `songs`
+
+```java
+@Entity
+@Table(
+        name = "songs",
+        indexes = {
+                @Index(name = "idx_songs_status_release", columnList = "status, release_at"),
+                @Index(name = "idx_songs_artist_status", columnList = "artist_id, status")
+        }
+)
+public class Song {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "artist_id", nullable = false)
+    private User artist;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "song_featured_artists",
+            joinColumns = @JoinColumn(name = "song_id"),
+            inverseJoinColumns = @JoinColumn(name = "artist_id")
+    )
+    private Set<User> featuredArtists = new HashSet<>();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "genre_id")
+    private Genre genre;
+
+    @Column(nullable = false, length = 150)
+    private String title;
+
+    @Column(name = "audio_url", nullable = false, length = 255)
+    private String audioUrl;
+
+    @Column(name = "cover_url", length = 255)
+    private String coverUrl;
+
+    @Column(name = "canvas_url", length = 255)
+    private String canvasUrl;
+
+    @Column(name = "duration_seconds", nullable = false)
+    private Integer durationSeconds;
+
+    @Column(name = "play_count", nullable = false, updatable = false)
+    private Long playCount = 0L;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private SongStatus status = SongStatus.PENDING;
+
+    @Column(name = "release_at")
+    private LocalDateTime releaseAt;
+
+    @Column(name = "reject_reason", length = 255)
+    private String rejectReason;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Version
+    @Column(nullable = false)
+    private long version;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
+    // ... getter, setter
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| `idx_songs_status_release` (`status, release_at`) | Chỉ mục cho câu hỏi hay gặp nhất: "bài nào `APPROVED` và đã tới giờ phát hành" (mọi danh sách của người nghe) |
+| `idx_songs_artist_status` (`artist_id, status`) | Cho câu "bài của nghệ sĩ X, trừ bài đã xóa" (trang "Bài hát của tôi") |
+| `artist` — `@ManyToOne` LAZY, `nullable = false` | Nghệ sĩ **chính**, bắt buộc có (A2.1, A3) |
+| `featuredArtists` — `@ManyToMany` + `@JoinTable` | Các nghệ sĩ feat, lưu ở bảng trung gian `song_featured_artists` (A2.2) |
+| `= new HashSet<>()` | Khởi tạo sẵn tập rỗng. Bài không có feat thì là tập rỗng, không phải `null` → code duyệt `for (User u : song.getFeaturedArtists())` không bị lỗi |
+| `genre` — **không** có `nullable = false` | Bài đăng **trước khi** có tính năng thể loại không có thể loại. Code luôn kiểm tra `genre != null` trước khi dùng (C9, C17) |
+| `title`, `length = 150` | Khớp `@Size(max = 150)` của DTO |
+| `audioUrl` bắt buộc; `coverUrl`, `canvasUrl` được trống | Bài phải có nhạc; ảnh bìa và canvas là tùy chọn |
+| `durationSeconds` | Do server **tự đo** khi đăng (A13.2), không nhận từ người dùng |
+| `playCount`, `updatable = false`, `= 0L` | Bắt đầu từ 0; **chỉ** đổi được qua câu `incrementPlayCount` (A6) |
+| `status = SongStatus.PENDING` | Bài mới luôn chờ duyệt |
+| `releaseAt` | Giờ phát hành. `null` = "phát hành ngay khi được duyệt" (lúc duyệt sẽ tự gán giờ duyệt, C14) |
+| `rejectReason` | Lý do Admin từ chối / gỡ. Xóa về `null` khi bài được gửi duyệt lại |
+| `createdAt` (`updatable = false`), `updatedAt` | Tự điền bằng `@PrePersist` / `@PreUpdate` (A8) |
+| `@Version long version` | Chống 2 người cùng sửa đè nhau (A7) |
+
+---
+
+### C3. `Genre` và `SongLyrics`
+
+#### C3.1. `entity/Genre.java` — bảng `genres`
+
+```java
+@Entity
+@Table(name = "genres")
+public class Genre {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true, length = 50)
+    private String name;
+
+    // ... getter, setter
+}
+```
+Bảng nhỏ, 25 dòng cố định (Pop, V-Pop, Ballad...). **Không có API** thêm / sửa / xóa thể loại: dữ liệu được thêm 1 lần bằng câu `INSERT` (mục 24.2a). `name` unique → không có 2 thể loại trùng tên.
+
+#### C3.2. `entity/SongLyrics.java` — bảng `song_lyrics`
+
+```java
+@Entity
+@Table(name = "song_lyrics")
+public class SongLyrics {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "song_id", nullable = false, unique = true)
+    private Song song;
+
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String content;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    @PreUpdate
+    protected void onSave() {
+        updatedAt = LocalDateTime.now();
+    }
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| Bảng riêng, không phải 1 cột trong `songs` | Lời bài hát dài (tới 10.000 ký tự). Để riêng thì mọi câu đọc danh sách bài không phải kéo theo cục chữ lớn này |
+| `@OneToOne` + `unique = true` | Mỗi bài tối đa 1 bản lời (A2.3) |
+| `columnDefinition = "TEXT"` | Bảo Hibernate tạo cột kiểu `TEXT` của MySQL (chứa tới ~65.000 byte), thay vì `VARCHAR(255)` mặc định |
+| `content` | Lưu **chữ đã chuẩn hóa** (mục 15.5, C15), không phải nguyên văn người dùng gửi |
+| `@PrePersist` + `@PreUpdate` trên cùng 1 method | Lưu lần đầu hay sửa đều cập nhật `updatedAt` (A8) |
+
+---
+
+### C4. `document/ListeningHistory.java` — collection MongoDB
+
+```java
+@Document(collection = "listening_history")
+@CompoundIndex(name = "idx_user_played_at", def = "{'userId': 1, 'playedAt': -1}")
+public class ListeningHistory {
+
+    @Id
+    private String id;
+
+    private Long userId;
+    private Long songId;
+
+    @Indexed(name = "idx_played_at_ttl", expireAfter = "90d")
+    private LocalDateTime playedAt;
+
+    public ListeningHistory() {}
+
+    public ListeningHistory(Long userId, Long songId, LocalDateTime playedAt) {
+        this.userId = userId;
+        this.songId = songId;
+        this.playedAt = playedAt;
+    }
+
+    // ... getter, setter
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| Nằm ở package `document/`, không phải `entity/` | Quy ước của dự án: `entity` = MySQL, `document` = MongoDB |
+| `@Document(collection = "listening_history")` | "Class này là 1 loại document, lưu trong collection `listening_history`" (A9) |
+| `@Id private String id` | MongoDB tự sinh ObjectId; Spring đổi sang chuỗi 24 ký tự |
+| `userId`, `songId` là **số**, không phải `User` / `Song` | Không nối thẳng được MongoDB với MySQL (A9.3) |
+| `@CompoundIndex` | Chỉ mục (userId tăng, playedAt giảm) cho truy vấn "lịch sử của tôi, mới nhất trước" |
+| `@Indexed(expireAfter = "90d")` | TTL: MongoDB tự xóa lượt nghe cũ hơn 90 ngày (A9.4) |
+| Constructor rỗng `ListeningHistory() {}` | Spring Data cần để tạo object khi **đọc** từ MongoDB lên |
+| Constructor 3 tham số | Cho code tạo nhanh 1 lượt nghe mới: `new ListeningHistory(userId, songId, LocalDateTime.now())` |
+
+---
+
+### C5. `repository/SongRepository.java` — mọi truy vấn bài hát
+
+#### C5.1. Hai điều kiện dùng chung
+
+```java
+public interface SongRepository extends JpaRepository<Song, Long> {
+
+    String PUBLISHED_CONDITION =
+            "s.status = com.winhmm.myspotify.enums.SongStatus.APPROVED "
+                    + "AND s.releaseAt <= :now "
+                    + "AND s.artist.accountStatus = com.winhmm.myspotify.enums.AccountStatus.ACTIVE "
+                    + "AND s.artist.role = com.winhmm.myspotify.enums.Role.ARTIST";
+
+    String ACTIVE_FEATURED_CONDITION =
+            "f.accountStatus = com.winhmm.myspotify.enums.AccountStatus.ACTIVE "
+                    + "AND f.role = com.winhmm.myspotify.enums.Role.ARTIST";
+```
+- Biến khai báo trong interface tự động là `public static final` (hằng số), dù không ghi.
+- `PUBLISHED_CONDITION` = 4 điều kiện "đã phát hành" (mục 8.4): đã duyệt, đã tới giờ, nghệ sĩ chính còn hoạt động, còn là ARTIST. Bí danh của bài **phải là `s`**.
+- `ACTIVE_FEATURED_CONDITION`: nghệ sĩ feat còn hoạt động và còn là ARTIST. Bí danh của nghệ sĩ feat **phải là `f`**.
+
+#### C5.2. Truy vấn cho người nghe
+
+```java
+    @Query("SELECT s FROM Song s WHERE " + PUBLISHED_CONDITION)
+    Page<Song> findPublished(@Param("now") LocalDateTime now, Pageable pageable);
+
+    @Query("SELECT s FROM Song s WHERE s.genre.id = :genreId AND " + PUBLISHED_CONDITION)
+    Page<Song> findPublishedByGenre(@Param("genreId") Long genreId,
+                                    @Param("now") LocalDateTime now,
+                                    Pageable pageable);
+
+    @Query("SELECT s FROM Song s WHERE s.id = :songId AND " + PUBLISHED_CONDITION)
+    Optional<Song> findPublishedById(@Param("songId") Long songId,
+                                     @Param("now") LocalDateTime now);
+
+    @Query("SELECT s FROM Song s WHERE s.id IN :songIds AND " + PUBLISHED_CONDITION)
+    List<Song> findPublishedByIds(@Param("songIds") Collection<Long> songIds,
+                                  @Param("now") LocalDateTime now);
+```
+
+| Method | Dùng cho | Ghi chú |
+|---|---|---|
+| `findPublished` | Trang chủ, danh sách bài; bể ứng viên "bài phổ biến" của gợi ý | Có `Pageable` → phân trang + sắp xếp (A5) |
+| `findPublishedByGenre` | Lọc theo thể loại; gợi ý theo thể loại | `s.genre.id` = đi từ bài sang thể loại, lấy id |
+| `findPublishedById` | Chi tiết bài, ghi lượt nghe, xem lời, làm "bài gốc" của gợi ý | Bài chưa phát hành → `Optional` rỗng → `Song does not exist`. Người nghe **không phân biệt được** "không tồn tại" với "chưa phát hành" |
+| `findPublishedByIds` | Lịch sử nghe, gợi ý từ Python | Lấy nhiều bài trong **1 câu** (`IN`), thay vì gọi từng bài |
+
+Tham số `now` do Service truyền vào (`LocalDateTime.now()`), không viết `CURRENT_TIMESTAMP` trong câu truy vấn. Lợi ích: test được bằng cách truyền 1 thời điểm giả, và giờ lấy đúng theo máy chủ Java (mục 20).
+
+#### C5.3. Tìm kiếm và trang nghệ sĩ (có `JOIN` + `DISTINCT` + `countQuery`)
+
+```java
+    @Query(value = "SELECT DISTINCT s FROM Song s LEFT JOIN s.featuredArtists f "
+            + "WHERE " + PUBLISHED_CONDITION + " AND ("
+            + "LOWER(s.title) LIKE LOWER(CONCAT('%', :keyword, '%')) "
+            + "OR LOWER(s.artist.artistName) LIKE LOWER(CONCAT('%', :keyword, '%')) "
+            + "OR (LOWER(f.artistName) LIKE LOWER(CONCAT('%', :keyword, '%')) AND " + ACTIVE_FEATURED_CONDITION + "))",
+            countQuery = "SELECT COUNT(DISTINCT s) FROM Song s LEFT JOIN s.featuredArtists f "
+                    + "WHERE " + PUBLISHED_CONDITION + " AND ("
+                    + "LOWER(s.title) LIKE LOWER(CONCAT('%', :keyword, '%')) "
+                    + "OR LOWER(s.artist.artistName) LIKE LOWER(CONCAT('%', :keyword, '%')) "
+                    + "OR (LOWER(f.artistName) LIKE LOWER(CONCAT('%', :keyword, '%')) AND " + ACTIVE_FEATURED_CONDITION + "))")
+    Page<Song> searchPublished(@Param("keyword") String keyword,
+                               @Param("now") LocalDateTime now,
+                               Pageable pageable);
+```
+Đọc từng phần:
+```
+SELECT DISTINCT s                                   lấy các bài, bỏ trùng
+FROM Song s LEFT JOIN s.featuredArtists f           nối thêm feat (bài không feat vẫn giữ)
+WHERE <đã phát hành>
+  AND (   tên bài chứa từ khóa
+       OR nghệ danh nghệ sĩ chính chứa từ khóa
+       OR (nghệ danh 1 người feat chứa từ khóa AND người feat đó còn hoạt động) )
+```
+- Vì sao `DISTINCT`? Bài có 3 feat → `JOIN` ra 3 dòng; nếu cả 3 cùng khớp thì bài xuất hiện 3 lần. `DISTINCT` gộp lại.
+- Vì sao điều kiện feat phải kèm `ACTIVE_FEATURED_CONDITION`? Người feat bị khóa thì **không hiện** trong bài (C9), nên tìm theo tên họ cũng không được ra bài đó.
+- Vì sao tự viết `countQuery`? Spring tự sinh câu đếm từ câu chính, nhưng với `DISTINCT` + `JOIN` dễ đếm sai (đếm cả dòng trùng) → tổng số trang sai. Tự viết `COUNT(DISTINCT s)` cho chắc.
+
+```java
+    @Query(value = "SELECT DISTINCT s FROM Song s LEFT JOIN s.featuredArtists f "
+            + "WHERE " + PUBLISHED_CONDITION
+            + " AND (s.artist.id = :artistId OR f.id = :artistId)",
+            countQuery = "SELECT COUNT(DISTINCT s) FROM Song s LEFT JOIN s.featuredArtists f "
+                    + "WHERE " + PUBLISHED_CONDITION
+                    + " AND (s.artist.id = :artistId OR f.id = :artistId)")
+    Page<Song> findPublishedByArtist(@Param("artistId") Long artistId,
+                                     @Param("now") LocalDateTime now,
+                                     Pageable pageable);
+```
+Trang nghệ sĩ: bài người đó **hát chính** (`s.artist.id`) **hoặc được feat** (`f.id`). Chú ý chuỗi bắt đầu bằng `" AND ("` có dấu cách ở đầu (A4.2).
+
+#### C5.4. Cộng lượt nghe
+
+```java
+    @Modifying
+    @Transactional
+    @Query("UPDATE Song s SET s.playCount = s.playCount + 1 WHERE s.id = :songId")
+    int incrementPlayCount(@Param("songId") Long songId);
+```
+Đã giải thích ở A6.
+
+#### C5.5. Truy vấn sinh từ tên method (cho Artist và Admin)
+
+```java
+    List<Song> findByArtistIdAndStatusNotOrderByCreatedAtDesc(Long artistId, SongStatus status);
+    Optional<Song> findByIdAndArtistId(Long id, Long artistId);
+    Page<Song> findByStatusNot(SongStatus status, Pageable pageable);
+    Page<Song> findByStatus(SongStatus status, Pageable pageable);
+}
+```
+
+| Method | SQL tương đương (gọn) | Dùng cho |
+|---|---|---|
+| `findByArtistIdAndStatusNotOrderByCreatedAtDesc(id, DELETED)` | `WHERE artist_id = ? AND status <> 'DELETED' ORDER BY created_at DESC` | "Bài hát của tôi" (không phân trang) |
+| `findByIdAndArtistId(songId, artistId)` | `WHERE id = ? AND artist_id = ?` | **Chốt bảo mật**: Artist chỉ lấy được bài **của chính mình**. Đoán id bài người khác → không tìm thấy → `Song does not exist` |
+| `findByStatusNot(DELETED, pageable)` | `WHERE status <> 'DELETED'` + phân trang | Admin xem mọi bài (không lọc trạng thái) |
+| `findByStatus(status, pageable)` | `WHERE status = ?` + phân trang | Admin lọc theo 1 trạng thái |
+
+`ArtistId` trong tên method: Spring hiểu là `artist.id` (đi từ field `artist` sang `id` của nó). `StatusNot` = "khác".
+
+---
+
+### C6. Ba repository còn lại
+
+```java
+public interface GenreRepository extends JpaRepository<Genre, Long> {
+    List<Genre> findAllByOrderByNameAsc();
+}
+```
+`findAll` + `OrderByNameAsc` = lấy hết, sắp theo tên A → Z. Chữ `By` đứng 1 mình (không có điều kiện) là bắt buộc trong cú pháp.
+
+```java
+public interface SongLyricsRepository extends JpaRepository<SongLyrics, Long> {
+    Optional<SongLyrics> findBySongId(Long songId);
+}
+```
+Tìm lời theo id bài (`song.id`).
+
+```java
+public interface ListeningHistoryRepository extends MongoRepository<ListeningHistory, String> {
+    List<ListeningHistory> findTop100ByUserIdOrderByPlayedAtDesc(Long userId);
+}
+```
+- Kế thừa `MongoRepository` (không phải `JpaRepository`) → làm việc với MongoDB. Khóa chính kiểu `String`.
+- Lấy **100** lượt nghe gần nhất (không phải 10). Lý do: 1 bài nghe nhiều lần chiếm nhiều lượt; lấy dư rồi gộp trùng mới đủ 10 bài **khác nhau** (C12).
+
+---
+
+### C7. DTO request — dữ liệu nhận vào
+
+#### C7.1. `UploadSongRequest` — đăng bài (form-data)
+
+```java
+public class UploadSongRequest {
+
+    @NotBlank(message = "Title is required")
+    @Size(max = 150, message = "Title must not exceed 150 characters")
+    private String title;
+
+    @NotNull(message = "Genre is required")
+    private Long genreId;
+
+    @NotNull(message = "Audio file is required")
+    private MultipartFile audio;
+
+    private MultipartFile cover;
+
+    @Size(max = 5, message = "Maximum 5 featured artists")
+    private List<Long> featuredArtistIds = new ArrayList<>();
+
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+    private LocalDateTime releaseAt;
+
+    public void setFeaturedArtistIds(List<Long> featuredArtistIds) {
+        this.featuredArtistIds = (featuredArtistIds != null) ? featuredArtistIds : new ArrayList<>();
+    }
+
+    // ... các getter, setter khác
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| Nhận bằng `@ModelAttribute` (không phải `@RequestBody`) | Vì có file (A11.1) |
+| `MultipartFile audio` + `@NotNull` | Bắt buộc có file nhạc. `@NotNull` chỉ chặn "không gửi ngăn `audio`"; gửi ngăn rỗng thì `FileStorageService` chặn tiếp (`Audio file is required`) |
+| `cover` không có nhãn | Ảnh bìa tùy chọn |
+| `@Size(max = 5)` trên `List` | Với danh sách, `@Size` đếm **số phần tử** |
+| `= new ArrayList<>()` + setter đặc biệt | Không gửi feat → danh sách rỗng, không bao giờ `null`. Setter cũng đổi `null` thành danh sách rỗng, phòng khi Spring gọi setter với `null` |
+| `@DateTimeFormat(iso = DATE_TIME)` | Đổi chữ `2026-12-24T20:00:00` thành `LocalDateTime` (A11.3). **Chỉ** form-data cần nhãn này; JSON do Jackson tự hiểu |
+| Không có `@Future` cho `releaseAt` | Kiểm tra "phải ở tương lai" nằm trong Service (`checkFutureTime`, C13) |
+
+#### C7.2. Các DTO request khác
+
+| DTO | Kiểu body | Field và luật | Dùng cho |
+|---|---|---|---|
+| `UpdateSongRequest` | JSON | `title` không trống, ≤ 150; `featuredArtistIds` tối đa 5 (setter đổi `null` thành rỗng) | Sửa tên + **thay toàn bộ** danh sách feat |
+| `UpdateReleaseRequest` | JSON | `releaseAt` (được `null` = bỏ lịch) | Đổi lịch phát hành |
+| `RejectSongRequest` | JSON | `reason` không trống, ≤ 255 | Admin từ chối **và** gỡ bài (dùng chung) |
+| `LyricsRequest` | JSON | `content` không trống, ≤ 10.000 ký tự | Lưu lời bài hát |
+
+`UpdateReleaseRequest` không có nhãn kiểm tra nào, và Controller nhận nó **không có** `@Valid`: `releaseAt = null` là hợp lệ ("bỏ hẹn giờ"). Gửi sai định dạng ngày → Jackson không đọc được → 400 `Invalid request data`.
+
+---
+
+### C8. DTO response — dữ liệu trả ra
+
+#### C8.1. `SongResponse` (cho người nghe) và Builder viết tay
+
+```java
+public class SongResponse {
+    private Long id;
+    private String title;
+    private String audioUrl;
+    private String coverUrl;
+    private String canvasUrl;
+    private Integer durationSeconds;
+    private Long playCount;
+    private LocalDateTime releaseAt;
+    private Long artistId;
+    private String artistName;
+    private List<ArtistSummary> featuredArtists;
+    private Long genreId;
+    private String genreName;
+
+    private SongResponse(Builder builder) {          // ①
+        this.id = builder.id;
+        this.title = builder.title;
+        // ... gán đủ 13 field từ builder
+    }
+
+    public static Builder builder() {                // ②
+        return new Builder();
+    }
+
+    // ... 13 getter (không có setter)
+
+    public static class Builder {                    // ③
+        private Long id;
+        private String title;
+        // ... đủ 13 field giống hệt bên ngoài
+
+        public Builder id(Long id) { this.id = id; return this; }           // ④
+        public Builder title(String title) { this.title = title; return this; }
+        // ... mỗi field 1 method như trên
+
+        public SongResponse build() {                // ⑤
+            return new SongResponse(this);
+        }
+    }
+}
+```
+
+| Bước | Giải thích |
+|---|---|
+| ① Constructor `private` | Bên ngoài **không** `new SongResponse(...)` được, bắt buộc đi qua Builder |
+| ② `builder()` | Cửa vào: `SongResponse.builder()` trả về 1 Builder rỗng |
+| ③ `static class Builder` nằm trong | Class con, `static` = không cần object `SongResponse` có sẵn mới tạo được Builder |
+| ④ `return this` | Trả lại chính Builder → viết nối `.id(...).title(...)...` (A16.1) |
+| ⑤ `build()` | Đưa toàn bộ giá trị vào constructor private → tạo `SongResponse` hoàn chỉnh |
+| Không có setter | Object trả ra rồi thì không ai sửa được (an toàn khi truyền qua lại) |
+
+So với `SongManageResponse`: có thêm `status`, `released`, `rejectReason`, `createdAt`, `updatedAt` (thông tin chỉ Artist / Admin cần). `boolean released` có getter tên `isReleased()` → JSON trường `released`.
+
+| Response | Trả cho | Vì sao tách 2 loại |
+|---|---|---|
+| `SongResponse` | Người nghe | Không lộ trạng thái nội bộ, lý do bị từ chối, ngày tạo... |
+| `SongManageResponse` | Artist (bài của mình), Admin | Cần đủ thông tin để quản lý |
+
+#### C8.2. Các DTO response nhỏ
+
+| DTO | Field | Ghi chú |
+|---|---|---|
+| `ArtistSummary` | `id`, `artistName` | Thông tin gọn 1 nghệ sĩ feat; cũng là kết quả "tìm nghệ sĩ để feat" |
+| `GenreResponse` | `id`, `name` | |
+| `PageResponse<T>` | `content`, `page`, `size`, `totalElements`, `totalPages` | Generic (A16.2), mục 21 |
+| `ArtistSongsResponse` | `artistId`, `artistName`, `bio`, `avatarUrl`, `songs` (là `PageResponse<SongResponse>`) | Trang nghệ sĩ: thông tin người + 1 trang bài |
+| `ListeningHistoryResponse` | `song` (`SongResponse`), `playedAt` | 1 dòng lịch sử nghe |
+| `LyricLine` | `timeMs` (`null` nếu lời thường), `text` | 1 dòng lời. Field `final`: tạo xong không đổi |
+| `LyricsResponse` | `songId`, `synced`, `content`, `lines`, `updatedAt` | `synced = true` khi lời có mốc thời gian |
+| `RecommendApiResponse` | `recommendedIds` / `recommendations` | **Không** trả cho frontend: đây là JSON **Python trả về** cho Java (A14.4) |
+
+`RecommendApiResponse.getSongIds()`:
+```java
+public List<Long> getSongIds() {
+    if (recommendedIds != null) {
+        return recommendedIds;
+    }
+    if (recommendations != null) {
+        return recommendations;
+    }
+    return List.of();
+}
+```
+Chấp nhận **cả 2 tên trường** mà service Python có thể dùng; không có cái nào → danh sách rỗng (không bao giờ `null`).
+
+---
+
+### C9. `mapper/SongMapper.java` — Entity → DTO
+
+```java
+public class SongMapper {
+
+    private SongMapper() {}
+
+    public static ArtistSummary toArtistSummary(User user) {
+        return new ArtistSummary(user.getId(), user.getArtistName());
+    }
+
+    public static GenreResponse toGenreResponse(Genre genre) {
+        return new GenreResponse(genre.getId(), genre.getName());
+    }
+
+    private static Long genreId(Song song) {
+        Genre genre = song.getGenre();
+        return genre != null ? genre.getId() : null;
+    }
+
+    private static String genreName(Song song) {
+        Genre genre = song.getGenre();
+        return genre != null ? genre.getName() : null;
+    }
+
+    private static List<ArtistSummary> activeFeaturedArtists(Song song) {
+        List<ArtistSummary> result = new ArrayList<>();
+        for(User user : song.getFeaturedArtists()) {
+            if(user.getAccountStatus() == AccountStatus.ACTIVE && user.getRole() == Role.ARTIST) {
+                result.add(toArtistSummary(user));
+            }
+        }
+        result.sort(Comparator.comparing(ArtistSummary::getId));
+        return result;
+    }
+```
+
+| Code | Giải thích |
+|---|---|
+| `private SongMapper() {}` + mọi method `static` | "Hộp đựng hàm", không cần object, không phải bean (giống `UserMapper`) |
+| `genreId`, `genreName` | Bài cũ có thể không có thể loại → trả `null`, không lỗi |
+| `activeFeaturedArtists` | **Lọc** nghệ sĩ feat: chỉ giữ người còn ACTIVE và còn là ARTIST. Người feat bị khóa / xóa / hạ role thì **biến khỏi** bài, nhưng dòng trong bảng trung gian **vẫn còn**: được mở khóa lại là tự hiện lại |
+| `result.sort(Comparator.comparing(ArtistSummary::getId))` | Sắp theo id tăng dần. `Set` không có thứ tự cố định; không sắp thì mỗi lần gọi API thứ tự feat có thể khác nhau, giao diện bị "nhảy" |
+| `song.getFeaturedArtists()`, `song.getGenre()`, `song.getArtist()` | Đều là quan hệ LAZY → chạy thêm SQL ở đây, nhờ "giữ phiên tới hết request" (A3) |
+
+```java
+    public static SongResponse toSongResponse(Song song) {
+        return SongResponse.builder()
+                .id(song.getId())
+                .title(song.getTitle())
+                // ... audioUrl, coverUrl, canvasUrl, durationSeconds, playCount, releaseAt
+                .artistId(song.getArtist().getId())
+                .artistName(song.getArtist().getArtistName())
+                .featuredArtists(activeFeaturedArtists(song))
+                .genreId(genreId(song))
+                .genreName(genreName(song))
+                .build();
+    }
+
+    public static SongManageResponse toManageResponse(Song song) {
+        boolean released = song.getStatus() == SongStatus.APPROVED
+                && song.getReleaseAt() != null
+                && !song.getReleaseAt().isAfter(LocalDateTime.now());
+        return SongManageResponse.builder()
+                // ... như trên, thêm status, released, rejectReason, createdAt, updatedAt
+                .build();
+    }
+```
+`released` tính **tại thời điểm gọi API**: đã duyệt + có giờ phát hành + giờ đó không ở sau bây giờ (A17). Không xét trạng thái nghệ sĩ (mục 8.5 giải thích vì sao).
+
+```java
+    public static <T> PageResponse<T> toPageResponse(Page<Song> page, Function<Song, T> converter) {
+        List<T> content = new ArrayList<>();
+        for(Song song : page.getContent()) {
+            content.add(converter.apply(song));
+        }
+        return new PageResponse<>(
+                content,
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages()
+        );
+    }
+}
+```
+- `<T>` đứng trước kiểu trả về = method generic (A16.2).
+- Đổi từng `Song` trong trang bằng hàm được truyền vào (A16.3), rồi chép 4 con số phân trang từ `Page` sang `PageResponse`.
+
+---
+
+### C10. `service/FileStorageService.java` — phần nhạc và video
+
+File dùng chung với module User (ảnh đại diện) và Playlist (ảnh bìa playlist). Phần ảnh (`saveImage`, chữ ký đầu file, `saveFile`, `delete`) đã giải thích kỹ ở `USER_MODULE.md` C20. Ở đây chỉ đọc phần **nhạc** và **video**.
+
+#### C10.1. Hằng số
+
+```java
+    private static final long MAX_MP3_SIZE = 20L * 1024 * 1024;     // 20 MB
+    private static final long MAX_WAV_SIZE = 100L * 1024 * 1024;    // 100 MB
+    private static final long MAX_IMAGE_SIZE = 2L * 1024 * 1024;    // 2 MB
+    private static final long MAX_VIDEO_SIZE = 50L * 1024 * 1024;   // 50 MB
+    private static final String URL_PREFIX = "/uploads/";
+    private static final String AUDIO_FOLDER = "songs/audio";
+```
+Nhạc luôn vào `songs/audio` (cố định). Ảnh và video do nơi gọi truyền thư mục vào (`songs/covers`, `songs/canvas`, `avatars`, `playlists`).
+
+#### C10.2. `saveAudio` — lưu file nhạc
+
+```java
+    public String saveAudio(MultipartFile file) {
+        if(file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Audio file is required");
+        }
+        String extension = getExtension(file.getOriginalFilename());
+        if(".mp3".equals(extension)) {
+            if(file.getSize() > MAX_MP3_SIZE) {
+                throw new IllegalArgumentException("MP3 file must not exceed 20MB");
+            }
+        } else if(".wav".equals(extension)) {
+            if(file.getSize() > MAX_WAV_SIZE) {
+                throw new IllegalArgumentException("WAV file must not exceed 100MB");
+            }
+        } else {
+            throw new IllegalArgumentException("Only MP3 or WAV files are allowed");
+        }
+        return saveFile(file, AUDIO_FOLDER, extension);
+    }
+
+    private String getExtension(String fileName) {
+        if(fileName == null || !fileName.contains(".")) {
+            return "";
+        }
+        return fileName.substring(fileName.lastIndexOf(".")).toLowerCase();
+    }
+```
+| Code | Giải thích |
+|---|---|
+| `getExtension` | Lấy phần đuôi từ **dấu chấm cuối cùng**: `bai.hat.MP3` → `.mp3` (`toLowerCase` đổi về chữ thường, nên `.MP3` cũng nhận) |
+| Phân loại theo đuôi tên file | Khác với ảnh (xem loại file + chữ ký đầu file). Với nhạc, lớp kiểm tra "thật hay giả" là bước **đo thời lượng** ngay sau đó: file giả không đo được → báo lỗi và bị xóa (C13) |
+| Mỗi loại 1 giới hạn | WAV không nén nên nặng gấp ~10 lần MP3 cùng độ dài |
+
+#### C10.3. `getAudioDuration` — đo thời lượng nhạc
+
+```java
+    public int getAudioDuration(String audioUrl) {
+        Path path = toPath(audioUrl);
+        int seconds;
+        try {
+            if(audioUrl.endsWith(".mp3")) {
+                seconds = getMp3Duration(path);
+            } else {
+                seconds = getWavDuration(path);
+            }
+        } catch(Exception e) {
+            throw new IllegalArgumentException("Invalid or corrupted audio file");
+        }
+        if(seconds <= 0) {
+            throw new IllegalArgumentException("Invalid or corrupted audio file");
+        }
+        return seconds;
+    }
+
+    private int getMp3Duration(Path path) throws Exception {
+        Mp3File mp3File = new Mp3File(path.toString());
+        return (int) mp3File.getLengthInSeconds();
+    }
+
+    private int getWavDuration(Path path) throws Exception {
+        try(AudioInputStream stream = AudioSystem.getAudioInputStream(path.toFile())) {
+            AudioFormat format = stream.getFormat();
+            long frames = stream.getFrameLength();
+            return (int) (frames / format.getFrameRate());
+        }
+    }
+
+    private Path toPath(String url) {
+        return Paths.get(uploadDir, url.substring(URL_PREFIX.length()));
+    }
+```
+| Code | Giải thích |
+|---|---|
+| Nhận `audioUrl` (đường dẫn đã lưu) chứ không nhận `MultipartFile` | Đo trên **file đã nằm trên ổ đĩa**. Thư viện đọc MP3 cần đường dẫn file thật |
+| `toPath` | `"/uploads/songs/audio/abc.mp3"` → bỏ `"/uploads/"` → ghép với thư mục upload → đường dẫn thật trên ổ đĩa |
+| `catch(Exception e)` | Mọi kiểu hỏng (không phải MP3 thật, header sai...) → 1 câu lỗi chung |
+| `seconds <= 0` | File "đọc được" nhưng dài 0 giây cũng coi là hỏng |
+| `try(AudioInputStream stream = ...)` | **try-with-resources**: tự đóng file khi xong, kể cả khi có lỗi. Quên đóng file → Windows không cho xóa file đó |
+| `(int) (...)` | Ép về số nguyên, bỏ phần lẻ giây |
+
+#### C10.4. `saveVideo` và `getVideoDurationMs` — canvas
+
+```java
+    public String saveVideo(MultipartFile file, String folder) {
+        if(file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Video file is required");
+        }
+        if(file.getSize() > MAX_VIDEO_SIZE) {
+            throw new IllegalArgumentException("Video must not exceed 50MB");
+        }
+        if(!"video/mp4".equals(file.getContentType())) {
+            throw new IllegalArgumentException("Only MP4 videos are allowed");
+        }
+        if(!isRealMp4(file)) {
+            throw new IllegalArgumentException("Invalid or corrupted video file");
+        }
+        return saveFile(file, folder, ".mp4");
+    }
+
+    private boolean isRealMp4(MultipartFile file) {
+        try(InputStream in = file.getInputStream()) {
+            byte[] head = in.readNBytes(8);
+            return head.length >= 8
+                    && head[4] == 'f' && head[5] == 't' && head[6] == 'y' && head[7] == 'p';
+        } catch(IOException e) {
+            return false;
+        }
+    }
+```
+Giống hệt khuôn của ảnh: rỗng? quá cỡ? đúng loại khai báo? chữ ký đầu file thật (`ftyp` ở byte 4–7, A13.1)? rồi mới lưu.
+
+```java
+    public long getVideoDurationMs(String videoUrl) {
+        try(RandomAccessFile file = new RandomAccessFile(toPath(videoUrl).toFile(), "r")) {
+            long[] moov = findBox(file, 0, file.length(), "moov");               // ①
+            if(moov == null) {
+                throw new IllegalArgumentException("Invalid or corrupted video file");
+            }
+            long[] mvhd = findBox(file, moov[0], moov[1], "mvhd");               // ②
+            if(mvhd == null) {
+                throw new IllegalArgumentException("Invalid or corrupted video file");
+            }
+            file.seek(mvhd[0]);                                                  // ③
+            int version = file.readUnsignedByte();
+            file.skipBytes(3);
+            long timescale;
+            long duration;
+            if(version == 1) {
+                file.skipBytes(16);
+                timescale = file.readInt() & 0xFFFFFFFFL;
+                duration = file.readLong();
+            } else {
+                file.skipBytes(8);
+                timescale = file.readInt() & 0xFFFFFFFFL;
+                duration = file.readInt() & 0xFFFFFFFFL;
+            }
+            if(timescale == 0 || duration <= 0) {
+                throw new IllegalArgumentException("Invalid or corrupted video file");
+            }
+            return duration * 1000 / timescale;                                  // ④
+        } catch(IOException e) {
+            throw new IllegalArgumentException("Invalid or corrupted video file");
+        }
+    }
+```
+| Bước | Giải thích |
+|---|---|
+| `RandomAccessFile(..., "r")` | Mở file chỉ để **đọc**, cho phép nhảy tới vị trí bất kỳ (`seek`) thay vì đọc tuần tự từ đầu. File 50MB mà chỉ cần vài chục byte thì nhảy là nhanh nhất |
+| ① | Tìm hộp `moov` trong cả file. Trả về `[vị trí bắt đầu nội dung, vị trí kết thúc]` |
+| ② | Tìm hộp `mvhd` **bên trong** khoảng của `moov` |
+| ③ | Nhảy tới nội dung `mvhd`, đọc 1 byte phiên bản, bỏ 3 byte cờ, bỏ qua 2 mốc thời gian tạo / sửa (8 byte ở bản 0, 16 byte ở bản 1), rồi đọc `timescale` và `duration` (A13.3) |
+| `& 0xFFFFFFFFL` | `readInt()` của Java đọc số **có dấu** (có thể ra số âm). Phép này đổi về số **không dấu** đúng như file MP4 lưu. Mẹo kỹ thuật, không cần nhớ |
+| ④ | Đổi ra mili giây: `duration × 1000 ÷ timescale` |
+
+```java
+    private long[] findBox(RandomAccessFile file, long start, long end, String wantedType) throws IOException {
+        long position = start;
+        while(position + 8 <= end) {
+            file.seek(position);
+            long size = file.readInt() & 0xFFFFFFFFL;
+            byte[] typeBytes = new byte[4];
+            file.readFully(typeBytes);
+            String type = new String(typeBytes, StandardCharsets.US_ASCII);
+            long headerSize = 8;
+            if(size == 1) {
+                size = file.readLong();
+                headerSize = 16;
+            } else if(size == 0) {
+                size = end - position;
+            }
+            if(size < headerSize || position + size > end) {
+                return null;
+            }
+            if(type.equals(wantedType)) {
+                return new long[] { position + headerSize, position + size };
+            }
+            position += size;
+        }
+        return null;
+    }
+```
+Vòng lặp "đọc tên hộp → đúng thì trả về, sai thì nhảy qua cả hộp":
+- `size == 1`: hộp quá lớn, kích thước thật nằm ở 8 byte tiếp theo.
+- `size == 0`: hộp kéo dài tới hết vùng đang tìm.
+- `size < headerSize || position + size > end`: số liệu vô lý (file hỏng) → dừng, trả `null`, tránh vòng lặp chạy mãi.
+
+---
+
+### C11. `service/SongService.java` — chức năng của người nghe
+
+```java
+@Service
+public class SongService {
+
+    private static final int MAX_PAGE_SIZE = 50;
+    private static final Duration PLAY_COOLDOWN = Duration.ofSeconds(30);
+
+    private final SongRepository songRepository;
+    private final UserRepository userRepository;
+    private final GenreRepository genreRepository;
+    private final StringRedisTemplate redisTemplate;
+    private final ListeningHistoryService listeningHistoryService;
+
+    // ... constructor nhận 5 bean trên
+```
+
+#### C11.1. Danh sách, thể loại, tìm kiếm, chi tiết
+
+```java
+    public Page<Song> getPublishedSongs(Long genreId, int page, int size) {
+        if(genreId == null) {
+            return songRepository.findPublished(LocalDateTime.now(), pageable(page, size));
+        }
+        return songRepository.findPublishedByGenre(genreId, LocalDateTime.now(), pageable(page, size));
+    }
+
+    public List<Genre> getGenres() {
+        return genreRepository.findAllByOrderByNameAsc();
+    }
+
+    public Page<Song> searchSongs(String keyword, int page, int size) {
+        if(keyword == null || keyword.isBlank()) {
+            return getPublishedSongs(null, page, size);
+        }
+        return songRepository.searchPublished(keyword.trim(), LocalDateTime.now(), pageable(page, size));
+    }
+
+    public Song getPublishedSong(Long songId) {
+        return songRepository.findPublishedById(songId, LocalDateTime.now())
+                .orElseThrow(() -> new IllegalArgumentException("Song does not exist"));
+    }
+
+    private Pageable pageable(int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        return PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "releaseAt"));
+    }
+```
+- Không truyền `genreId` → mọi bài; có → lọc theo thể loại. 1 API phục vụ cả 2.
+- Từ khóa rỗng / toàn dấu cách → trả danh sách thường, không báo lỗi. `trim()` bỏ dấu cách 2 đầu (`"  son  "` → `"son"`).
+- `pageable`: kẹp tham số (A5.4), luôn sắp **mới phát hành trước**.
+- `getPublishedSong` là `public` vì `LyricsService` cũng dùng (lời của bài chưa phát hành thì người nghe không được xem).
+
+#### C11.2. `play` — ghi nhận 1 lượt nghe
+
+```java
+    public void play(Long songId, String email) {
+        getPublishedSong(songId);                                              // ①
+
+        boolean shouldCount;
+        try {
+            Boolean firstTime = redisTemplate.opsForValue()
+                    .setIfAbsent("play:" + songId + ":" + email, "1", PLAY_COOLDOWN);   // ②
+            shouldCount = Boolean.TRUE.equals(firstTime);
+        } catch (Exception e) {
+            shouldCount = true;                                                // ③
+        }
+
+        if(shouldCount) {
+            songRepository.incrementPlayCount(songId);                         // ④
+            userRepository.findByEmail(email)
+                    .ifPresent(user -> listeningHistoryService.record(user.getId(), songId));  // ⑤
+        }
+    }
+```
+| Bước | Giải thích |
+|---|---|
+| ① | Bài phải đang phát hành; không thì 400. Kết quả trả về không dùng, chỉ để kiểm tra |
+| ② | Chống đếm trùng trong 30 giây (A18). Khóa gồm id bài + email: mỗi người, mỗi bài 1 khóa riêng |
+| `Boolean.TRUE.equals(firstTime)` | `setIfAbsent` trả `Boolean` (object, có thể `null`). Viết kiểu này an toàn với `null` (`null` → `false`), khác với `if (firstTime)` sẽ lỗi khi `null` |
+| ③ | Redis lỗi → **vẫn đếm** (thà đếm dư hơn là để API nghe nhạc lỗi). Ngược với rate limit chỗ khác nhưng cùng tinh thần: Redis hỏng không làm sập tính năng chính |
+| ④ | Cộng 1 bằng câu `UPDATE` nguyên tử (A6) |
+| ⑤ | Tìm user theo email rồi ghi lịch sử **chạy nền** (A10). `ifPresent(...)` = "có thì làm, không có thì thôi" |
+| Bị chặn bởi cooldown | Không cộng, không ghi lịch sử, nhưng API **vẫn trả 200** `Play recorded`: người nghe không cần biết |
+
+#### C11.3. Trang nghệ sĩ
+
+```java
+    public User getArtist(Long artistId) {
+        User artist = userRepository.findById(artistId)
+                .orElseThrow(() -> new IllegalArgumentException("Artist does not exist"));
+        if(artist.getRole() != Role.ARTIST || artist.getAccountStatus() != AccountStatus.ACTIVE) {
+            throw new IllegalArgumentException("Artist does not exist");
+        }
+        return artist;
+    }
+
+    public Page<Song> getArtistSongs(Long artistId, int page, int size) {
+        return songRepository.findPublishedByArtist(artistId, LocalDateTime.now(), pageable(page, size));
+    }
+```
+Id không tồn tại, hoặc là user thường / Admin, hoặc nghệ sĩ bị khóa → **cùng 1 câu** `Artist does not exist`: không lộ "id này là 1 tài khoản thường".
+
+---
+
+### C12. `service/ListeningHistoryService.java` — lịch sử nghe
+
+```java
+@Service
+public class ListeningHistoryService {
+
+    private static final Logger log = LoggerFactory.getLogger(ListeningHistoryService.class);
+    private static final int RECENT_SONG_LIMIT = 10;
+
+    private final ListeningHistoryRepository historyRepository;
+    private final SongRepository songRepository;
+
+    // ... constructor
+
+    @Async
+    public void record(Long userId, Long songId) {
+        try {
+            historyRepository.save(new ListeningHistory(userId, songId, LocalDateTime.now()));
+        } catch (Exception e) {
+            log.warn("Could not save listening history (user {}, song {}): {}",
+                    userId, songId, e.getMessage());
+        }
+    }
+```
+- `@Async` → chạy ở luồng nền (A10).
+- `save` vào MongoDB. Lỗi (MongoDB tắt, sai mật khẩu, IP chưa được Atlas cho phép...) → chỉ ghi log `WARN`. Lượt nghe trong MySQL **vẫn đã được cộng** ở bước trước.
+
+```java
+    public List<ListeningHistoryResponse> getRecentSongs(Long userId) {
+        List<ListeningHistory> recentPlays = historyRepository.findTop100ByUserIdOrderByPlayedAtDesc(userId); // ①
+
+        Map<Long, LocalDateTime> lastPlayedAt = new LinkedHashMap<>();                                      // ②
+        for(ListeningHistory play : recentPlays) {
+            lastPlayedAt.putIfAbsent(play.getSongId(), play.getPlayedAt());
+        }
+        if(lastPlayedAt.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, Song> songsById = new HashMap<>();                                                        // ③
+        for(Song song : songRepository.findPublishedByIds(lastPlayedAt.keySet(), LocalDateTime.now())) {
+            songsById.put(song.getId(), song);
+        }
+
+        List<ListeningHistoryResponse> result = new ArrayList<>();                                          // ④
+        for(Map.Entry<Long, LocalDateTime> entry : lastPlayedAt.entrySet()) {
+            Song song = songsById.get(entry.getKey());
+            if(song != null) {
+                result.add(new ListeningHistoryResponse(SongMapper.toSongResponse(song), entry.getValue()));
+                if(result.size() == RECENT_SONG_LIMIT) {
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+}
+```
+
+| Bước | Giải thích |
+|---|---|
+| ① | 100 lượt nghe gần nhất từ MongoDB, mới nhất trước |
+| ② `LinkedHashMap` + `putIfAbsent` | **Gộp trùng, giữ lần nghe mới nhất**. `putIfAbsent` = "chỉ thêm nếu chưa có khóa này". Duyệt từ mới tới cũ nên lần đầu gặp 1 bài chính là lần nghe gần nhất. `LinkedHashMap` (khác `HashMap`) **giữ thứ tự thêm vào** → thứ tự "mới nhất trước" không bị xáo |
+| ③ | Lấy **cùng lúc** mọi bài từ MySQL bằng 1 câu `IN` (A9.5), chỉ lấy bài **đang phát hành**. Cho vào `HashMap` để tra theo id cho nhanh |
+| ④ | Duyệt theo thứ tự ở ②; bài nào không còn phát hành (bị ẩn, gỡ, xóa, nghệ sĩ bị khóa) thì không có trong ③ → **bỏ qua**. Đủ 10 bài thì dừng |
+
+Ví dụ: 100 lượt nghe gần nhất của Lan là bài `12, 12, 7, 12, 30, 7, 5...` → sau ② còn `12, 7, 30, 5...` (theo thứ tự lần nghe gần nhất). Bài 30 vừa bị Artist ẩn → kết quả `12, 7, 5...`.
+
+---
+
+### C13. `service/ArtistSongService.java` — nghệ sĩ quản lý bài
+
+```java
+@Service
+public class ArtistSongService {
+
+    private static final int MAX_FEATURED_ARTISTS = 5;
+    private static final String COVER_FOLDER = "songs/covers";
+    private static final String CANVAS_FOLDER = "songs/canvas";
+    private static final double MIN_CANVAS_SECONDS = 7;
+    private static final double MAX_CANVAS_SECONDS = 10;
+
+    private final SongRepository songRepository;
+    private final UserRepository userRepository;
+    private final GenreRepository genreRepository;
+    private final FileStorageService fileStorageService;
+
+    // ... constructor nhận 4 bean trên
+```
+Đọc **các hàm phụ trợ** trước (cuối file), vì method nào cũng dùng chúng.
+
+#### C13.1. Hàm phụ trợ
+
+```java
+    private User getArtist(Long artistId) {
+        User artist = userRepository.findById(artistId)
+                .orElseThrow(() -> new IllegalArgumentException("User does not exist"));
+        if(artist.getRole() != Role.ARTIST || artist.getAccountStatus() != AccountStatus.ACTIVE) {
+            throw new IllegalArgumentException("Only active artists can manage songs");
+        }
+        return artist;
+    }
+
+    private Song getMySong(Long artistId, Long songId) {
+        Song song = songRepository.findByIdAndArtistId(songId, artistId)
+                .orElseThrow(() -> new IllegalArgumentException("Song does not exist"));
+        if(song.getStatus() == SongStatus.DELETED) {
+            throw new IllegalArgumentException("Song does not exist");
+        }
+        return song;
+    }
+```
+- `getArtist`: mở đầu mọi thao tác. `@PreAuthorize("hasRole('ARTIST')")` ở Controller đã chặn trước, đây là **lớp thứ 2** (mục 9.0).
+- `getMySong`: **chốt bảo mật quan trọng nhất** của file. Tìm theo **cả** id bài **và** id nghệ sĩ (C5.5). Artist A gửi id bài của Artist B → không tìm thấy → `Song does not exist` (không phải 403: không cho biết bài đó có tồn tại). Bài đã xóa cũng coi như không tồn tại.
+
+```java
+    private Genre getGenre(Long genreId) {
+        if(genreId == null) {
+            throw new IllegalArgumentException("Genre is required");
+        }
+        return genreRepository.findById(genreId)
+                .orElseThrow(() -> new IllegalArgumentException("Genre does not exist"));
+    }
+
+    private void checkFutureTime(LocalDateTime releaseAt) {
+        if(releaseAt != null && !releaseAt.isAfter(LocalDateTime.now())) {
+            throw new IllegalArgumentException("Release time must be in the future");
+        }
+    }
+```
+`checkFutureTime`: `null` (không hẹn giờ) thì cho qua; có giờ thì giờ đó phải **ở sau** bây giờ.
+
+```java
+    private Set<User> loadFeaturedArtists(Long artistId, List<Long> ids) {
+        Set<User> result = new HashSet<>();
+        if(ids == null || ids.isEmpty()) {
+            return result;                                                            // ①
+        }
+        Set<Long> uniqueIds = new HashSet<>(ids);                                     // ②
+        uniqueIds.remove(null);
+        if(uniqueIds.size() > MAX_FEATURED_ARTISTS) {
+            throw new IllegalArgumentException("Maximum " + MAX_FEATURED_ARTISTS + " featured artists");
+        }
+        if(uniqueIds.contains(artistId)) {
+            throw new IllegalArgumentException("You cannot feature yourself");        // ③
+        }
+        for (User user : userRepository.findAllById(uniqueIds)) {                     // ④
+            if(user.getRole() != Role.ARTIST || user.getAccountStatus() != AccountStatus.ACTIVE) {
+                throw new IllegalArgumentException("Featured artist is not available: " + user.getId());
+            }
+            result.add(user);
+        }
+        if(result.size() != uniqueIds.size()) {
+            throw new IllegalArgumentException("Some featured artists do not exist"); // ⑤
+        }
+        return result;
+    }
+```
+| Bước | Giải thích |
+|---|---|
+| ① | Không feat ai → tập rỗng |
+| ② | `new HashSet<>(ids)` tự **bỏ trùng** (`[5, 5, 9]` → `{5, 9}`); bỏ luôn ô `null`. Đếm lại sau khi bỏ trùng |
+| ③ | Không tự feat chính mình |
+| ④ | `findAllById`: lấy nhiều user trong **1 câu** `WHERE id IN (...)`. Mỗi người phải là ARTIST đang hoạt động |
+| ⑤ | Gửi 3 id mà database chỉ có 2 → có id không tồn tại |
+
+```java
+    private boolean wasApproved(Song song) {
+        return song.getStatus() == SongStatus.APPROVED
+                || song.getStatus() == SongStatus.HIDDEN;
+    }
+
+    private boolean isReleased(Song song) {
+        return wasApproved(song)
+                && song.getReleaseAt() != null
+                && !song.getReleaseAt().isAfter(LocalDateTime.now());
+    }
+
+    private void resubmitIfRejected(Song song) {
+        if(song.getStatus() == SongStatus.REJECTED) {
+            song.setStatus(SongStatus.PENDING);
+            song.setRejectReason(null);
+        }
+    }
+
+    private void checkCanvasDuration(String canvasUrl) {
+        long durationMs = fileStorageService.getVideoDurationMs(canvasUrl);
+        double seconds = Math.round(durationMs / 100.0) / 10.0;
+        if(seconds < MIN_CANVAS_SECONDS || seconds > MAX_CANVAS_SECONDS) {
+            throw new IllegalArgumentException(
+                    "Canvas video must be between 7 and 10 seconds (current: " + seconds + "s)");
+        }
+    }
+```
+| Hàm | Giải thích |
+|---|---|
+| `wasApproved` | Bài **từng được duyệt**: đang `APPROVED`, hoặc `HIDDEN` (chỉ bài đã duyệt mới ẩn được) |
+| `isReleased` | Từng được duyệt **và** đã tới giờ phát hành. Khác `released` của mapper (C9) ở chỗ tính cả bài đang ẩn: bài đã phát hành rồi bị ẩn thì cũng không được đổi lịch nữa |
+| `resubmitIfRejected` | Bài bị từ chối mà Artist **sửa nội dung** (tên, feat, ảnh, canvas) → tự gửi duyệt lại: về `PENDING`, xóa lý do cũ |
+| `checkCanvasDuration` | Đổi mili giây ra giây, **làm tròn 1 chữ số lẻ**: `durationMs / 100.0` ra đơn vị 0,1 giây → `Math.round` làm tròn → `/ 10.0` về giây. 10.040 ms → 10,0 giây (qua); 10.060 ms → 10,1 giây (trượt). Làm tròn để video dài 10,04 giây (do phần mềm dựng video thêm vài khung) không bị từ chối oan |
+
+#### C13.2. `uploadSong` — đăng bài
+
+```java
+    public Song uploadSong(Long artistId, String title, Long genreId, MultipartFile audioFile,
+                           MultipartFile coverFile, List<Long> featuredArtistIds,
+                           LocalDateTime releaseAt) {
+        // GIAI ĐOẠN 1: kiểm tra mọi thứ KHÔNG cần file
+        User artist = getArtist(artistId);
+        checkFutureTime(releaseAt);
+        Set<User> featuredArtists = loadFeaturedArtists(artistId, featuredArtistIds);
+        Genre genre = getGenre(genreId);
+
+        // GIAI ĐOẠN 2: lưu file nhạc
+        String audioUrl = fileStorageService.saveAudio(audioFile);
+        String coverUrl = null;
+
+        try {
+            // GIAI ĐOẠN 3: đo thời lượng, lưu ảnh, lưu database
+            int duration = fileStorageService.getAudioDuration(audioUrl);
+            if(coverFile != null && !coverFile.isEmpty()) {
+                coverUrl = fileStorageService.saveImage(coverFile, COVER_FOLDER);
+            }
+            Song song = new Song();
+            song.setArtist(artist);
+            song.setTitle(title.trim());
+            song.setGenre(genre);
+            song.setAudioUrl(audioUrl);
+            song.setCoverUrl(coverUrl);
+            song.setDurationSeconds(duration);
+            song.setFeaturedArtists(featuredArtists);
+            song.setReleaseAt(releaseAt);
+            song.setStatus(SongStatus.PENDING);
+            return songRepository.save(song);
+        } catch(RuntimeException exception) {
+            // GIAI ĐOẠN 4: có lỗi → dọn file đã lưu
+            fileStorageService.delete(audioUrl);
+            fileStorageService.delete(coverUrl);
+            throw exception;
+        }
+    }
+```
+
+| Giai đoạn | Giải thích |
+|---|---|
+| 1 | Mọi kiểm tra **rẻ** (chỉ đọc database) làm **trước**. Sai thì báo lỗi ngay, chưa tốn công ghi file chục MB xuống ổ đĩa |
+| 2 | Lưu file nhạc. Sai đuôi / quá cỡ → lỗi ngay (chưa có gì để dọn) |
+| 3 | Đo thời lượng (file hỏng → lỗi), lưu ảnh bìa nếu có, tạo `Song` rồi `save` → `INSERT` vào `songs` **và** các dòng trong `song_featured_artists` |
+| 4 | **Bất kỳ** lỗi nào ở giai đoạn 3 → xóa file nhạc và ảnh vừa lưu, rồi ném lại lỗi (`throw exception`) cho `GlobalExceptionHandler`. Không để lại file "mồ côi" trên ổ đĩa. `delete(null)` an toàn (khi chưa kịp lưu ảnh) |
+| `title.trim()` | Bỏ dấu cách thừa 2 đầu tên bài |
+| `setStatus(PENDING)` | Thật ra trùng giá trị mặc định (C2), viết lại cho rõ ý |
+
+Không có `@Transactional`: chỉ có 1 lần ghi database (`save`) ở cuối, ổ đĩa thì tự dọn bằng `try / catch`.
+
+#### C13.3. Bài của tôi, tìm nghệ sĩ để feat
+
+```java
+    public List<Song> getMySongs(Long artistId) {
+        return songRepository.findByArtistIdAndStatusNotOrderByCreatedAtDesc(artistId, SongStatus.DELETED);
+    }
+
+    public List<User> searchArtists(Long artistId, String keyword) {
+        if(keyword == null || keyword.isBlank()) {
+            return List.of();
+        }
+        return userRepository.findTop10ByRoleAndAccountStatusAndArtistNameContainingIgnoreCaseAndIdNot(
+                Role.ARTIST, AccountStatus.ACTIVE, keyword.trim(), artistId);
+    }
+```
+- Bài của tôi: mọi bài **trừ** đã xóa, mới tạo trước.
+- Tìm nghệ sĩ: tối đa 10 người, đang hoạt động, nghệ danh chứa từ khóa, **trừ chính mình** (`IdNot`). Câu truy vấn nằm trong `UserRepository` (`USER_MODULE.md` C5).
+
+#### C13.4. Sửa tên + feat, đổi ảnh bìa
+
+```java
+    public Song updateSong(Long artistId, Long songId, String title, List<Long> featuredArtistIds) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+        song.setTitle(title.trim());
+        song.setFeaturedArtists(loadFeaturedArtists(artistId, featuredArtistIds));
+        resubmitIfRejected(song);
+        return songRepository.save(song);
+    }
+
+    public Song updateCover(Long artistId, Long songId, MultipartFile coverFile) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+        String oldCoverUrl = song.getCoverUrl();
+        String newCoverUrl = fileStorageService.saveImage(coverFile, COVER_FOLDER);
+        try {
+            song.setCoverUrl(newCoverUrl);
+            resubmitIfRejected(song);
+            Song saved = songRepository.save(song);
+            fileStorageService.delete(oldCoverUrl);
+            return saved;
+        } catch(RuntimeException exception) {
+            fileStorageService.delete(newCoverUrl);
+            throw exception;
+        }
+    }
+```
+- `updateSong`: **thay toàn bộ** danh sách feat bằng danh sách mới (gửi `[]` = bỏ hết feat). Hibernate tự thêm / xóa dòng ở bảng trung gian.
+- `updateCover`: đúng khuôn "lưu mới → ghi database → xóa cũ; lỗi thì xóa mới" như đổi ảnh đại diện (`USER_MODULE.md` C18.3). Lỗi ở `save` có thể là **409** do khóa lạc quan (A7) → ảnh mới vừa lưu được dọn sạch.
+- **Không** có API đổi file nhạc. Thể loại cũng không đổi được sau khi đăng (mục 9.4).
+
+#### C13.5. Canvas
+
+```java
+    public Song updateCanvas(Long artistId, Long songId, MultipartFile videoFile) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+        String oldCanvasUrl = song.getCanvasUrl();
+        String newCanvasUrl = fileStorageService.saveVideo(videoFile, CANVAS_FOLDER);
+        try {
+            checkCanvasDuration(newCanvasUrl);
+            song.setCanvasUrl(newCanvasUrl);
+            resubmitIfRejected(song);
+            Song saved = songRepository.save(song);
+            fileStorageService.delete(oldCanvasUrl);
+            return saved;
+        } catch(RuntimeException exception) {
+            fileStorageService.delete(newCanvasUrl);
+            throw exception;
+        }
+    }
+
+    public Song removeCanvas(Long artistId, Long songId) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+        String oldCanvasUrl = song.getCanvasUrl();
+        if(oldCanvasUrl == null) {
+            throw new IllegalArgumentException("Song has no canvas video");
+        }
+        song.setCanvasUrl(null);
+        Song saved = songRepository.save(song);
+        fileStorageService.delete(oldCanvasUrl);
+        return saved;
+    }
+```
+- Thời lượng chỉ đo được **sau khi lưu** (cần file thật trên ổ đĩa), nên `checkCanvasDuration` nằm **trong** `try`: video 15 giây → lỗi → file vừa lưu bị xóa.
+- Gỡ canvas **không** gọi `resubmitIfRejected`: bỏ bớt nội dung thì không cần duyệt lại.
+
+#### C13.6. Đổi lịch phát hành
+
+```java
+    public Song updateReleaseSchedule(Long artistId, Long songId, LocalDateTime releaseAt) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+        if(isReleased(song)) {
+            throw new IllegalArgumentException("Cannot change the schedule of a released song");   // ①
+        }
+        checkFutureTime(releaseAt);                                                                 // ②
+        if(releaseAt == null && wasApproved(song)) {
+            song.setReleaseAt(LocalDateTime.now());                                                 // ③
+        } else {
+            song.setReleaseAt(releaseAt);                                                           // ④
+        }
+        return songRepository.save(song);
+    }
+```
+| Bước | Giải thích |
+|---|---|
+| ① | Bài đã phát hành rồi thì không đổi lịch được (không thể "thu hồi" bài đã ra mắt bằng cách dời lịch; muốn thì dùng ẩn) |
+| ② | Giờ mới phải ở tương lai (hoặc `null`) |
+| ③ | Bỏ lịch (`null`) cho bài **đã duyệt** (đang chờ tới giờ) = **phát hành ngay**: gán giờ hiện tại |
+| ④ | Còn lại: đặt giờ mới. Bài `PENDING` mà gửi `null` thì giữ `null` = "phát hành ngay khi được duyệt" (C14) |
+
+Không gọi `resubmitIfRejected`: đổi lịch không phải đổi nội dung.
+
+#### C13.7. Ẩn, hiện, xóa
+
+```java
+    public Song hideSong(Long artistId, Long songId) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+        if(song.getStatus() != SongStatus.APPROVED) {
+            throw new IllegalArgumentException("Only approved songs can be hidden");
+        }
+        song.setStatus(SongStatus.HIDDEN);
+        return songRepository.save(song);
+    }
+
+    public Song showSong(Long artistId, Long songId) {
+        // ... ngược lại: chỉ HIDDEN → APPROVED, sai thì "Only hidden songs can be shown again"
+    }
+
+    public void deleteSong(Long artistId, Long songId) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+        song.setStatus(SongStatus.DELETED);
+        songRepository.save(song);
+        fileStorageService.delete(song.getAudioUrl());
+        fileStorageService.delete(song.getCoverUrl());
+        fileStorageService.delete(song.getCanvasUrl());
+    }
+```
+- Ẩn / hiện: chỉ đổi trạng thái, giữ nguyên lượt nghe, lịch phát hành.
+- Xóa: **xóa mềm** (giữ dòng, đổi `DELETED`, mục 8.7) nhưng **xóa thật** cả 3 file trên ổ đĩa để giải phóng chỗ. Thứ tự: lưu database **trước**, xóa file **sau**. Nếu `save` lỗi (ví dụ 409) thì file còn nguyên, bài vẫn nghe được bình thường.
+
+---
+
+### C14. `service/AdminSongService.java` — duyệt, từ chối, gỡ bài
+
+```java
+@Service
+public class AdminSongService {
+
+    private static final int MAX_PAGE_SIZE = 50;
+    private final SongRepository songRepository;
+
+    // ... constructor
+
+    public Page<Song> getSongs(SongStatus status, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+        if(status == null) {
+            return songRepository.findByStatusNot(SongStatus.DELETED, pageable);
+        }
+        return songRepository.findByStatus(status, pageable);
+    }
+```
+- Sắp theo **ngày tạo** mới nhất (Admin quan tâm bài mới gửi lên), khác người nghe sắp theo ngày phát hành.
+- Không lọc → mọi bài trừ `DELETED`. Lọc `?status=DELETED` thì **vẫn xem được** bài đã xóa (để tra cứu).
+
+```java
+    public Song approveSong(Long songId) {
+        Song song = getSong(songId);
+        if(song.getStatus() != SongStatus.PENDING) {
+            throw new IllegalArgumentException("Only pending songs can be approved");
+        }
+        User artist = song.getArtist();
+        if(artist.getAccountStatus() != AccountStatus.ACTIVE || artist.getRole() != Role.ARTIST) {
+            throw new IllegalArgumentException("Artist account is not active");
+        }
+        if(song.getReleaseAt() == null) {
+            song.setReleaseAt(LocalDateTime.now());
+        }
+        song.setRejectReason(null);
+        song.setStatus(SongStatus.APPROVED);
+        return songRepository.save(song);
+    }
+```
+| Dòng | Giải thích |
+|---|---|
+| Chỉ duyệt bài `PENDING` | |
+| `song.getArtist()` | Quan hệ LAZY → chạy thêm 1 câu SQL ở đây (A3). Nghệ sĩ bị khóa / hạ role thì không duyệt |
+| `releaseAt == null` → gán bây giờ | Bài không hẹn giờ → **phát hành ngay lúc duyệt**. Có hẹn giờ thì giữ nguyên, tới giờ tự phát hành (không cần ai làm gì: điều kiện `releaseAt <= :now` trong truy vấn tự đúng khi tới giờ) |
+| `setRejectReason(null)` | Xóa lý do từ chối cũ (nếu bài từng bị từ chối rồi gửi lại) |
+
+```java
+    public Song rejectSong(Long songId, String reason) {
+        Song song = getSong(songId);
+        if(song.getStatus() != SongStatus.PENDING) {
+            throw new IllegalArgumentException("Only pending songs can be rejected");
+        }
+        song.setStatus(SongStatus.REJECTED);
+        song.setRejectReason(reason.trim());
+        return songRepository.save(song);
+    }
+
+    public Song removeSong(Long songId, String reason) {
+        Song song = getSong(songId);
+        if(song.getStatus() != SongStatus.APPROVED && song.getStatus() != SongStatus.HIDDEN) {
+            throw new IllegalArgumentException("Only approved songs can be removed");
+        }
+        song.setStatus(SongStatus.REJECTED);
+        song.setRejectReason(reason.trim());
+        return songRepository.save(song);
+    }
+
+    private Song getSong(Long songId) {
+        Song song = songRepository.findById(songId)
+                .orElseThrow(() -> new IllegalArgumentException("Song does not exist"));
+        if(song.getStatus() == SongStatus.DELETED) {
+            throw new IllegalArgumentException("Song does not exist");
+        }
+        return song;
+    }
+}
+```
+- **Từ chối** (bài chờ) và **gỡ** (bài đã duyệt / đang ẩn) cùng đưa bài về `REJECTED` kèm lý do, chỉ khác điều kiện đầu vào. Vì sao gỡ không dùng `DELETED`: mục 8.6.
+- Admin dùng `findById` thường (không có `AndArtistId` như Artist): Admin được thao tác bài của mọi người. Bảo vệ "chỉ Admin" nằm ở `@PreAuthorize` của Controller (C20).
+
+---
+
+### C15. `service/LyricsService.java` — lời bài hát
+
+#### C15.1. Hằng số và regex
+
+```java
+    private static final int MAX_LINES = 300;
+    private static final int MAX_LINE_LENGTH = 200;
+    private static final Pattern TIMED_LINE =
+            Pattern.compile("^\\[(\\d{1,3}):(\\d{2})(?:[.:](\\d{1,3}))?\\](.*)$");
+    private static final Pattern TAG_LINE = Pattern.compile("^\\[[a-zA-Z#]+:.*\\]$");
+```
+- `TIMED_LINE`: dòng có mốc thời gian (mổ xẻ ở A15.2).
+- `TAG_LINE`: dòng thẻ thông tin kiểu `[ti:Hẹn Hò]`, `[ar:Mây Chiều]`, `[length:03:30]`: `[` + **chữ cái** (hoặc `#`) + `:` + gì cũng được + `]`. Dòng `[00:12.50]...` bắt đầu bằng **số** nên không khớp mẫu này.
+
+Constructor nhận 4 bean: `SongLyricsRepository`, `SongRepository`, `UserRepository`, `SongService`.
+
+#### C15.2. Các method public
+
+```java
+    public LyricsResponse getPublishedLyrics(Long songId) {
+        Song song = songService.getPublishedSong(songId);
+        return toResponse(song);
+    }
+
+    public LyricsResponse getMyLyrics(Long artistId, Long songId) {
+        Song song = getMySong(artistId, songId);
+        return toResponse(song);
+    }
+
+    public LyricsResponse saveLyrics(Long artistId, Long songId, String content) {
+        getArtist(artistId);
+        Song song = getMySong(artistId, songId);
+        List<LyricLine> lines = parseLyrics(content, song);                             // ①
+        SongLyrics lyrics = songLyricsRepository.findBySongId(songId).orElse(new SongLyrics()); // ②
+        lyrics.setSong(song);
+        lyrics.setContent(toContent(lines));                                             // ③
+        SongLyrics saved = songLyricsRepository.save(lyrics);
+        return toResponse(song, saved);
+    }
+
+    public void deleteLyrics(Long artistId, Long songId) {
+        getArtist(artistId);
+        getMySong(artistId, songId);
+        SongLyrics lyrics = songLyricsRepository.findBySongId(songId)
+                .orElseThrow(() -> new IllegalArgumentException("Song has no lyrics"));
+        songLyricsRepository.delete(lyrics);
+    }
+```
+| Điểm | Giải thích |
+|---|---|
+| Người nghe: `getPublishedLyrics` | Chỉ xem được lời của bài **đang phát hành** (dùng lại `SongService.getPublishedSong`) |
+| Artist: `getMyLyrics` | Xem lời bài **của mình** ở mọi trạng thái (trừ đã xóa) |
+| `getMySong`, `getArtist` | Viết lại riêng trong file này, giống hệt bản trong `ArtistSongService` (C13.1) |
+| ① | Kiểm tra từng dòng (C15.3). Sai → 400, chưa ghi gì |
+| ② `orElse(new SongLyrics())` | **"Có thì sửa, chưa có thì tạo"** (upsert). Đã có lời → lấy dòng cũ lên sửa (`save` → `UPDATE`); chưa có → tạo object mới (`save` → `INSERT`). Nhờ vậy 1 API `PUT` dùng cho cả thêm lẫn sửa |
+| ③ | Lưu bản **đã chuẩn hóa** (C15.4), không lưu nguyên văn |
+| `deleteLyrics` | Xóa **thật** dòng lời (`DELETE`), không phải xóa mềm: lời không có giá trị lịch sử cần giữ |
+| Lưu / xóa lời **không** đổi trạng thái bài | Không gửi duyệt lại, kể cả bài đang `REJECTED` (mục 15.6) |
+
+#### C15.3. `parseLyrics` — kiểm tra và tách từng dòng
+
+```java
+    private List<LyricLine> parseLyrics(String content, Song song) {
+        long maxTimeMs = (song.getDurationSeconds() + 1) * 1000L;                      // ①
+        List<LyricLine> lines = new ArrayList<>();
+        int timedCount = 0;
+        Long previousTimeMs = null;
+        String[] rows = content.split("\\r?\\n");                                      // ②
+
+        for(int i = 0; i < rows.length; i++) {
+            int rowNumber = i + 1;                                                     // ③
+            String row = rows[i].trim();
+            if(row.isEmpty() || TAG_LINE.matcher(row).matches()) {
+                continue;                                                              // ④
+            }
+
+            Matcher matcher = TIMED_LINE.matcher(row);
+            Long timeMs = null;
+            String text = row;
+            if(matcher.matches()) {                                                    // ⑤
+                int minutes = Integer.parseInt(matcher.group(1));
+                int seconds = Integer.parseInt(matcher.group(2));
+                String fraction = matcher.group(3) == null ? "" : matcher.group(3);
+                int centiseconds = Integer.parseInt((fraction + "00").substring(0, 2));
+                if(seconds >= 60) {
+                    throw new IllegalArgumentException("Line " + rowNumber + ": invalid time, seconds must be 00 - 59");
+                }
+                timeMs = (minutes * 60L + seconds) * 1000 + centiseconds * 10L;
+                text = matcher.group(4).trim();
+                if(timeMs > maxTimeMs) {
+                    throw new IllegalArgumentException("Line " + rowNumber + ": time is longer than the song");
+                }
+                if(previousTimeMs != null && timeMs <= previousTimeMs) {
+                    throw new IllegalArgumentException(
+                            "Line " + rowNumber + ": time must be greater than the previous line");
+                }
+                previousTimeMs = timeMs;
+                timedCount++;
+            }
+
+            if(text.length() > MAX_LINE_LENGTH) {
+                throw new IllegalArgumentException(
+                        "Line " + rowNumber + ": must not exceed " + MAX_LINE_LENGTH + " characters");
+            }
+            lines.add(new LyricLine(timeMs, text));
+        }
+
+        if(lines.isEmpty()) {
+            throw new IllegalArgumentException("Lyrics must not be empty");                         // ⑥
+        }
+        if(lines.size() > MAX_LINES) {
+            throw new IllegalArgumentException("Lyrics must not exceed " + MAX_LINES + " lines");
+        }
+        if(timedCount > 0 && timedCount < lines.size()) {
+            throw new IllegalArgumentException("Only " + timedCount + "/" + lines.size()
+                    + " lines have a time. Either all lines must have a time or none");             // ⑦
+        }
+        return lines;
+    }
+```
+
+| Bước | Giải thích |
+|---|---|
+| ① | Mốc thời gian lớn nhất cho phép = thời lượng bài + 1 giây (dư 1 giây cho sai số làm tròn) |
+| ② `split("\\r?\\n")` | Tách thành từng dòng. `\r?\n` khớp cả kiểu xuống dòng Windows (`\r\n`) lẫn Linux / Mac (`\n`) |
+| ③ `rowNumber` | Số dòng **tính cả dòng trống và dòng thẻ** → khớp đúng số dòng người dùng thấy trong ô soạn thảo, báo lỗi "Line 7" là họ tìm được ngay |
+| ④ | Bỏ qua dòng trống và dòng thẻ thông tin |
+| ⑤ | Dòng có mốc thời gian: tách phút, giây, phần lẻ. Phần lẻ chuẩn hóa về **2 chữ số** (phần trăm giây): `"5"` → `"500"` → `"50"` (= 0,50 giây); `"123"` → `"12"`. Rồi tính ra mili giây. Kiểm tra: giây < 60, không vượt thời lượng bài, **tăng dần** so với dòng trước |
+| Dòng không có mốc | `timeMs` giữ `null`, `text` là cả dòng |
+| `text` rỗng được phép | Dòng `[01:30.00]` không chữ = đoạn nhạc không lời |
+| ⑥ | Toàn dòng trống / dòng thẻ → không còn gì → lỗi |
+| ⑦ | **Hoặc tất cả** dòng có mốc, **hoặc không dòng nào**. Lẫn lộn → báo rõ bao nhiêu dòng có mốc |
+
+Ví dụ tính: `[01:02.5]Điệp khúc` → phút 1, giây 2, phần lẻ `"5"` → 50 phần trăm giây → (1 × 60 + 2) × 1000 + 50 × 10 = **62.500 ms**.
+
+#### C15.4. Chuẩn hóa và trả về
+
+```java
+    private String toContent(List<LyricLine> lines) {
+        StringBuilder builder = new StringBuilder();
+        for(LyricLine line : lines) {
+            if(builder.length() > 0) {
+                builder.append("\n");
+            }
+            if(line.getTimeMs() != null) {
+                builder.append(formatTime(line.getTimeMs()));
+                if(!line.getText().isEmpty()) {
+                    builder.append(" ");
+                }
+            }
+            builder.append(line.getText());
+        }
+        return builder.toString();
+    }
+
+    private String formatTime(long timeMs) {
+        long minutes = timeMs / 60000;
+        long seconds = (timeMs / 1000) % 60;
+        long centiseconds = (timeMs % 1000) / 10;
+        return String.format("[%02d:%02d.%02d]", minutes, seconds, centiseconds);
+    }
+```
+- `StringBuilder`: ghép chuỗi nhiều lần cho nhanh (cộng chuỗi bằng `+` trong vòng lặp tạo ra rất nhiều chuỗi tạm).
+- Ghép lại thành dạng chuẩn: mỗi dòng `[mm:ss.cc] chữ`, ngăn bằng `\n`, đã bỏ dòng trống và dòng thẻ.
+- `formatTime(62500)` → phút `62500 / 60000 = 1`, giây `62 % 60 = 2`, phần trăm giây `500 / 10 = 50` → `[01:02.50]`. `%` là phép **lấy dư**; `%02d` = số nguyên đủ 2 chữ số, thiếu thêm 0.
+
+```java
+    private LyricsResponse toResponse(Song song) {
+        SongLyrics lyrics = songLyricsRepository.findBySongId(song.getId()).orElse(null);
+        return toResponse(song, lyrics);
+    }
+
+    private LyricsResponse toResponse(Song song, SongLyrics lyrics) {
+        if(lyrics == null) {
+            return new LyricsResponse(song.getId(), false, "", new ArrayList<>(), null);
+        }
+        List<LyricLine> lines = parseLyrics(lyrics.getContent(), song);
+        boolean synced = lines.get(0).getTimeMs() != null;
+        return new LyricsResponse(song.getId(), synced, lyrics.getContent(), lines, lyrics.getUpdatedAt());
+    }
+```
+- Bài chưa có lời → **200** với `content = ""`, `lines = []` (không phải lỗi 404): frontend chỉ cần ẩn ô lời.
+- Đọc ra thì tách lại từ chữ đã lưu bằng chính `parseLyrics`. `synced` = dòng đầu có mốc thời gian không (luật ⑦ đảm bảo dòng đầu đại diện được cho tất cả).
+
+---
+
+### C16. `client/RecommendClient.java` — gọi sang service Python
+
+Package `client/` = các class **gọi ra ngoài** (ngược với `controller/` là nơi **nhận vào**).
+
+```java
+@Component
+public class RecommendClient {
+
+    private final RestClient restClient;
+
+    public RecommendClient(@Value("${app.recommend.base-url:http://127.0.0.1:8000}") String baseUrl,
+                           @Value("${app.recommend.timeout-ms:3000}") long timeoutMs) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofMillis(timeoutMs));
+        requestFactory.setReadTimeout(Duration.ofMillis(timeoutMs));
+        this.restClient = RestClient.builder()
+                .baseUrl(baseUrl)
+                .requestFactory(requestFactory)
+                .build();
+    }
+
+    public List<Long> similarSongs(Long songId, int topN) {
+        return post("/recommend", Map.of("song_id", songId, "top_n", topN));
+    }
+
+    public List<Long> artistSongs(Long songId, int topN) {
+        return post("/recommend/artist", Map.of("song_id", songId, "top_n", topN));
+    }
+
+    public List<Long> genreSongs(List<Long> genreIds, int topN) {
+        return post("/recommend/genres", Map.of("genre_ids", genreIds, "top_n", topN));
+    }
+
+    public List<Long> playlistSongs(List<Long> songIds, int topN) {
+        return post("/recommend/playlist", Map.of("song_ids", songIds, "top_n", topN));
+    }
+
+    private List<Long> post(String path, Map<String, Object> body) {
+        RecommendApiResponse response = restClient.post()
+                .uri(path)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(RecommendApiResponse.class);
+        if (response == null) {
+            return List.of();
+        }
+        return response.getSongIds();
+    }
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| `${app.recommend.base-url:http://127.0.0.1:8000}` | Cú pháp `${khóa:giá trị mặc định}`: file cấu hình **không có** khóa này thì dùng giá trị sau dấu `:`. Nhờ vậy thiếu khóa vẫn khởi động được (khác `app.jwt.secret` không có mặc định) |
+| `SimpleClientHttpRequestFactory` + 2 timeout | Kết nối quá 3 giây, hoặc kết nối được nhưng chờ trả lời quá 3 giây → bỏ cuộc, ném lỗi (A14.3) |
+| `RestClient.builder()...build()` | Tạo **1 lần** trong constructor, dùng lại cho mọi lần gọi |
+| 4 method public | Mỗi method = 1 API của service Python. Hiện **chỉ `genreSongs` được dùng**; 3 cái còn lại để dành (mục 16.5) |
+| `Map.of("genre_ids", ..., "top_n", ...)` | Body JSON, tên khóa kiểu Python (A14.4) |
+| `post(...)` | Gửi và nhận (A14.2). Python trả body rỗng → `null` → đổi thành danh sách rỗng |
+| **Không** tự bắt lỗi ở đây | Lỗi mạng / timeout / 5xx bay lên cho `RecommendationService` quyết định cách xử lý (C17). Client chỉ lo **gọi**, không lo **nghiệp vụ** |
+
+---
+
+### C17. `service/RecommendationService.java` — 3 kiểu gợi ý
+
+#### C17.1. Hằng số và hàm phụ trợ
+
+```java
+    private static final int MAX_LIMIT = 20;
+    private static final int MAX_GENRES = 10;
+    private static final int SAME_ARTIST_LIMIT = 3;
+    private static final int CANDIDATE_POOL = 50;
+
+    private int safeLimit(int limit) {
+        return Math.min(Math.max(limit, 1), MAX_LIMIT);
+    }
+
+    private Pageable topByPlayCount(int size) {
+        return PageRequest.of(0, size, Sort.by(Sort.Order.desc("playCount"), Sort.Order.desc("id")));
+    }
+
+    private Song findPublishedSong(Long songId) {
+        return songRepository.findPublishedById(songId, LocalDateTime.now())
+                .orElseThrow(() -> new IllegalArgumentException("Song does not exist"));
+    }
+```
+- `topByPlayCount`: mẹo "top N" bằng phân trang (A5.5).
+- `CANDIDATE_POOL = 50`: mỗi bước lấy **bể ứng viên** 50 bài phổ biến nhất rồi mới lọc trong Java (mục 16.1).
+
+```java
+    private void addSongs(List<Song> result, List<Song> candidates, Set<Long> skipIds,
+                          Long skipArtistId, int maxSize) {
+        for (Song candidate : candidates) {
+            if (result.size() >= maxSize) {
+                break;                                           // đủ rồi → dừng
+            }
+            if (skipIds.contains(candidate.getId())) {
+                continue;                                        // bài cần bỏ qua → xét bài sau
+            }
+            if (candidate.getArtist().getId().equals(skipArtistId)) {
+                continue;                                        // bài của nghệ sĩ cần tránh
+            }
+            result.add(candidate);
+            skipIds.add(candidate.getId());                      // đã lấy → lần sau không lấy lại
+        }
+    }
+
+    private List<Song> sameGenreFirst(List<Song> songs, Song seed) {
+        List<Song> sameGenre = new ArrayList<>();
+        List<Song> otherGenre = new ArrayList<>();
+        for (Song song : songs) {
+            if (isSameGenre(song, seed)) {
+                sameGenre.add(song);
+            } else {
+                otherGenre.add(song);
+            }
+        }
+        sameGenre.addAll(otherGenre);
+        return sameGenre;
+    }
+```
+- `addSongs`: "thêm ứng viên vào kết quả cho tới khi đủ `maxSize`, bỏ qua bài trong `skipIds` và bài của `skipArtistId`". `break` = thoát hẳn vòng lặp; `continue` = bỏ qua phần tử này, sang phần tử kế.
+- `skipArtistId` truyền `null` → `.equals(null)` luôn `false` → không tránh nghệ sĩ nào.
+- `sameGenreFirst`: chia 2 rổ (cùng thể loại / khác), nối rổ 2 vào sau rổ 1. Thứ tự lượt nghe **trong mỗi rổ** được giữ nguyên.
+- `isSameGenre`: bài nào không có thể loại thì coi như khác thể loại.
+
+#### C17.2. `getSimilarSongs` — gợi ý phát tiếp
+
+```java
+    public List<SongResponse> getSimilarSongs(Long songId, int limit, List<Long> excludeIds) {
+        Song song = findPublishedSong(songId);
+        int safeLimit = safeLimit(limit);
+        LocalDateTime now = LocalDateTime.now();
+        Long artistId = song.getArtist().getId();
+
+        Set<Long> skipIds = new HashSet<>();
+        skipIds.add(songId);
+        if (excludeIds != null) {
+            for (Long excludeId : excludeIds) {
+                if (excludeId != null) {
+                    skipIds.add(excludeId);
+                }
+            }
+        }
+
+        List<Song> result = new ArrayList<>();
+
+        // BƯỚC 1: cùng nghệ sĩ, tối đa 3 bài
+        List<Song> artistSongs = songRepository.findPublishedByArtist(
+                artistId, now, topByPlayCount(CANDIDATE_POOL)).getContent();
+        int sameArtistLimit = Math.min(SAME_ARTIST_LIMIT, safeLimit);
+        addSongs(result, sameGenreFirst(artistSongs, song), skipIds, null, sameArtistLimit);
+        for (Song artistSong : artistSongs) {
+            skipIds.add(artistSong.getId());
+        }
+
+        // BƯỚC 2: cùng thể loại, nghệ sĩ khác
+        if (result.size() < safeLimit && song.getGenre() != null) {
+            List<Song> genreSongs = songRepository.findPublishedByGenre(
+                    song.getGenre().getId(), now, topByPlayCount(CANDIDATE_POOL)).getContent();
+            addSongs(result, genreSongs, skipIds, artistId, safeLimit);
+        }
+
+        // BƯỚC 3: bài phổ biến bất kỳ
+        if (result.size() < safeLimit) {
+            List<Song> popularSongs = songRepository.findPublished(
+                    now, topByPlayCount(CANDIDATE_POOL)).getContent();
+            addSongs(result, popularSongs, skipIds, artistId, safeLimit);
+        }
+
+        return toResponses(result);
+    }
+```
+Thuật toán và ví dụ cụ thể: mục 16.2. Điểm code đáng chú ý:
+- `skipIds` là `Set` (tra "có trong tập không" rất nhanh) và **lớn dần** qua từng bước: bài gốc + `excludeIds` → bài đã chọn → mọi bài của nghệ sĩ gốc (sau bước 1) → ...
+- Sau bước 1, **mọi** bài trong `artistSongs` bị đưa vào `skipIds` (kể cả bài không được chọn), để bước 2, 3 không "lọt" thêm bài của nghệ sĩ này. Bước 2, 3 còn truyền thêm `skipArtistId = artistId` để chặn cả bài của nghệ sĩ này nằm ngoài bể 50 bài.
+- `findPublishedByArtist` lấy cả bài nghệ sĩ **được feat** (C5.3), nên "cùng nghệ sĩ" gồm cả bài họ góp giọng.
+
+#### C17.3. `getArtistSongs` — thêm từ nghệ sĩ này
+
+```java
+    public List<SongResponse> getArtistSongs(Long songId, int limit) {
+        Song song = findPublishedSong(songId);
+        int safeLimit = safeLimit(limit);
+        List<Song> artistSongs = songRepository.findPublishedByArtist(
+                song.getArtist().getId(), LocalDateTime.now(), topByPlayCount(CANDIDATE_POOL)).getContent();
+        Set<Long> skipIds = new HashSet<>();
+        skipIds.add(songId);
+        List<Song> result = new ArrayList<>();
+        addSongs(result, sameGenreFirst(artistSongs, song), skipIds, null, safeLimit);
+        if (result.isEmpty()) {
+            result = topSongsSameGenre(song, safeLimit);
+        }
+        return toResponses(result);
+    }
+
+    private List<Song> topSongsSameGenre(Song song, int limit) {
+        Pageable top = topByPlayCount(limit + 1);
+        LocalDateTime now = LocalDateTime.now();
+        List<Song> candidates;
+        if (song.getGenre() != null) {
+            candidates = songRepository.findPublishedByGenre(song.getGenre().getId(), now, top).getContent();
+        } else {
+            candidates = songRepository.findPublished(now, top).getContent();
+        }
+        return excludeAndLimit(candidates, song.getId(), limit);
+    }
+
+    private List<Song> excludeAndLimit(List<Song> songs, Long excludeId, int limit) {
+        return songs.stream()
+                .filter(song -> !song.getId().equals(excludeId))
+                .limit(limit)
+                .toList();
+    }
+```
+- Nghệ sĩ không còn bài nào khác → dự phòng bằng bài phổ biến cùng thể loại (mục 16.3).
+- `limit + 1`: lấy dư 1 bài, phòng trường hợp chính bài gốc nằm trong danh sách và bị loại → vẫn đủ `limit`.
+- `stream().filter(...).limit(...).toList()`: "băng chuyền" (`USER_MODULE.md` A5.11): **lọc** bỏ bài gốc → **cắt** còn tối đa `limit` → gom lại thành danh sách.
+
+#### C17.4. `getGenreSongs` — gợi ý theo thể loại (có gọi Python)
+
+```java
+    public List<SongResponse> getGenreSongs(List<Long> genreIds, int limit) {
+        if (genreIds == null || genreIds.isEmpty()) {
+            throw new IllegalArgumentException("Genre ids are required");
+        }
+        List<Long> cleanGenreIds = genreIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (cleanGenreIds.isEmpty()) {
+            throw new IllegalArgumentException("Genre ids are required");
+        }
+        if (cleanGenreIds.size() > MAX_GENRES) {
+            throw new IllegalArgumentException("At most " + MAX_GENRES + " genres are allowed");
+        }
+        int safeLimit = safeLimit(limit);
+        int askCount = safeLimit * 2;
+        List<Long> ids = askPython("genres", () -> recommendClient.genreSongs(cleanGenreIds, askCount)); // ①
+        List<Song> songs = loadPublishedInOrder(ids, null, safeLimit);                                  // ②
+        if (songs.isEmpty()) {
+            songs = topSongsInGenres(cleanGenreIds, safeLimit);                                          // ③
+        }
+        return toResponses(songs);
+    }
+
+    private List<Long> askPython(String apiName, Supplier<List<Long>> call) {
+        try {
+            return call.get();
+        } catch (RestClientException e) {
+            log.warn("Recommend service error ({}): {}", apiName, e.getMessage());
+            return List.of();
+        }
+    }
+```
+| Phần | Giải thích |
+|---|---|
+| `filter(Objects::nonNull).distinct()` | Bỏ ô `null`, bỏ trùng (`[5, 5, 24]` → `[5, 24]`) |
+| `askCount = safeLimit * 2` | Xin Python **gấp đôi**: 1 số id Python trả có thể là bài đã bị ẩn / gỡ |
+| ① `askPython(..., () -> ...)` | Truyền **cả việc gọi** vào dưới dạng lambda. `Supplier<List<Long>>` = "1 hàm không tham số, trả về `List<Long>`"; `call.get()` mới thật sự chạy nó. Viết vậy để bọc `try / catch` dùng chung cho mọi lần gọi Python sau này |
+| `catch (RestClientException e)` | Mọi lỗi gọi HTTP → log `WARN` + danh sách rỗng (A14.3) |
+| ② | Lọc id Python trả: chỉ giữ bài đang phát hành, **giữ đúng thứ tự Python xếp** |
+| ③ | Không còn bài nào → dự phòng: bài phổ biến nhất trong các thể loại đó |
+
+```java
+    private List<Song> loadPublishedInOrder(List<Long> ids, Long excludeId, int limit) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Song> songsById = new HashMap<>();
+        for (Song song : songRepository.findPublishedByIds(ids, LocalDateTime.now())) {
+            songsById.put(song.getId(), song);
+        }
+        List<Song> result = new ArrayList<>();
+        for (Long id : new LinkedHashSet<>(ids)) {
+            if (id.equals(excludeId)) {
+                continue;
+            }
+            Song song = songsById.get(id);
+            if (song == null) {
+                continue;
+            }
+            result.add(song);
+            if (result.size() == limit) {
+                break;
+            }
+        }
+        return result;
+    }
+
+    private List<Song> topSongsInGenres(List<Long> genreIds, int limit) {
+        LocalDateTime now = LocalDateTime.now();
+        List<Song> candidates = new ArrayList<>();
+        for (Long genreId : genreIds) {
+            candidates.addAll(songRepository.findPublishedByGenre(genreId, now, topByPlayCount(limit)).getContent());
+        }
+        candidates.sort(Comparator.comparing(Song::getPlayCount).reversed());
+        return excludeAndLimit(candidates, null, limit);
+    }
+```
+- `loadPublishedInOrder`: cùng kỹ thuật với lịch sử nghe (C12): lấy 1 lần bằng `IN`, tra bằng `HashMap`, duyệt theo thứ tự gốc. `LinkedHashSet` = tập hợp **bỏ trùng mà vẫn giữ thứ tự** (Python lỡ trả trùng id thì chỉ lấy 1).
+- `topSongsInGenres`: mỗi thể loại lấy top `limit` bài, gộp lại, sắp lại theo lượt nghe **giảm dần** (`reversed()`), cắt còn `limit`.
+
+```java
+    private List<SongResponse> toResponses(List<Song> songs) {
+        return songs.stream()
+                .map(SongMapper::toSongResponse)
+                .toList();
+    }
+```
+Service này trả thẳng **DTO** (`List<SongResponse>`), khác các service khác trả Entity rồi để Controller đổi. Lý do: kết quả gợi ý luôn chỉ có 1 dạng cho người nghe.
+
+---
+
+### C18. `SongController` và `GenreController` — cửa ngõ của người nghe
+
+```java
+@RestController
+@RequestMapping("/api/songs")
+public class SongController {
+
+    private final SongService songService;
+
+    // ... constructor
+
+    @GetMapping
+    public ResponseEntity<PageResponse<SongResponse>> getSongs(
+            @RequestParam(required = false) Long genreId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(SongMapper.toPageResponse(
+                songService.getPublishedSongs(genreId, page, size), SongMapper::toSongResponse));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<PageResponse<SongResponse>> searchSongs(
+            @RequestParam(defaultValue = "") String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(SongMapper.toPageResponse(
+                songService.searchSongs(keyword, page, size), SongMapper::toSongResponse));
+    }
+
+    @GetMapping("/{songId}")
+    public ResponseEntity<SongResponse> getSong(@PathVariable Long songId) {
+        return ResponseEntity.ok(SongMapper.toSongResponse(songService.getPublishedSong(songId)));
+    }
+
+    @PostMapping("/{songId}/play")
+    public ResponseEntity<Map<String, String>> play(Authentication authentication,
+                                                    @PathVariable Long songId) {
+        songService.play(songId, authentication.getName());
+        return ResponseEntity.ok(Map.of("message", "Play recorded"));
+    }
+
+    @GetMapping("/artists/{artistId}")
+    public ResponseEntity<ArtistSongsResponse> getArtistPage(
+            @PathVariable Long artistId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        User artist = songService.getArtist(artistId);
+        PageResponse<SongResponse> songs = SongMapper.toPageResponse(
+                songService.getArtistSongs(artistId, page, size), SongMapper::toSongResponse);
+        return ResponseEntity.ok(new ArtistSongsResponse(
+                artist.getId(), artist.getArtistName(), artist.getBio(), artist.getAvatarUrl(), songs));
+    }
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| `@GetMapping` (không có đường dẫn) | Xử lý đúng `GET /api/songs` |
+| `@RequestParam(required = false) Long genreId` | Lấy tham số **sau dấu `?`**: `/api/songs?genreId=7`. `required = false` = được bỏ trống → `null` |
+| `@RequestParam(defaultValue = "0") int page` | Không gửi → dùng mặc định. Viết `"0"` (chuỗi) vì mọi thứ trên URL đều là chữ, Spring tự đổi sang `int`. Gửi `page=abc` → 400 `Invalid parameter: page` |
+| `@RequestParam` khác `@PathVariable` | `@PathVariable`: nằm **trong** đường dẫn (`/api/songs/12`). `@RequestParam`: nằm **sau** dấu `?` (`/api/songs?page=2`) |
+| `SongMapper.toPageResponse(..., SongMapper::toSongResponse)` | Đổi `Page<Song>` thành `PageResponse<SongResponse>` (C9) |
+| `/{songId}` và `/search` cùng là `GET /api/songs/<gì đó>` | Spring ưu tiên đường dẫn **viết cố định** (`/search`) hơn đường dẫn có biến (`/{songId}`), nên `/api/songs/search` không bị hiểu nhầm là bài có id "search" |
+| `play` cần `Authentication` | Lấy email người nghe để chống đếm trùng và ghi lịch sử |
+| `getArtistPage` | Controller **tự ghép** 2 kết quả (thông tin nghệ sĩ + 1 trang bài) thành `ArtistSongsResponse`. `getArtist` chạy trước: nghệ sĩ không hợp lệ thì 400, không tốn công lấy bài |
+
+Mọi API dưới `/api/songs` **phải đăng nhập** (mọi role, mục 18.1): `SecurityConfig` chỉ mở `/api/auth/**` và `/uploads/**`.
+
+```java
+@RestController
+@RequestMapping("/api/genres")
+public class GenreController {
+
+    private final SongService songService;
+
+    // ... constructor
+
+    @GetMapping
+    public ResponseEntity<List<GenreResponse>> getGenres() {
+        List<GenreResponse> result = songService.getGenres()
+                .stream()
+                .map(SongMapper::toGenreResponse)
+                .toList();
+        return ResponseEntity.ok(result);
+    }
+}
+```
+Controller riêng cho đường dẫn `/api/genres`, nhưng dùng lại `SongService` (không tạo `GenreService` riêng chỉ để chứa 1 dòng). `.toList()` là cách viết gọn của `.collect(Collectors.toList())` (Java 16+).
+
+---
+
+### C19. `controller/ArtistSongController.java` — cửa ngõ của nghệ sĩ
+
+```java
+@PreAuthorize("hasRole('ARTIST')")
+@RestController
+@RequestMapping("/api/artist")
+@Validated
+public class ArtistSongController {
+
+    private final ArtistSongService artistSongService;
+    private final UserService userService;
+
+    // ... constructor
+
+    private Long me(Authentication authentication) {
+        return userService.getByEmail(authentication.getName()).getId();
+    }
+
+    @PostMapping(value = "/songs", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<SongManageResponse> uploadSong(Authentication authentication,
+                                                         @Valid @ModelAttribute UploadSongRequest request) {
+        Song song = artistSongService.uploadSong(
+                me(authentication),
+                request.getTitle(),
+                request.getGenreId(),
+                request.getAudio(),
+                request.getCover(),
+                request.getFeaturedArtistIds(),
+                request.getReleaseAt());
+        return ResponseEntity.ok(SongMapper.toManageResponse(song));
+    }
+
+    @PutMapping(value = "/songs/{songId}/cover", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<SongManageResponse> updateCover(Authentication authentication,
+                                                          @PathVariable Long songId,
+                                                          @RequestParam("cover") MultipartFile cover) {
+        Song song = artistSongService.updateCover(me(authentication), songId, cover);
+        return ResponseEntity.ok(SongMapper.toManageResponse(song));
+    }
+
+    @PutMapping("/songs/{songId}/release")
+    public ResponseEntity<SongManageResponse> updateRelease(Authentication authentication,
+                                                            @PathVariable Long songId,
+                                                            @RequestBody UpdateReleaseRequest request) {
+        Song song = artistSongService.updateReleaseSchedule(
+                me(authentication), songId, request.getReleaseAt());
+        return ResponseEntity.ok(SongMapper.toManageResponse(song));
+    }
+
+    // ... getMySongs, searchArtists, updateSong, updateCanvas, removeCanvas,
+    //     hideSong, showSong, deleteSong: cùng 1 khuôn
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| `@PreAuthorize("hasRole('ARTIST')")` trên class | **Chỉ ARTIST**. USER và cả ADMIN đều bị 403 (Admin không đăng bài được, mục 18.1) |
+| `@Validated` | Bật kiểm tra nhãn đặt **thẳng lên tham số** (ví dụ `@RequestParam @NotBlank String keyword`). Hiện chưa tham số nào dùng kiểu đó nên chưa có tác dụng; giữ lại cho sau này. Khác `@Valid` (kiểm tra **bên trong** 1 DTO) |
+| `me(authentication)` | Email trong token → id nghệ sĩ. **Không bao giờ** lấy id nghệ sĩ từ request: không ai giả làm nghệ sĩ khác được |
+| `@Valid @ModelAttribute UploadSongRequest` | Nhận form-data có file (A11) |
+| `request.getXxx()` truyền từng giá trị vào Service | Service không phụ thuộc DTO của tầng web (dễ gọi lại từ chỗ khác, dễ test) |
+| `@RequestParam("cover") MultipartFile cover` | Đổi ảnh bìa: form-data chỉ 1 ngăn tên `cover` (canvas là ngăn `canvas`). Thiếu ngăn → 400 `File is required` |
+| `@RequestBody UpdateReleaseRequest` **không** có `@Valid` | DTO không có nhãn kiểm tra nào, `null` là hợp lệ (C7.2) |
+| Mọi API trả `SongManageResponse` | Artist thấy đủ trạng thái, lý do bị từ chối... của bài mình |
+
+Bảng 11 API (tiền tố `/api/artist`):
+
+| API | Gọi | Body |
+|---|---|---|
+| `POST /songs` | `uploadSong` | form-data |
+| `GET /songs` | `getMySongs` | |
+| `GET /search-artists?keyword=` | `searchArtists` | |
+| `PUT /songs/{songId}` | `updateSong` | JSON `UpdateSongRequest` |
+| `PUT /songs/{songId}/cover` | `updateCover` | form-data `cover` |
+| `PUT /songs/{songId}/canvas` | `updateCanvas` | form-data `canvas` |
+| `DELETE /songs/{songId}/canvas` | `removeCanvas` | |
+| `PUT /songs/{songId}/release` | `updateReleaseSchedule` | JSON `UpdateReleaseRequest` |
+| `PUT /songs/{songId}/hide` | `hideSong` | |
+| `PUT /songs/{songId}/show` | `showSong` | |
+| `DELETE /songs/{songId}` | `deleteSong` | |
+
+Lời bài hát của Artist nằm ở `LyricsController` (C21), không ở đây.
+
+---
+
+### C20. `controller/AdminSongController.java` — cửa ngõ của Admin
+
+```java
+@PreAuthorize("hasRole('ADMIN')")
+@RestController
+@RequestMapping("/api/admin/songs")
+public class AdminSongController {
+
+    private final AdminSongService adminSongService;
+
+    // ... constructor
+
+    @GetMapping
+    public ResponseEntity<PageResponse<SongManageResponse>> getSongs(
+            @RequestParam(required = false) SongStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(SongMapper.toPageResponse(
+                adminSongService.getSongs(status, page, size),
+                SongMapper::toManageResponse));
+    }
+
+    @PutMapping("/{songId}/approve")
+    public ResponseEntity<SongManageResponse> approveSong(@PathVariable Long songId) {
+        return ResponseEntity.ok(SongMapper.toManageResponse(adminSongService.approveSong(songId)));
+    }
+
+    @PutMapping("/{songId}/reject")
+    public ResponseEntity<SongManageResponse> rejectSong(@PathVariable Long songId,
+                                                         @Valid @RequestBody RejectSongRequest request) {
+        return ResponseEntity.ok(SongMapper.toManageResponse(
+                adminSongService.rejectSong(songId, request.getReason())));
+    }
+
+    @PutMapping("/{songId}/remove")
+    public ResponseEntity<SongManageResponse> removeSong(@PathVariable Long songId,
+                                                         @Valid @RequestBody RejectSongRequest request) {
+        return ResponseEntity.ok(SongMapper.toManageResponse(
+                adminSongService.removeSong(songId, request.getReason())));
+    }
+}
+```
+- `@RequestParam(required = false) SongStatus status`: Spring tự đổi chữ `PENDING` thành enum. Viết thường (`pending`) hoặc sai → 400 `Invalid parameter: status`.
+- Cùng 1 DTO `RejectSongRequest` cho cả từ chối và gỡ (đều cần lý do).
+- `toPageResponse(..., SongMapper::toManageResponse)`: cùng method phân trang với người nghe, chỉ khác hàm đổi (A16.3).
+
+---
+
+### C21. `LyricsController`, `RecommendationController`, `ListeningHistoryController`
+
+Ba Controller này **không có** `@RequestMapping` trên class: đường dẫn đầy đủ ghi trên từng method, vì các API của chúng nằm rải ở nhiều tiền tố khác nhau.
+
+#### C21.1. `LyricsController`
+
+```java
+@RestController
+public class LyricsController {
+
+    // ... field LyricsService, UserService + constructor + hàm me(authentication)
+
+    @GetMapping("/api/songs/{songId}/lyrics")
+    public ResponseEntity<LyricsResponse> getLyrics(@PathVariable Long songId) {
+        return ResponseEntity.ok(lyricsService.getPublishedLyrics(songId));
+    }
+
+    @PreAuthorize("hasRole('ARTIST')")
+    @GetMapping("/api/artist/songs/{songId}/lyrics")
+    public ResponseEntity<LyricsResponse> getMyLyrics(Authentication authentication,
+                                                      @PathVariable Long songId) {
+        return ResponseEntity.ok(lyricsService.getMyLyrics(me(authentication), songId));
+    }
+
+    @PreAuthorize("hasRole('ARTIST')")
+    @PutMapping("/api/artist/songs/{songId}/lyrics")
+    public ResponseEntity<LyricsResponse> saveLyrics(Authentication authentication,
+                                                     @PathVariable Long songId,
+                                                     @Valid @RequestBody LyricsRequest request) {
+        LyricsResponse response = lyricsService.saveLyrics(me(authentication), songId, request.getContent());
+        return ResponseEntity.ok(response);
+    }
+
+    @PreAuthorize("hasRole('ARTIST')")
+    @DeleteMapping("/api/artist/songs/{songId}/lyrics")
+    public ResponseEntity<Map<String, String>> deleteLyrics(Authentication authentication,
+                                                            @PathVariable Long songId) {
+        lyricsService.deleteLyrics(me(authentication), songId);
+        return ResponseEntity.ok(Map.of("message", "Lyrics have been deleted"));
+    }
+}
+```
+`@PreAuthorize` đặt **trên từng method** (không phải trên class): API xem lời của người nghe thì ai đăng nhập cũng gọi được, 3 API còn lại chỉ ARTIST. Gom vào 1 Controller vì cùng 1 chủ đề (lời bài hát).
+
+#### C21.2. `RecommendationController`
+
+```java
+@RestController
+public class RecommendationController {
+
+    // ... field RecommendationService + constructor
+
+    @GetMapping("/api/songs/{songId}/recommendations")
+    public ResponseEntity<List<SongResponse>> getSimilarSongs(@PathVariable Long songId,
+                                                              @RequestParam(defaultValue = "5") int limit,
+                                                              @RequestParam(required = false) List<Long> excludeIds) {
+        return ResponseEntity.ok(recommendationService.getSimilarSongs(songId, limit, excludeIds));
+    }
+
+    @GetMapping("/api/songs/{songId}/recommendations/artist")
+    public ResponseEntity<List<SongResponse>> getArtistSongs(@PathVariable Long songId,
+                                                             @RequestParam(defaultValue = "5") int limit) {
+        return ResponseEntity.ok(recommendationService.getArtistSongs(songId, limit));
+    }
+
+    @GetMapping("/api/recommendations/genres")
+    public ResponseEntity<List<SongResponse>> getGenreSongs(@RequestParam(required = false) List<Long> genreIds,
+                                                            @RequestParam(defaultValue = "10") int limit) {
+        return ResponseEntity.ok(recommendationService.getGenreSongs(genreIds, limit));
+    }
+}
+```
+- `@RequestParam List<Long> excludeIds`: nhận danh sách trên URL, viết lặp (`?excludeIds=1&excludeIds=2`) hoặc dấu phẩy (`?excludeIds=1,2`).
+- `genreIds` để `required = false` để **Service tự báo lỗi** bằng câu dễ hiểu `Genre ids are required`, thay vì lỗi mặc định khó hiểu của Spring khi thiếu tham số bắt buộc.
+
+#### C21.3. `ListeningHistoryController`
+
+```java
+@RestController
+@RequestMapping("/api/users/me/history")
+public class ListeningHistoryController {
+
+    // ... field ListeningHistoryService, UserService + constructor
+
+    @GetMapping
+    public ResponseEntity<List<ListeningHistoryResponse>> getMyHistory(Authentication authentication) {
+        Long userId = userService.getByEmail(authentication.getName()).getId();
+        return ResponseEntity.ok(listeningHistoryService.getRecentSongs(userId));
+    }
+}
+```
+Đường dẫn nằm dưới `/api/users/me/...` (giống các API "của tôi" trong module User), nhưng code thuộc module Song.
+
+---
+
+### C22. Theo dấu: đăng bài → duyệt → nghe
+
+Ghép mọi thứ lại qua 1 câu chuyện, mỗi bước chỉ ra **code nào chạy**, **câu SQL / lệnh Redis / MongoDB nào** được gửi đi. (Phần "đi qua các filter" giống hệt `USER_MODULE.md` C25, ở đây viết gọn.)
+
+#### Bước 1 — Mây Chiều (ARTIST, id 3) đăng bài
+
+```http
+POST /api/artist/songs
+Authorization: Bearer <token của Mây>
+Content-Type: multipart/form-data; boundary=...
+
+title = Chiều Mưa
+genreId = 5
+audio = chieu-mua.mp3        (4,8 MB)
+cover = bia.jpg              (300 KB)
+featuredArtistIds = 9
+releaseAt = 2026-12-24T20:00:00
+```
+```
+① Tomcat đọc form-data, lưu tạm các file (file > 100 MB → dừng ở đây, 413)
+② JwtAuthenticationFilter: token hợp lệ → "mây@... , ROLE_ARTIST"
+   RateLimitFilter: Redis INCR rate:user:may@gmail.com
+③ AuthorizationFilter: /api/artist/** cần đăng nhập ✔
+④ @PreAuthorize("hasRole('ARTIST')") ✔
+⑤ Spring điền UploadSongRequest qua setter (A11.1), @Valid: title ✔, genreId ✔, audio ✔, 1 feat ✔
+⑥ me(): SELECT * FROM users WHERE email = 'may@gmail.com'                       → id 3
+⑦ ArtistSongService.uploadSong (C13.2)
+   getArtist(3):            SELECT * FROM users WHERE id = 3                   → ARTIST, ACTIVE ✔
+   checkFutureTime:         24/12 20:00 sau bây giờ ✔
+   loadFeaturedArtists:     SELECT * FROM users WHERE id IN (9)                → ARTIST, ACTIVE ✔
+   getGenre(5):             SELECT * FROM genres WHERE id = 5                  → Ballad ✔
+   saveAudio:               ghi uploads/songs/audio/7b1e...c4.mp3
+   getAudioDuration:        mp3agic đọc file → 214 giây
+   saveImage:               kiểm tra chữ ký JPG → ghi uploads/songs/covers/a90f...11.jpg
+   save(song):
+     INSERT INTO songs (artist_id, genre_id, title, audio_url, cover_url, duration_seconds,
+                        play_count, status, release_at, created_at, updated_at, version, ...)
+            VALUES (3, 5, 'Chiều Mưa', '/uploads/songs/audio/7b1e...c4.mp3', '/uploads/songs/covers/a90f...11.jpg',
+                    214, 0, 'PENDING', '2026-12-24 20:00:00', <bây giờ>, <bây giờ>, 0, ...)   → id 40
+     INSERT INTO song_featured_artists (song_id, artist_id) VALUES (40, 9)
+⑧ SongMapper.toManageResponse: đọc nghệ sĩ, feat, thể loại (đã có sẵn trong bộ nhớ của request)
+⑨ 200 + JSON SongManageResponse: status "PENDING", released false, ...
+```
+
+#### Bước 2 — Admin duyệt
+
+```http
+PUT /api/admin/songs/40/approve
+Authorization: Bearer <token Admin>
+```
+```
+@PreAuthorize("hasRole('ADMIN')") ✔
+AdminSongService.approveSong(40) (C14)
+  SELECT * FROM songs WHERE id = 40                                           → PENDING, version 0
+  song.getArtist() (LAZY): SELECT * FROM users WHERE id = 3                   → ACTIVE, ARTIST ✔
+  releaseAt đã có (24/12 20:00) → giữ nguyên
+  UPDATE songs SET status = 'APPROVED', reject_reason = NULL, updated_at = <bây giờ>, version = 1, ...
+         WHERE id = 40 AND version = 0                                        (A7)
+         (không có play_count trong câu UPDATE: updatable = false, A6)
+200 + SongManageResponse: status "APPROVED", released false (chưa tới 20:00)
+```
+
+#### Bước 3 — 20:00 ngày 24/12
+
+**Không có code nào chạy.** Không có "bộ hẹn giờ" nào bật bài lên. Chỉ đơn giản: từ thời điểm này, điều kiện `s.releaseAt <= :now` trong mọi câu truy vấn của người nghe bắt đầu **đúng** với bài 40 → bài tự xuất hiện.
+
+#### Bước 4 — Lan (USER, id 7) mở trang chủ
+
+```http
+GET /api/songs?page=0&size=20
+```
+```
+SongService.getPublishedSongs(null, 0, 20) (C11.1)
+  SELECT s.* FROM songs s JOIN users a ON a.id = s.artist_id
+  WHERE s.status = 'APPROVED' AND s.release_at <= <bây giờ>
+    AND a.account_status = 'ACTIVE' AND a.role = 'ARTIST'
+  ORDER BY s.release_at DESC LIMIT 20 OFFSET 0
+  + SELECT COUNT(...) (cùng điều kiện)                                        (A5.2)
+SongMapper.toSongResponse cho từng bài → đọc thêm nghệ sĩ, feat, thể loại (A3.3)
+200 + PageResponse { content: [ {id: 40, title: "Chiều Mưa", ...}, ... ], page: 0, size: 20, ... }
+```
+
+#### Bước 5 — Lan bấm phát
+
+Frontend làm **2 việc song song**:
+
+(a) Gắn file vào trình phát: `<audio src="http://<server>:8080/uploads/songs/audio/7b1e...c4.mp3">`
+```
+GET /uploads/songs/audio/7b1e...c4.mp3        Range: bytes=0-
+  → Không qua Controller, không cần token, không tính rate limit
+  → 206 Partial Content (A12)
+```
+
+(b) Báo đã nghe:
+```http
+POST /api/songs/40/play
+Authorization: Bearer <token của Lan>
+```
+```
+SongService.play(40, "lan@gmail.com") (C11.2)
+  findPublishedById(40)                                                       → đang phát hành ✔
+  Redis: SET play:40:lan@gmail.com 1 NX EX 30                                 → OK (lần đầu)
+  MySQL: UPDATE songs SET play_count = play_count + 1 WHERE id = 40           (A6, không tăng version)
+  MySQL: SELECT * FROM users WHERE email = 'lan@gmail.com'                    → id 7
+  listeningHistoryService.record(7, 40)  ──► chuyển sang luồng nền (A10)
+200 {"message": "Play recorded"}                       ← trả ngay, không chờ MongoDB
+
+  (luồng nền) MongoDB: insert { userId: 7, songId: 40, playedAt: <bây giờ> } vào listening_history
+```
+
+#### Bước 6 — Lan xem "Nghe gần đây"
+
+```http
+GET /api/users/me/history
+```
+```
+ListeningHistoryService.getRecentSongs(7) (C12)
+  MongoDB: find({userId: 7}).sort({playedAt: -1}).limit(100)
+  Gộp trùng → [40, 12, 7, ...]
+  MySQL: SELECT ... FROM songs WHERE id IN (40, 12, 7, ...) AND <đã phát hành>
+  Ghép theo thứ tự, tối đa 10 bài
+200 + [ { song: {id: 40, ...}, playedAt: "2026-12-24T20:05:13" }, ... ]
+```
+
+---
+
+### C23. Ví dụ luyện tập: tự thêm 1 API mới
+
+> ⚠️ **Đây là bài tập**, code dưới đây **không có** trong dự án.
+
+**Yêu cầu giả định:** trang chủ có mục "Top bài nghe nhiều nhất".
+API: `GET /api/songs/top?limit=10`.
+
+**Bước 1 — Có cần truy vấn mới không?** Không. `findPublished(now, pageable)` đã có sẵn; chỉ cần truyền `Pageable` sắp theo lượt nghe (mẹo A5.5).
+
+**Bước 2 — Service** (`SongService.java`, thêm method):
+```java
+public List<Song> getTopSongs(int limit) {
+    int safeLimit = Math.min(Math.max(limit, 1), MAX_PAGE_SIZE);
+    Pageable top = PageRequest.of(0, safeLimit,
+            Sort.by(Sort.Order.desc("playCount"), Sort.Order.desc("id")));
+    return songRepository.findPublished(LocalDateTime.now(), top).getContent();
+}
+```
+
+**Bước 3 — Controller** (`SongController.java`, thêm method):
+```java
+@GetMapping("/top")
+public ResponseEntity<List<SongResponse>> getTopSongs(@RequestParam(defaultValue = "10") int limit) {
+    List<SongResponse> result = songService.getTopSongs(limit)
+            .stream()
+            .map(SongMapper::toSongResponse)
+            .toList();
+    return ResponseEntity.ok(result);
+}
+```
+`/top` không đụng `/{songId}` vì đường dẫn cố định được ưu tiên (C18).
+
+**Bước 4 — Database?** Không đổi gì, không cần `ALTER TABLE`.
+
+**Bước 5 — Test bằng Postman** (token bất kỳ role nào):
+
+| Thử | Mong đợi |
+|---|---|
+| `/api/songs/top` | 200, tối đa 10 bài, lượt nghe giảm dần |
+| `?limit=3` | 3 bài |
+| `?limit=1000` | Tối đa 50 bài |
+| `?limit=abc` | 400 `Invalid parameter: limit` |
+| Không token | 401 |
+| Ẩn 1 bài top đầu bằng tài khoản Artist rồi gọi lại | Bài đó biến mất khỏi danh sách |
+
+**Bước 6 — Git**: nhánh riêng → commit → push → Pull Request vào `main` (`USER_MODULE.md` C26).
+
+**Tự làm thêm** (không có đáp án): API "Top bài theo thể loại" `GET /api/songs/top?genreId=5`: gợi ý dùng `findPublishedByGenre` khi có `genreId`.
+
+---
+
+### C24. Bài tập tự kiểm tra (có đáp án)
+
+1. `SongMapper` chạy ở Controller, sau khi Service đã xong, mà vẫn đọc được `song.getArtist().getArtistName()` (quan hệ LAZY). Vì sao?
+2. Bài "Chiều Mưa" feat nghệ sĩ C. Admin khóa tài khoản C. JSON bài "Chiều Mưa" hiện gì ở `featuredArtists`? Mở khóa C thì sao?
+3. Lan bấm phát 1 bài 5 lần trong 10 giây. `playCount` tăng bao nhiêu?
+4. Vì sao không cộng lượt nghe bằng `song.setPlayCount(song.getPlayCount() + 1)` rồi `save(song)`? (2 lý do)
+5. Artist A gửi `PUT /api/artist/songs/99` mà bài 99 là của Artist B. Kết quả?
+6. Artist mở trang sửa bài, Admin duyệt bài đó, rồi Artist mới bấm lưu tên mới. Kết quả?
+7. Đăng bài: file nhạc hợp lệ, ảnh bìa 3 MB. File nhạc đã ghi xuống ổ đĩa có bị bỏ lại không?
+8. Canvas dài 10,04 giây có được nhận không? 10,06 giây thì sao?
+9. Lời bài 10 dòng, 9 dòng có mốc thời gian. Kết quả?
+10. Service Python đang tắt. Gọi `GET /api/recommendations/genres?genreIds=5`. Kết quả?
+11. MongoDB đang hỏng. Lan bấm phát bài. API trả gì? Lượt nghe có tăng không? Lịch sử có ghi không?
+12. Vì sao lấy 100 bản ghi lịch sử từ MongoDB mà chỉ trả 10 bài?
+13. Gọi `GET /api/songs?size=1000`. Nhận bao nhiêu bài mỗi trang?
+14. Sửa `PUBLISHED_CONDITION`, lỡ xóa dấu cách cuối `"... APPROVED "` thành `"... APPROVED"`. Chuyện gì xảy ra?
+15. Bài hẹn giờ 20:00 đã được duyệt. Đúng 20:00, code nào chạy để bài hiện ra?
+16. Admin gọi `POST /api/artist/songs`. Mã gì?
+
+**Đáp án**
+
+1. Spring Boot mặc định bật `spring.jpa.open-in-view=true`: phiên database mở suốt cả request, nên quan hệ LAZY vẫn tải được trong Controller (A3.2).
+2. C **biến khỏi** danh sách `featuredArtists` (mapper chỉ giữ feat ACTIVE + ARTIST). Dòng trong bảng trung gian vẫn còn, nên mở khóa C thì C **tự hiện lại** (C9).
+3. **1**. Lần đầu ghi được khóa Redis `play:<id>:lan@...` sống 30 giây, 4 lần sau `setIfAbsent` trả `false` → không cộng (A18, C11.2).
+4. (a) 2 người nghe cùng lúc cùng đọc 1 số cũ → mất lượt (A6). (b) Cột `play_count` có `updatable = false` → `save` **không bao giờ** ghi cột này, số mới bị bỏ qua.
+5. **400 `Song does not exist`**: `findByIdAndArtistId(99, A)` không tìm thấy (C5.5, C13.1).
+6. **409** `This data was changed by someone else, please reload and try again`: `version` đã tăng lúc Admin duyệt, câu `UPDATE ... WHERE version = <cũ>` không khớp (A7).
+7. **Không.** Lỗi ảnh xảy ra trong `try` của `uploadSong` → `catch` xóa file nhạc (và ảnh nếu có) rồi ném lỗi → 400 `Image must not exceed 2MB` (C13.2).
+8. 10,04 giây → làm tròn 10,0 → **được**. 10,06 giây → 10,1 → **bị từ chối** (C13.1).
+9. **400** `Only 9/10 lines have a time. Either all lines must have a time or none` (C15.3 bước ⑦).
+10. **200** kèm danh sách gợi ý **dự phòng** (bài nhiều lượt nghe nhất của thể loại 5). Log có dòng `Recommend service error (genres)` (A14.3, C17.4).
+11. **200** `Play recorded`; lượt nghe trong MySQL **có tăng**; lịch sử **không** ghi được, chỉ có dòng log `WARN` (A10, C12).
+12. 1 bài nghe nhiều lần chiếm nhiều bản ghi. Lấy dư rồi gộp trùng, bỏ bài không còn phát hành, mới đủ 10 bài khác nhau (C6, C12).
+13. **50** (bị kẹp bởi `MAX_PAGE_SIZE`, A5.4).
+14. `"...APPROVED" + "AND ..."` dính thành `APPROVEDAND` → câu JPQL sai cú pháp → ứng dụng **không khởi động được** (A4.2).
+15. **Không code nào.** Điều kiện `releaseAt <= :now` trong các truy vấn tự đúng từ thời điểm đó (C22 bước 3).
+16. **403**: `ArtistSongController` chỉ cho `hasRole('ARTIST')`, Admin không có quyền này (C19).
+
+---
+
+## PHẦN D — FRONTEND, CẤU HÌNH VÀ PHỤ LỤC
+
+---
+
 ## 23. HƯỚNG DẪN RIÊNG CHO FRONTEND
 
 ### 23.1. Đường dẫn file
@@ -2489,6 +5725,57 @@ Các test tự động hiện có: `SongOptimisticLockTest` (2 người cùng s�
 - CI hiện **chưa chạy test** (bỏ qua bằng `-DskipTests`), test chạy ở máy local.
 - Khi thay đổi enum `SongStatus` hoặc cấu trúc bảng (thêm cột, thêm bảng): vì VPS dùng `ddl-auto=validate`, phải tự chạy `ALTER TABLE` / `CREATE TABLE` trên VPS **trước** khi merge, nếu không bản mới sẽ không khởi động được.
 
+### 24.5. Thử toàn bộ luồng Song trên máy của bạn (MỚI)
+
+Điều kiện: đã chạy được backend trên máy theo `USER_MODULE.md` mục 21.7 (MySQL, Redis, file cấu hình, có cả `spring.mongodb.uri`). Service AI Python **không bắt buộc**: thiếu nó thì gợi ý theo thể loại tự dùng phương án dự phòng.
+
+**Bước 1 — Thêm 25 thể loại** (1 lần, database mới): chạy câu `INSERT INTO genres ...` ở mục 24.2a.
+
+**Bước 2 — Tạo 3 tài khoản** (Postman, theo `USER_MODULE.md` mục 20): `artist@...`, `admin@...`, `listener@...`. Mỗi tài khoản đăng ký + nhập OTP. Rồi trong MySQL:
+```sql
+UPDATE users SET access_status = 'ACCEPT'
+WHERE email IN ('artist@gmail.com', 'admin@gmail.com', 'listener@gmail.com');
+
+UPDATE users SET role = 'ADMIN' WHERE email = 'admin@gmail.com';
+```
+
+**Bước 3 — Biến `artist@...` thành nghệ sĩ** bằng đúng luồng thật:
+1. Đăng nhập `artist@...` → `POST /api/users/me/artist-request` với `{"artistName": "Mây Chiều", "bio": "Thử nghiệm"}`.
+2. Đăng nhập `admin@...` → `GET /api/admin/artist-requests` lấy id → `PUT /api/admin/artist-requests/{id}/approve`.
+
+**Bước 4 — Đăng bài** (token `artist@...`): `POST /api/artist/songs`, Body → **form-data**:
+
+| Key | Kiểu | Giá trị |
+|---|---|---|
+| `title` | Text | `Bài thử` |
+| `genreId` | Text | `1` (hoặc id lấy từ `GET /api/genres`) |
+| `audio` | **File** | 1 file `.mp3` thật, ≤ 20 MB |
+| `cover` | File | (tùy chọn) 1 ảnh JPG/PNG ≤ 2 MB |
+
+→ 200, `status: "PENDING"`. Ghi lại `id` bài.
+
+**Bước 5 — Duyệt** (token `admin@...`): `PUT /api/admin/songs/{id}/approve` → `status: "APPROVED"`, `released: true` (không hẹn giờ nên phát hành ngay).
+
+**Bước 6 — Nghe** (token `listener@...`):
+1. `GET /api/songs` → thấy bài vừa đăng.
+2. Mở trình duyệt: `http://localhost:8080` + `audioUrl` của bài → nghe được, kéo thanh thời gian được (A12).
+3. `POST /api/songs/{id}/play` 2 lần liên tiếp → `GET /api/songs/{id}` → `playCount` chỉ tăng **1** (A18).
+4. `GET /api/users/me/history` → có bài vừa nghe (nếu MongoDB kết nối được).
+
+**Bước 7 — Nhìn vào dữ liệu** để hiểu chuyện gì đã xảy ra:
+```sql
+SELECT id, title, status, release_at, play_count, version FROM songs;
+SELECT * FROM song_featured_artists;
+```
+```
+redis-cli
+KEYS play:*                     ← khóa chống đếm trùng (biến mất sau 30 giây)
+TTL play:1:listener@gmail.com
+```
+MongoDB: mở **MongoDB Compass** (hoặc trang Atlas) → database trong `spring.mongodb.uri` → collection `listening_history`.
+
+Làm thêm: đổi lịch, ẩn / hiện, thêm lời bài hát có mốc thời gian, thêm canvas (video MP4 7–10 giây), gọi 3 API gợi ý... rồi mỗi lần nhìn lại bảng `songs` xem `status`, `version`, `updated_at` đổi ra sao.
+
 ---
 
 ## 25. GIỚI HẠN ĐÃ BIẾT VÀ HƯỚNG PHÁT TRIỂN
@@ -2533,6 +5820,18 @@ Các test tự động hiện có: `SongOptimisticLockTest` (2 người cùng s�
 ---
 
 ## 26. CÂU HỎI THƯỜNG GẶP
+
+**H: Mình chưa học Spring Boot, nên đọc từ đâu?**
+Đ: Đọc Phần A của `USER_MODULE.md` (kiến thức chung) → Phần A của tài liệu này (A1 → A18) → theo lộ trình đầu tiên ở mục 1. Rồi tự đi hết 1 vòng "đăng bài → duyệt → nghe" trên máy (24.5).
+
+**H: Lúc khởi động, log có dòng `WARN ... spring.jpa.open-in-view is enabled by default`. Có lỗi gì không?**
+Đ: Không. Đó là lời nhắc của Spring Boot về chế độ "giữ phiên tới hết request". Dự án **đang dựa vào** chế độ này để `SongMapper` đọc được nghệ sĩ, thể loại, feat (A3.2). Đừng tắt nó nếu chưa sửa lại cách truy vấn.
+
+**H: Sửa 1 câu `@Query` trong `SongRepository` xong thì ứng dụng không chạy nữa?**
+Đ: Hibernate kiểm tra cú pháp mọi `@Query` lúc khởi động. Hay gặp nhất: thiếu dấu cách khi ghép chuỗi (A4.2), gõ sai tên field (JPQL dùng tên field Java `releaseAt`, không phải tên cột `release_at`, A4.1). Đọc dòng lỗi trong log, thường có ghi rõ chỗ sai.
+
+**H: Code `SongService` không có `@Transactional` mà vẫn ghi database được?**
+Đ: Mỗi lần gọi `save(...)` của repository tự chạy trong 1 transaction riêng. `@Transactional` chỉ cần khi muốn **gom nhiều thao tác** thành 1 khối "tất cả hoặc không gì cả" (`USER_MODULE.md` A9.7). Riêng câu `@Modifying` tự khai báo `@Transactional` ngay trên repository (A6).
 
 **H: Tôi đăng bài rồi mà tìm không thấy?**
 Đ: Bài cần Admin duyệt. Kiểm tra `GET /api/artist/songs`: `PENDING` = chờ duyệt; `APPROVED` + `released: false` = chưa tới lịch.
@@ -2731,3 +6030,30 @@ Các test tự động hiện có: `SongOptimisticLockTest` (2 người cùng s�
 - Swagger: `http://157.66.100.87:8080/swagger-ui.html` — thử API trực tiếp trên trình duyệt
 - Comment trong từng file code — giải thích chi tiết từng dòng
 - Comment trong từng file code — giải thích chi tiết từng dòng
+
+### 27.5. Bản đồ file → mục giải thích
+
+| File | Nghiệp vụ (Phần B) | Giải thích code (Phần C) |
+|---|---|---|
+| `enums/SongStatus.java` | 8 | C1 |
+| `entity/Song.java` | 7.1, 7.2, 19.1 | C2, A2, A6, A7, A8 |
+| `entity/Genre.java` | 7.2a, 13 | C3.1 |
+| `entity/SongLyrics.java` | 7.2b, 15 | C3.2 |
+| `document/ListeningHistory.java` | 7.4, 12 | C4, A9 |
+| `repository/SongRepository.java` | 8.4, 11 | C5, A4, A5, A6 |
+| `repository/GenreRepository.java`, `SongLyricsRepository.java`, `ListeningHistoryRepository.java` | | C6 |
+| `dto/song/UploadSongRequest.java` và các DTO request khác | 9.1, 23.2 | C7, A11 |
+| `dto/song/SongResponse.java`, `SongManageResponse.java`, `PageResponse.java`... | 8.5, 21 | C8, A16 |
+| `mapper/SongMapper.java` | 8.5 | C9, A3 |
+| `service/FileStorageService.java` (nhạc, video) | 17 | C10, A13 |
+| `service/SongService.java` | 11 | C11, A18 |
+| `service/ListeningHistoryService.java` | 12 | C12, A10 |
+| `service/ArtistSongService.java` | 9, 14 | C13 |
+| `service/AdminSongService.java` | 10 | C14 |
+| `service/LyricsService.java` | 15 | C15, A15 |
+| `client/RecommendClient.java` | 16.5 | C16, A14 |
+| `service/RecommendationService.java` | 16 | C17 |
+| `controller/SongController.java`, `GenreController.java` | 11, 13 | C18 |
+| `controller/ArtistSongController.java` | 9, 14 | C19 |
+| `controller/AdminSongController.java` | 10 | C20 |
+| `controller/LyricsController.java`, `RecommendationController.java`, `ListeningHistoryController.java` | 12, 15, 16 | C21 |
