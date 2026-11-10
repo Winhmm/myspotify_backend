@@ -1,9 +1,9 @@
-# MODULE USER — TÀI LIỆU NGHIỆP VỤ VÀ LUỒNG XỬ LÝ
+# MODULE USER — TÀI LIỆU NGHIỆP VỤ, LUỒNG XỬ LÝ VÀ GIẢI THÍCH CODE
 
 > Dự án: **MySpotify Backend** (Spring Boot 4.1, Java 17 trong `pom.xml` — VPS chạy JDK 25, MySQL, Redis)
 > Package gốc: `com.winhmm.myspotify`
-> Cập nhật lần cuối: **08/11/2026** — khớp với code trên nhánh `main` sau Pull Request #11.
-> Đối tượng đọc: thành viên mới trong nhóm (backend, frontend, tester), **không cần biết trước Spring Boot**.
+> Cập nhật lần cuối: **10/11/2026** — khớp với code trên nhánh `main` (code module User không đổi kể từ Pull Request #11).
+> Đối tượng đọc: thành viên mới trong nhóm (backend, frontend, tester), **kể cả người chưa từng học Spring Boot**.
 > Tài liệu liên quan:
 > - `docs/SONG_MODULE.md` — module bài hát (nghe nhạc, đăng nhạc, thể loại, lời bài hát, gợi ý).
 > - `docs/PLAYLIST_MODULE.md` — module Playlist (mỗi tài khoản tự tạo playlist).
@@ -13,37 +13,91 @@
 
 ## MỤC LỤC
 
-0. [Có gì mới trong bản cập nhật này](#0-có-gì-mới-trong-bản-cập-nhật-này)
-1. [Cách đọc tài liệu này](#1-cách-đọc-tài-liệu-này)
-2. [Module User giải quyết bài toán gì?](#2-module-user-giải-quyết-bài-toán-gì)
-3. [Từ điển thuật ngữ](#3-từ-điển-thuật-ngữ)
-4. [Danh sách chức năng](#4-danh-sách-chức-năng)
-5. [Kiến trúc và vị trí các file](#5-kiến-trúc-và-vị-trí-các-file)
-6. [Dữ liệu: MySQL và Redis](#6-dữ-liệu-mysql-và-redis)
-7. [Bốn "trục trạng thái" của 1 tài khoản](#7-bốn-trục-trạng-thái-của-1-tài-khoản)
-8. [Mã OTP — trái tim của module](#8-mã-otp--trái-tim-của-module)
-9. [Đăng nhập, JWT và phiên đăng nhập](#9-đăng-nhập-jwt-và-phiên-đăng-nhập)
-10. [Hành trình của 1 request đã đăng nhập](#10-hành-trình-của-1-request-đã-đăng-nhập)
-11. [Luồng: đăng ký, xác thực, đăng nhập, quên mật khẩu](#11-luồng-đăng-ký-xác-thực-đăng-nhập-quên-mật-khẩu)
-12. [Luồng: người dùng tự quản lý tài khoản](#12-luồng-người-dùng-tự-quản-lý-tài-khoản)
-13. [Luồng: trở thành nghệ sĩ (ARTIST)](#13-luồng-trở-thành-nghệ-sĩ-artist)
-14. [Luồng: Admin quản lý người dùng](#14-luồng-admin-quản-lý-người-dùng)
-15. [Giới hạn tần suất (rate limit)](#15-giới-hạn-tần-suất-rate-limit)
-16. [Bảo mật — tổng hợp](#16-bảo-mật--tổng-hợp)
-17. [Xử lý lỗi](#17-xử-lý-lỗi)
-18. [Ảnh hưởng của module User lên module Song và Playlist](#18-ảnh-hưởng-của-module-user-lên-module-song-và-playlist)
-19. [Hướng dẫn riêng cho Frontend](#19-hướng-dẫn-riêng-cho-frontend)
-20. [Hướng dẫn test nhanh bằng Postman](#20-hướng-dẫn-test-nhanh-bằng-postman)
-21. [Cấu hình, môi trường và deploy](#21-cấu-hình-môi-trường-và-deploy)
-22. [Giới hạn đã biết và hướng phát triển](#22-giới-hạn-đã-biết-và-hướng-phát-triển)
-23. [Câu hỏi thường gặp](#23-câu-hỏi-thường-gặp)
-24. [Phụ lục](#24-phụ-lục)
+**Mở đầu**
+- 0. [Có gì mới trong bản cập nhật này](#0-có-gì-mới-trong-bản-cập-nhật-này)
+- 1. [Cách đọc tài liệu này](#1-cách-đọc-tài-liệu-này)
+
+**PHẦN A — Kiến thức nền cho người chưa học Spring Boot**
+- A1. Backend là gì? Ví dụ "quán ăn"
+- A2. HTTP — "ngôn ngữ" giữa frontend và backend
+- A3. JSON và form-data
+- A4. API, endpoint và quy ước đặt đường dẫn
+- A5. Java cần nắm trước khi đọc code
+- A6. Spring Boot là gì?
+- A7. Bean, IoC container và Dependency Injection
+- A8. Kiến trúc nhiều tầng: Controller → Service → Repository
+- A9. Database, MySQL và JPA / Hibernate
+- A10. Redis — bộ nhớ tạm siêu nhanh
+- A11. Kiểm tra dữ liệu đầu vào (validation)
+- A12. Xử lý lỗi tập trung
+- A13. Spring Security cơ bản
+- A14. Mật khẩu: băm bằng BCrypt
+- A15. JWT — "thẻ ra vào" có chữ ký
+- A16. Mã OTP và gửi email
+
+**PHẦN B — Nghiệp vụ: hệ thống làm gì**
+- 2. [Module User giải quyết bài toán gì?](#2-module-user-giải-quyết-bài-toán-gì)
+- 3. [Từ điển thuật ngữ](#3-từ-điển-thuật-ngữ)
+- 4. [Danh sách chức năng](#4-danh-sách-chức-năng)
+- 5. [Kiến trúc và vị trí các file](#5-kiến-trúc-và-vị-trí-các-file)
+- 6. [Dữ liệu: MySQL và Redis](#6-dữ-liệu-mysql-và-redis)
+- 7. [Bốn "trục trạng thái" của 1 tài khoản](#7-bốn-trục-trạng-thái-của-1-tài-khoản)
+- 8. [Mã OTP — trái tim của module](#8-mã-otp--trái-tim-của-module)
+- 9. [Đăng nhập, JWT và phiên đăng nhập](#9-đăng-nhập-jwt-và-phiên-đăng-nhập)
+- 10. [Hành trình của 1 request đã đăng nhập](#10-hành-trình-của-1-request-đã-đăng-nhập)
+- 11. [Luồng: đăng ký, xác thực, đăng nhập, quên mật khẩu](#11-luồng-đăng-ký-xác-thực-đăng-nhập-quên-mật-khẩu)
+- 12. [Luồng: người dùng tự quản lý tài khoản](#12-luồng-người-dùng-tự-quản-lý-tài-khoản)
+- 13. [Luồng: trở thành nghệ sĩ (ARTIST)](#13-luồng-trở-thành-nghệ-sĩ-artist)
+- 14. [Luồng: Admin quản lý người dùng](#14-luồng-admin-quản-lý-người-dùng)
+- 15. [Giới hạn tần suất (rate limit)](#15-giới-hạn-tần-suất-rate-limit)
+- 16. [Bảo mật — tổng hợp](#16-bảo-mật--tổng-hợp)
+- 17. [Xử lý lỗi](#17-xử-lý-lỗi)
+- 18. [Ảnh hưởng của module User lên module Song và Playlist](#18-ảnh-hưởng-của-module-user-lên-module-song-và-playlist)
+
+**PHẦN C — Đọc code từng file**
+- C0. Cách đọc phần này
+- C1. `MyspotifyApplication` · C2. Các enum · C3. `User` · C4. `OtpVerification` · C5. Repository
+- C6. DTO request · C7. DTO response và `UserMapper`
+- C8. `SessionService` · C9. `JwtUtil` · C10. `CustomUserDetailsService` · C11. `JwtAuthenticationFilter`
+- C12. `RateLimitService` và `RateLimitFilter` · C13. `SecurityConfig` · C14. `CorsConfig` và `WebMvcConfig`
+- C15. `EmailService` và `EmailSendException` · C16. `OtpService` · C17. `AuthService`
+- C18. `UserService` · C19. `AdminService` · C20. `FileStorageService` (phần ảnh đại diện)
+- C21. `AuthController` · C22. `UserController` · C23. `AdminController` · C24. `GlobalExceptionHandler`
+- C25. Theo dấu 1 request đăng ký từ đầu tới cuối
+- C26. Ví dụ luyện tập: tự thêm 1 API mới
+- C27. Bài tập tự kiểm tra (có đáp án)
+
+**PHẦN D — Frontend, test, cấu hình và phụ lục**
+- 19. [Hướng dẫn riêng cho Frontend](#19-hướng-dẫn-riêng-cho-frontend)
+- 20. [Hướng dẫn test nhanh bằng Postman](#20-hướng-dẫn-test-nhanh-bằng-postman)
+- 21. [Cấu hình, môi trường và deploy](#21-cấu-hình-môi-trường-và-deploy) (mới: 21.7 chạy dự án lần đầu trên máy của bạn)
+- 22. [Giới hạn đã biết và hướng phát triển](#22-giới-hạn-đã-biết-và-hướng-phát-triển)
+- 23. [Câu hỏi thường gặp](#23-câu-hỏi-thường-gặp)
+- 24. [Phụ lục](#24-phụ-lục)
 
 ---
 
 ## 0. CÓ GÌ MỚI TRONG BẢN CẬP NHẬT NÀY
 
-Bản trước viết ngày 18/10/2026. Từ đó tới nay code module User **chỉ có 1 thay đổi nghiệp vụ**, nhưng thay đổi này ảnh hưởng tới cả luồng đăng ký → đăng nhập:
+### 0.1. Bản 10/11/2026 (bản này): viết thêm cho người chưa học Spring Boot
+
+Code module User **không thay đổi**. Bản này chỉ bổ sung phần giải thích:
+
+| # | Bổ sung | Dành cho | Ở đâu |
+|---|---|---|---|
+| 1 | **Phần A — Kiến thức nền**: HTTP, JSON, Java cần biết, Spring Boot, bean và Dependency Injection, các tầng, database và JPA, Redis, validation, xử lý lỗi, Spring Security, BCrypt, JWT, OTP và email. Mọi ví dụ lấy từ chính dự án | Người chưa học Spring Boot | A1 → A16 |
+| 2 | **Phần C — Đọc code từng file**: trích code thật của mọi file module User, giải thích từng dòng, kèm lý do viết như vậy | Người sẽ đọc / sửa code | C0 → C24 |
+| 3 | **Theo dấu 1 request** đăng ký đi qua từng filter, từng class, từng câu SQL, từng lệnh Redis | Mọi người | C25 |
+| 4 | **Bài luyện tập** tự thêm 1 API mới theo đúng thứ tự các tầng | Người mới tập code | C26 |
+| 5 | **14 câu hỏi tự kiểm tra** có đáp án | Người mới | C27 |
+| 6 | **Chạy dự án lần đầu trên máy của bạn**: cài gì, tạo database, tạo file cấu hình, các lỗi khởi động hay gặp | Thành viên mới | 21.7 |
+| 7 | Thêm vài câu hỏi thường gặp và 1 giới hạn đã biết (mật khẩu có dấu) | | 22, 23 |
+
+Phần B (nghiệp vụ) và Phần D (frontend, test, cấu hình) giữ nguyên nội dung bản 08/11, chỉ thêm đường dẫn chéo sang Phần A và C.
+
+### 0.2. Bản 08/11/2026
+
+So với bản 18/10/2026, code module User **chỉ có 1 thay đổi nghiệp vụ**, nhưng thay đổi này ảnh hưởng tới cả luồng đăng ký → đăng nhập:
 
 | # | Thay đổi | Ảnh hưởng | Đọc ở mục |
 |---|---|---|---|
@@ -60,12 +114,29 @@ Số API của module User **không đổi** (vẫn 24 API).
 
 ## 1. CÁCH ĐỌC TÀI LIỆU NÀY
 
+Tài liệu chia 4 phần:
+
+| Phần | Trả lời câu hỏi | Độ khó |
+|---|---|---|
+| **A** (A1 → A16) | "Spring Boot, HTTP, JWT... là gì?" | Dễ, cho người mới hoàn toàn |
+| **B** (mục 2 → 18) | "Hệ thống làm gì, theo luật nào?" | Trung bình, không cần đọc code |
+| **C** (C0 → C27) | "Code viết ra sao, từng dòng nghĩa là gì?" | Khó nhất, cần đọc A trước |
+| **D** (mục 19 → 24) | "Frontend gọi thế nào, test thế nào, cấu hình ra sao?" | Tra cứu khi cần |
+
+Lộ trình gợi ý:
+
 | Bạn là | Đọc theo thứ tự | Có thể bỏ qua |
 |---|---|---|
-| **Người mới hoàn toàn** | 0 → 2 → 3 → 4 → 7 → 8 → 9 → 11 → 12 → 13 → 14 | 10, 21 |
-| **Frontend** | 0 → 2 → 4 → 7 → 9 → 19 → 11 → 12 → 13 → 17 | 5, 6, 10, 21 |
-| **Tester** | 0 → 2 → 4 → 7 → 8 → 9 → 11 → 12 → 13 → 14 → 15 → 20 | 5, 21 |
-| **Backend sắp sửa code** | Đọc hết, đặc biệt 5, 6, 7.3a, 8, 9, 10, 16 | |
+| **Chưa học Spring Boot, muốn hiểu và code được** | A1 → A16 → 2 → 4 → 7 → 8 → 9 → 11 → C0 → C27 → 21.7 (tự chạy thử) → 20 (tự test) | |
+| **Người mới, chỉ cần hiểu hệ thống** | 0 → 2 → 3 → 4 → 7 → 8 → 9 → 11 → 12 → 13 → 14 | Phần C, 10, 21 |
+| **Frontend** | A2, A3, A15 (nếu chưa rõ) → 2 → 4 → 7 → 9 → 19 → 11 → 12 → 13 → 17 | Phần C, 5, 6, 10, 21 |
+| **Tester** | A2 → 2 → 4 → 7 → 8 → 9 → 11 → 12 → 13 → 14 → 15 → 20 → C27 | Phần C (trừ C27) |
+| **Backend sắp sửa code** | Đọc hết, đặc biệt 5, 6, 7.3a, 8, 9, 10, 16 và cả Phần C | |
+
+Mẹo cho người mới:
+- Đọc Phần A một lượt cho quen từ, **không cần nhớ hết**. Đọc phần sau gặp từ lạ thì quay lại tra.
+- Đọc Phần C thì **mở file thật trong IntelliJ bên cạnh** (giữ phím `Ctrl` rồi bấm vào tên class / method để nhảy tới chỗ nó được viết; `Ctrl + Alt + ←` để quay lại).
+- Học nhanh nhất là **tự chạy** (21.7) và **tự gọi API bằng Postman** (mục 20), vừa gọi vừa xem dữ liệu đổi trong MySQL.
 
 Quy ước:
 - `chữ như thế này` là tên trong code: class, method, cột database, trường JSON.
@@ -73,6 +144,1022 @@ Quy ước:
 - "Tài khoản đang hoạt động" = `accountStatus = ACTIVE`.
 - "Được phép vào web" = `accessStatus = ACCEPT`.
 - "Chủ dự án" = người quản lý server và database (khác với tài khoản ADMIN trong app).
+
+---
+
+## PHẦN A — KIẾN THỨC NỀN CHO NGƯỜI CHƯA HỌC SPRING BOOT
+
+Phần này **không** nói riêng về module User. Nó giải thích các khái niệm mà mọi mục phía sau đều dùng tới: HTTP, JSON, Spring Boot, database, Redis, bảo mật, mật khẩu, token... Mỗi khái niệm đều lấy ví dụ từ chính code của dự án.
+
+- Ai đã biết Spring Boot: bỏ qua, đọc từ mục 2.
+- Ai chưa biết gì: đọc lần lượt A1 → A16. Mỗi mục khoảng 5–10 phút. Không cần nhớ hết ngay, đọc phần sau thấy lạ thì quay lại tra.
+
+---
+
+### A1. Backend là gì? Ví dụ "quán ăn"
+
+Một ứng dụng web (hoặc app điện thoại) thường có 2 nửa:
+
+| Nửa | Là gì | Trong dự án |
+|---|---|---|
+| **Frontend** | Phần người dùng nhìn thấy và bấm vào: nút, ô nhập, danh sách bài hát | Web React trên Vercel, sau này có thể thêm app React Native |
+| **Backend** | Phần chạy trên máy chủ (server), người dùng không nhìn thấy. Nhận yêu cầu, kiểm tra, xử lý, đọc ghi dữ liệu, trả kết quả | Dự án Spring Boot này, chạy trên VPS ở cổng `8080` |
+
+So sánh với một quán ăn:
+
+```
+ KHÁCH HÀNG (người dùng)
+      │ bấm nút "Đăng nhập"
+      ▼
+ THỰC ĐƠN + NGƯỜI GHI ORDER (frontend)
+      │ gửi "phiếu order" qua Internet  ← đây là 1 HTTP request
+      ▼
+ NHÀ BẾP (backend)
+      ├─ Bồi bàn nhận phiếu, xem phiếu ghi đủ chưa          ← Controller
+      ├─ Đầu bếp nấu theo công thức, theo luật của quán      ← Service
+      └─ Thủ kho lấy / cất nguyên liệu                       ← Repository
+      ▼
+ KHO (database: MySQL, Redis)
+```
+
+Backend **không có giao diện**. Nó chỉ nói chuyện bằng dữ liệu. Vì vậy:
+- Muốn thử backend mà chưa có frontend → dùng **Postman** (một phần mềm gửi request bằng tay, xem mục 20).
+- Cùng 1 backend có thể phục vụ nhiều frontend: web, app Android, app iOS.
+
+Các "nhà cung cấp" mà backend của dự án nói chuyện cùng:
+
+```
+                    ┌──────────────────────────────┐
+  Web / App / ────► │  BACKEND SPRING BOOT (:8080) │ ──► MySQL   (lưu tài khoản, bài hát, playlist)
+  Postman           │                              │ ──► Redis   (phiên đăng nhập, bộ đếm)
+                    │                              │ ──► MongoDB (lịch sử nghe, module Song)
+                    │                              │ ──► Gmail   (gửi mã OTP)
+                    │                              │ ──► Ổ đĩa   (ảnh đại diện, file nhạc)
+                    └──────────────────────────────┘
+```
+
+---
+
+### A2. HTTP — "ngôn ngữ" giữa frontend và backend
+
+HTTP là quy ước để 2 máy nói chuyện qua mạng. Mỗi lần nói chuyện gồm **1 câu hỏi** (request) và **1 câu trả lời** (response).
+
+#### A2.1. Request (yêu cầu) gồm 4 phần
+
+Ví dụ thật: đăng nhập.
+
+```http
+POST /api/auth/login HTTP/1.1                 ← (1) method + (2) đường dẫn
+Host: 157.66.100.87:8080
+Content-Type: application/json                ← (3) header: thông tin phụ
+                                              ← dòng trống ngăn cách header và body
+{                                             ← (4) body: dữ liệu gửi kèm
+  "email": "lan@gmail.com",
+  "password": "matkhau123"
+}
+```
+
+| Phần | Ý nghĩa | Ví dụ |
+|---|---|---|
+| **Method** | Muốn làm **loại** việc gì | `GET`, `POST`, `PUT`, `DELETE` |
+| **Đường dẫn (path)** | Làm việc đó với **cái gì** | `/api/auth/login` |
+| **Header** | Thông tin phụ: dữ liệu dạng gì, ai đang gọi | `Content-Type: application/json`, `Authorization: Bearer eyJ...` |
+| **Body** | Dữ liệu chính gửi lên (không phải request nào cũng có) | `{"email": "...", "password": "..."}` |
+
+#### A2.2. Response (trả lời) gồm 3 phần
+
+```http
+HTTP/1.1 200 OK                               ← (1) mã trạng thái
+Content-Type: application/json                ← (2) header
+
+{                                             ← (3) body
+  "token": "eyJhbGciOiJIUzUxMiJ9...",
+  "userId": 7,
+  "username": "lan.nguyen",
+  "role": "USER"
+}
+```
+
+#### A2.3. Bốn method dùng trong dự án
+
+| Method | Nghĩa thông thường | Ví dụ trong module User |
+|---|---|---|
+| `GET` | **Đọc** dữ liệu, không thay đổi gì. Không có body | `GET /api/users/me/profile` — xem hồ sơ |
+| `POST` | **Tạo mới** hoặc **gửi 1 hành động** | `POST /api/auth/register` — đăng ký; `POST /api/users/logout` — đăng xuất |
+| `PUT` | **Sửa / cập nhật** | `PUT /api/users/me/profile` — sửa họ tên |
+| `DELETE` | **Xóa** | Module User không dùng (xem dưới) |
+
+Lưu ý: xóa tài khoản dùng `PUT /api/users/me/delete` chứ **không** phải `DELETE`. Lý do: tài khoản không bị xóa khỏi database, chỉ **đổi trạng thái** thành `DELETED` (gọi là "xóa mềm", mục 7.1). Về bản chất đó là một lần **cập nhật**, nên dùng `PUT`.
+
+Cùng 1 đường dẫn nhưng khác method là **2 API khác nhau**:
+- `GET /api/users/me/profile` → xem hồ sơ.
+- `PUT /api/users/me/profile` → sửa hồ sơ.
+
+#### A2.4. Các phần của 1 địa chỉ (URL)
+
+```
+http://157.66.100.87:8080/api/admin/users/42/lock
+└─┬─┘ └─────┬──────┘ └┬─┘└────────────┬─────────┘
+giao thức  máy chủ   cổng          đường dẫn
+```
+
+- `42` trong đường dẫn gọi là **path variable** (biến trên đường dẫn). Trong code viết là `/users/{userId}/lock`, `{userId}` là "chỗ trống" được điền bằng số thật.
+- Một số API module khác có **query string** sau dấu `?`, ví dụ `?page=0&size=20`. Module User không dùng.
+
+#### A2.5. Mã trạng thái (status code)
+
+Số 3 chữ số đầu tiên của response cho biết kết quả. Nhóm đầu 2 = thành công, đầu 4 = **phía gửi** làm sai, đầu 5 = **phía server** gặp sự cố.
+
+| Mã | Tên | Nghĩa dễ hiểu | Ví dụ trong module User |
+|---|---|---|---|
+| **200** | OK | Thành công | Đăng nhập đúng |
+| **400** | Bad Request | Dữ liệu gửi lên sai, hoặc vi phạm luật nghiệp vụ | Email sai định dạng; `Email already exists` |
+| **401** | Unauthorized | **Chưa xác định được bạn là ai**: không gửi token, token sai, hết hạn, phiên đã bị hủy | Gọi `/api/users/me/profile` mà không gửi token |
+| **403** | Forbidden | **Biết bạn là ai, nhưng bạn không đủ quyền** | USER thường gọi `/api/admin/users` |
+| **404** | Not Found | Không có API này | Gõ sai đường dẫn (khi đã gửi token) |
+| **409** | Conflict | Dữ liệu bị trùng do 2 request xảy ra cùng lúc | 2 người đăng ký cùng username trong cùng 1 tích tắc |
+| **413** | Content Too Large | File gửi lên quá lớn so với giới hạn của server | Ảnh đại diện vài chục MB |
+| **429** | Too Many Requests | Gọi quá nhiều lần trong thời gian ngắn | Đăng nhập sai liên tục > 10 lần / 60 giây |
+| **500** | Internal Server Error | Server bị lỗi không lường trước (lỗi code) | Hiếm khi xảy ra; xem log |
+| **503** | Service Unavailable | Một dịch vụ bên ngoài đang trục trặc | Gmail không gửi được email OTP |
+
+Mẹo nhớ 401 và 403: **401 = "bạn là ai?"**, **403 = "biết bạn rồi, nhưng không được vào"**.
+
+#### A2.6. Ba header hay gặp
+
+| Header | Ai gửi | Ý nghĩa |
+|---|---|---|
+| `Content-Type: application/json` | Frontend → server | "Body tôi gửi là JSON" |
+| `Authorization: Bearer eyJ...` | Frontend → server | "Đây là token đăng nhập của tôi" (mục A15) |
+| `Retry-After: 37` | Server → frontend | Đi kèm lỗi 429: "37 giây nữa hãy thử lại" |
+
+---
+
+### A3. JSON và form-data — hai cách gói dữ liệu
+
+#### A3.1. JSON
+
+JSON là cách viết dữ liệu dạng chữ mà máy nào, ngôn ngữ nào cũng đọc được. Ví dụ hồ sơ người dùng trả về từ `GET /api/users/me/profile`:
+
+```json
+{
+  "id": 7,
+  "username": "lan.nguyen",
+  "email": "lan@gmail.com",
+  "fullName": "Nguyễn Thị Lan",
+  "avatarUrl": null,
+  "accountStatus": "ACTIVE",
+  "role": "USER",
+  "artistRequestStatus": "NONE",
+  "artistName": null,
+  "bio": null
+}
+```
+
+Quy tắc viết JSON:
+
+| Quy tắc | Đúng | Sai |
+|---|---|---|
+| Bao ngoài bằng `{ }` (object) hoặc `[ ]` (danh sách) | `{"email": "a@b.com"}` | `email: a@b.com` |
+| Tên trường đặt trong **nháy kép** | `"email"` | `'email'` hoặc `email` |
+| Chuỗi chữ đặt trong **nháy kép** | `"lan@gmail.com"` | `'lan@gmail.com'` |
+| Số, `true`, `false`, `null` **không** có nháy | `"id": 7` | (viết `"7"` vẫn là JSON hợp lệ, nhưng thành chuỗi chữ chứ không phải số) |
+| Các cặp ngăn cách bằng dấu phẩy, **không** có dấu phẩy sau cặp cuối | `{"a": 1, "b": 2}` | `{"a": 1, "b": 2,}` |
+
+Viết JSON sai cú pháp → server không đọc được → **400 `"Invalid request data"`**.
+
+Danh sách (array) trong JSON, ví dụ `GET /api/admin/users` trả về:
+```json
+[
+  { "id": 1, "username": "admin", "...": "..." },
+  { "id": 7, "username": "lan.nguyen", "...": "..." }
+]
+```
+
+#### A3.2. multipart/form-data
+
+JSON chỉ chứa chữ, **không** gửi được file. Muốn gửi file (ảnh đại diện) phải dùng kiểu **form-data**: body chia thành nhiều "ngăn", mỗi ngăn có 1 tên (key). API đổi ảnh đại diện cần 1 ngăn tên `file` chứa ảnh.
+
+Trong Postman: tab **Body → form-data**, key `file`, đổi kiểu từ Text sang **File**, chọn ảnh.
+
+#### A3.3. Ai chuyển JSON thành object Java?
+
+Thư viện **Jackson** (Spring Boot cài sẵn) tự làm 2 chiều:
+- **JSON → object Java** (khi nhận request): Jackson tạo object rỗng, rồi gọi các **setter** theo tên trường. JSON có `"email"` → gọi `setEmail(...)`.
+- **Object Java → JSON** (khi trả response): Jackson gọi các **getter**. Có `getFullName()` → JSON có trường `"fullName"`.
+
+Vì vậy tên trường JSON phải **khớp chính xác** với tên trong Java, phân biệt hoa thường: gửi `"Email"` hay `"e-mail"` thì Jackson không điền vào `email`, trường đó còn `null` → lỗi `Email is required`.
+
+---
+
+### A4. API, endpoint và quy ước đặt đường dẫn
+
+- **API** (Application Programming Interface): danh sách các "món" backend phục vụ, kèm cách gọi. Giống thực đơn của quán.
+- **Endpoint**: 1 món cụ thể = 1 cặp **method + đường dẫn**. Ví dụ `POST /api/auth/login`.
+
+Module User có **24 endpoint**, chia 3 nhóm theo tiền tố đường dẫn:
+
+| Tiền tố | Ai gọi được | Ví dụ |
+|---|---|---|
+| `/api/auth/...` | **Ai cũng gọi được**, không cần đăng nhập | Đăng ký, đăng nhập, quên mật khẩu |
+| `/api/users/...` | Phải đăng nhập (mọi role) | Xem / sửa hồ sơ của chính mình |
+| `/api/admin/...` | Phải đăng nhập **và** là ADMIN | Khóa tài khoản, duyệt nghệ sĩ |
+
+Chữ `me` trong `/api/users/me/...` nghĩa là **"chính tôi"**. Server **không** lấy id người dùng từ đường dẫn hay body, mà lấy từ **token**. Vì vậy không ai sửa được hồ sơ của người khác bằng cách đổi số trong đường dẫn: đường dẫn không có số nào để đổi cả.
+
+---
+
+### A5. Java cần nắm trước khi đọc code
+
+Code dự án viết bằng Java. Mục này chỉ nhắc những gì **thật sự xuất hiện** trong module User.
+
+#### A5.1. Class, object, field, `new`
+
+```java
+public class User {               // class = "bản thiết kế"
+    private String email;         // field = 1 thuộc tính mà mọi object User đều có
+}
+
+User u = new User();              // new = tạo 1 object (1 "sản phẩm" theo bản thiết kế)
+u.setEmail("lan@gmail.com");      // gọi method của object
+```
+
+#### A5.2. `private`, getter và setter
+
+Field để `private` (bên ngoài không đụng trực tiếp được). Muốn đọc / ghi phải qua method:
+
+```java
+public String getEmail() { return email; }                 // getter: đọc
+public void setEmail(String email) { this.email = email; } // setter: ghi
+```
+`this.email` = field của object; `email` (không có `this`) = tham số truyền vào. Hai cái trùng tên nên phải có `this` để phân biệt.
+
+Dự án **tự viết tay** getter / setter (không dùng thư viện Lombok sinh tự động), để người mới đọc thấy rõ mọi thứ.
+
+#### A5.3. Constructor (hàm khởi tạo)
+
+Method đặc biệt, **cùng tên với class**, không có kiểu trả về, chạy 1 lần lúc `new`:
+
+```java
+public LoginResponse(String token, Long userId, String username, Role role) {
+    this.token = token;
+    this.userId = userId;
+    this.username = username;
+    this.role = role;
+}
+```
+
+#### A5.4. `final` và `static final`
+
+```java
+private final UserRepository userRepository;   // final: gán 1 lần trong constructor, sau đó không đổi được
+private static final int OTP_EXPIRE_MINUTES = 5; // static final: hằng số dùng chung, viết HOA_GẠCH_DƯỚI
+```
+
+#### A5.5. Interface
+
+Interface chỉ khai báo **tên method**, không có phần thân (không có code bên trong):
+
+```java
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByEmail(String email);    // không có { ... }
+}
+```
+Ai viết phần thân? **Spring** tự sinh lúc chạy (mục A9.5). Đây là điều "thần kỳ" đầu tiên người mới hay thắc mắc.
+
+#### A5.6. Enum
+
+Kiểu dữ liệu chỉ có **vài giá trị cố định**:
+```java
+public enum Role { USER, ARTIST, ADMIN }
+```
+Biến kiểu `Role` chỉ có thể là 1 trong 3 giá trị đó (hoặc `null`). So sánh bằng `==`: `if (user.getRole() == Role.ADMIN)`.
+
+#### A5.7. Annotation — "nhãn dán" có chữ `@`
+
+```java
+@Service
+public class AuthService { ... }
+
+@NotBlank(message = "Email is required")
+private String email;
+```
+Annotation **không tự chạy**. Nó là nhãn dán để **người khác đọc** (ở đây là Spring, Hibernate, Jackson): "class này là Service", "trường này không được để trống". Spring đọc nhãn rồi làm việc tương ứng. Hiểu Spring Boot phần lớn là hiểu các nhãn dán này; mỗi nhãn được giải thích ngay chỗ nó xuất hiện trong Phần C.
+
+#### A5.8. Exception — báo lỗi bằng cách "ném"
+
+```java
+if (userRepository.existsByUsername(username)) {
+    throw new IllegalArgumentException("Username already exists");
+}
+```
+- `throw` = dừng method ngay lập tức và "ném" lỗi lên chỗ đã gọi method này.
+- Lỗi cứ được ném ngược lên qua từng tầng (Service → Controller) cho tới khi có ai "bắt" (`catch`).
+- Trong dự án, người bắt là `GlobalExceptionHandler` (mục A12): nó biến lỗi thành response 400 + `{"message": "Username already exists"}`.
+
+`try / catch` là chỗ tự bắt lỗi:
+```java
+try {
+    mailSender.send(message);            // thử làm
+} catch (Exception e) {                  // nếu lỗi thì làm phần này
+    throw new EmailSendException("Could not send OTP email, please try again later", e);
+}
+```
+
+`RuntimeException` (và các con của nó như `IllegalArgumentException`) là loại lỗi không bắt buộc khai báo. Điều này quan trọng với `@Transactional` (mục A9.7).
+
+#### A5.9. `Optional` — "hộp có thể rỗng"
+
+`findByEmail` có thể không tìm thấy ai. Thay vì trả `null` (dễ gây lỗi `NullPointerException`), nó trả `Optional<User>` = 1 cái hộp, có thể có user hoặc rỗng.
+
+```java
+User user = userRepository.findByEmail(email)
+        .orElseThrow(() -> new IllegalArgumentException("Email does not exist"));
+// Hộp có user → lấy user ra. Hộp rỗng → ném lỗi.
+
+Optional<User> existing = userRepository.findByEmail(email);
+if (existing.isPresent()) {        // hộp có đồ không?
+    User oldUser = existing.get(); // lấy ra
+}
+```
+
+#### A5.10. `List`, `Map`
+
+```java
+List<User> users = userRepository.findAll();          // danh sách nhiều user
+Map.of("message", "Logout successful")                 // 1 cặp khóa → giá trị
+```
+`Map.of("message", "...")` được Jackson biến thành JSON `{"message": "..."}`. Đây là cách dự án trả mọi thông báo ngắn.
+
+#### A5.11. Lambda, method reference và stream
+
+```java
+() -> new IllegalArgumentException("User does not exist")
+```
+**Lambda** = 1 hàm nhỏ không tên, viết gọn. `()` là danh sách tham số (ở đây không có), sau `->` là việc cần làm. `orElseThrow` chỉ gọi hàm này **khi hộp rỗng**.
+
+```java
+adminService.getAllUsers()                         // List<User>
+        .stream()                                  // biến danh sách thành "băng chuyền"
+        .map(UserMapper::toUserProfileResponse)    // mỗi User trên băng chuyền → đổi thành UserProfileResponse
+        .collect(Collectors.toList());             // gom lại thành List<UserProfileResponse>
+```
+`UserMapper::toUserProfileResponse` là **method reference**: cách viết gọn của `user -> UserMapper.toUserProfileResponse(user)`.
+
+#### A5.12. Thời gian và định dạng số
+
+```java
+LocalDateTime now = LocalDateTime.now();       // thời điểm hiện tại (ngày + giờ)
+now.plusMinutes(5)                              // 5 phút sau
+expiredAt.isBefore(LocalDateTime.now())         // đã qua thời điểm expiredAt chưa?
+Duration.ofMinutes(5)                           // 1 khoảng thời gian dài 5 phút
+
+String.format("%06d", 4213)                     // → "004213"
+```
+`%06d` nghĩa là: in số nguyên (`d`), đủ 6 chữ số (`6`), thiếu thì thêm số `0` phía trước (`0`). Nhờ vậy mã OTP luôn đủ 6 ký tự.
+
+---
+
+### A6. Spring Boot là gì?
+
+#### A6.1. Framework
+
+**Framework** là "bộ khung" làm sẵn những việc lặp đi lặp lại. **Spring** là framework Java phổ biến nhất để làm backend. **Spring Boot** = Spring + cấu hình mặc định sẵn + server chạy kèm (Tomcat), bấm Run là có server.
+
+| Việc phải làm | Không có Spring Boot | Có Spring Boot |
+|---|---|---|
+| Mở cổng 8080, nhận request HTTP | Tự cài và cấu hình Tomcat | Có sẵn |
+| Đọc JSON trong request thành object | Tự viết code đọc chuỗi | Jackson tự làm |
+| Viết câu SQL `SELECT ... WHERE email = ?` | Tự viết, tự mở / đóng kết nối | Đặt tên method `findByEmail` là xong |
+| Kiểm tra email đúng định dạng | Tự viết `if` | Dán `@Email` |
+| Kiểm tra token mỗi request | Tự viết ở đầu mọi method | Viết 1 filter, Spring Security gọi giúp |
+| Tạo object và nối các object với nhau | Tự `new` hàng chục object theo đúng thứ tự | Spring tự làm (mục A7) |
+
+#### A6.2. Maven và `pom.xml`
+
+**Maven** là công cụ quản lý thư viện và build. File `pom.xml` liệt kê các thư viện dự án cần; Maven tự tải về. Những thư viện module User dùng:
+
+| Thư viện (`artifactId`) | Dùng để | Thấy ở đâu trong module User |
+|---|---|---|
+| `spring-boot-starter-webmvc` | Nhận request HTTP, Controller, Jackson, Tomcat | `@RestController`, `@PostMapping` |
+| `spring-boot-starter-data-jpa` | Làm việc với database qua Entity và Repository (Hibernate) | `@Entity`, `UserRepository` |
+| `mysql-connector-j` | "Dây nối" từ Java tới MySQL | Không thấy trong code, chỉ cần có |
+| `spring-boot-starter-security` | Đăng nhập, phân quyền, filter, BCrypt | `SecurityConfig`, `@PreAuthorize` |
+| `spring-boot-starter-validation` | Kiểm tra dữ liệu đầu vào | `@Valid`, `@NotBlank`, `@Email` |
+| `spring-boot-starter-data-redis` | Nói chuyện với Redis | `StringRedisTemplate` |
+| `spring-boot-starter-mail` | Gửi email | `JavaMailSender` |
+| `jjwt-api`, `jjwt-impl`, `jjwt-gson` | Tạo và đọc JWT | `JwtUtil` |
+| `spring-boot-starter-actuator` | API kiểm tra sức khỏe server | `GET /actuator/health` |
+| `springdoc-openapi-starter-webmvc-ui` | Trang Swagger liệt kê API | `/swagger-ui.html` |
+
+`lombok` có trong `pom.xml` nhưng code dự án **không dùng** (getter / setter viết tay).
+
+#### A6.3. Ứng dụng khởi động như thế nào?
+
+File `MyspotifyApplication.java` chỉ có vài dòng:
+
+```java
+@SpringBootApplication
+@EnableAsync
+public class MyspotifyApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(MyspotifyApplication.class, args);
+    }
+}
+```
+
+Bấm Run → `main` chạy → `SpringApplication.run(...)` làm lần lượt:
+
+```
+1. Đọc file cấu hình application.properties (mật khẩu database, khóa JWT...)
+2. Quét (scan) mọi class nằm trong package com.winhmm.myspotify và các package con
+   → tìm class có nhãn @Service, @RestController, @Configuration, @Component...
+3. Tạo object cho từng class đó (gọi là bean, mục A7) và nối chúng với nhau
+4. Kết nối MySQL; Hibernate so sánh các @Entity với bảng thật
+   (local: tự tạo / thêm cột còn thiếu; VPS: chỉ kiểm tra, sai là dừng)
+5. Bật Tomcat, mở cổng 8080, bắt đầu nhận request
+```
+Dòng log cuối kiểu `Started MyspotifyApplication in 6.2 seconds` nghĩa là server đã sẵn sàng.
+
+- `@SpringBootApplication`: nhãn "đây là điểm bắt đầu, hãy quét package này". Vì quét từ `com.winhmm.myspotify` trở xuống, **mọi class mới phải nằm trong package đó**, đặt ra ngoài là Spring không thấy.
+- `@EnableAsync`: bật khả năng chạy method ở luồng riêng (module Song dùng để ghi lịch sử nghe). Module User không dùng.
+
+#### A6.4. File cấu hình `application.properties`
+
+Những giá trị **khác nhau giữa các máy** (mật khẩu database, khóa bí mật, thư mục upload) không viết cứng trong code mà để trong file cấu hình, dạng `khóa=giá trị`:
+
+```properties
+app.jwt.expiration-ms=86400000
+```
+Code đọc giá trị bằng `@Value`:
+```java
+public SessionService(StringRedisTemplate redisTemplate,
+                      @Value("${app.jwt.expiration-ms}") long expirationMs) { ... }
+```
+`${app.jwt.expiration-ms}` nghĩa là "lấy giá trị của khóa `app.jwt.expiration-ms` trong file cấu hình". Thiếu khóa này → ứng dụng **không khởi động được** và báo `Could not resolve placeholder 'app.jwt.expiration-ms'`.
+
+Danh sách khóa của module User: mục 21.1. Cách tạo file trên máy mới: mục 21.7.
+
+---
+
+### A7. Bean, IoC container và Dependency Injection
+
+Đây là khái niệm **quan trọng nhất** của Spring, và cũng khó hiểu nhất với người mới. Đọc chậm.
+
+#### A7.1. Vấn đề
+
+`AuthService` cần 5 "đồ nghề" để làm việc: `UserRepository`, `OtpService`, `PasswordEncoder`, `JwtUtil`, `SessionService`. `OtpService` lại cần `OtpVerificationRepository`, `EmailService`, `StringRedisTemplate`. `EmailService` cần `JavaMailSender`... Nếu tự làm bằng tay:
+
+```java
+// KHÔNG CÓ SPRING: tự tạo mọi thứ, đúng thứ tự, ở đâu đó
+JavaMailSender mailSender = new JavaMailSenderImpl(/* host, port, user, pass... */);
+EmailService emailService = new EmailService(mailSender);
+StringRedisTemplate redis = new StringRedisTemplate(/* kết nối Redis... */);
+OtpService otpService = new OtpService(otpRepo, emailService, redis);
+// ... thêm vài chục dòng nữa ...
+AuthService authService = new AuthService(userRepo, otpService, encoder, jwtUtil, sessionService);
+```
+Hàng chục class, mỗi class cần vài class khác → rối và dễ sai.
+
+#### A7.2. Cách Spring giải quyết
+
+Spring có 1 cái "kho" gọi là **IoC container** (hay ApplicationContext). Lúc khởi động (bước 3 ở A6.3), Spring:
+1. Tìm mọi class có nhãn `@Service`, `@Component`, `@RestController`, `@Configuration`...
+2. Tạo **đúng 1 object** cho mỗi class đó, cất vào kho. Mỗi object trong kho gọi là **bean**.
+3. Khi tạo 1 bean mà constructor của nó cần tham số, Spring **tự lấy bean phù hợp trong kho truyền vào**.
+
+Việc "đồ nghề được đưa tới tận tay thay vì tự đi lấy" gọi là **Dependency Injection** (DI, tiêm phụ thuộc). Việc "Spring nắm quyền tạo object thay vì mình" gọi là **Inversion of Control** (IoC, đảo ngược quyền điều khiển).
+
+Trong code, DI trông như sau:
+
+```java
+@Service                                         // ① nhãn: "Spring ơi, tạo giúp 1 bean AuthService"
+public class AuthService {
+    private final UserRepository userRepository; // ② đồ nghề cần dùng
+    private final OtpService otpService;
+    // ...
+
+    public AuthService(UserRepository userRepository, OtpService otpService, /* ... */) {
+        this.userRepository = userRepository;    // ③ Spring gọi constructor này,
+        this.otpService = otpService;            //    tự truyền các bean đúng kiểu vào
+        // ...
+    }
+}
+```
+Không có chỗ nào gọi `new AuthService(...)`. Spring gọi giúp. Cách này gọi là **constructor injection** (tiêm qua constructor), là cách dự án dùng ở mọi nơi.
+
+#### A7.3. Bean được tạo từ đâu?
+
+| Cách | Ví dụ trong dự án |
+|---|---|
+| Class có `@Service` | `AuthService`, `UserService`, `OtpService`, `SessionService`... |
+| Class có `@Component` | `JwtUtil` |
+| Class có `@RestController` | `AuthController`, `UserController`, `AdminController` |
+| Method có `@Bean` nằm trong class `@Configuration` (dùng khi muốn tự tay tạo object, thường là object của thư viện) | `passwordEncoder()` trong `SecurityConfig` tạo bean `PasswordEncoder`; `filterChain(...)` tạo bean `SecurityFilterChain`; `corsConfigurationSource()` trong `CorsConfig` |
+| Interface kế thừa `JpaRepository` | `UserRepository`, `OtpVerificationRepository` (Spring tự sinh class bên dưới) |
+| Spring Boot tự tạo sẵn khi thấy thư viện và cấu hình | `JavaMailSender` (từ `spring.mail.*`), `StringRedisTemplate` (từ `spring.data.redis.*`) |
+
+`JwtAuthenticationFilter` và `RateLimitFilter` **không** phải bean: chúng được tạo bằng `new` bên trong `SecurityConfig`. Lý do ở mục C13.
+
+#### A7.4. Lỗi hay gặp khi mới tập
+
+```
+Parameter 0 of constructor in com.winhmm.myspotify.service.AuthService
+required a bean of type 'com.winhmm.myspotify.service.SessionService' that could not be found.
+```
+Nghĩa là: AuthService cần `SessionService` nhưng kho không có. Nguyên nhân thường gặp:
+- Quên dán `@Service` lên class `SessionService`.
+- Class nằm ngoài package `com.winhmm.myspotify` nên Spring không quét tới.
+
+---
+
+### A8. Kiến trúc nhiều tầng: Controller → Service → Repository
+
+#### A8.1. Mỗi tầng một việc
+
+| Tầng | Ví dụ "quán ăn" | Việc được làm | Việc **không** được làm |
+|---|---|---|---|
+| **Controller** | Bồi bàn | Nhận request, kiểm tra dữ liệu có đúng mẫu không (`@Valid`), gọi Service, đóng gói kết quả thành response | Chứa luật nghiệp vụ (ví dụ "email đã tồn tại thì báo lỗi") |
+| **Service** | Đầu bếp | Toàn bộ **luật nghiệp vụ**: kiểm tra trạng thái, mã hóa mật khẩu, gửi OTP, tạo token | Biết gì về HTTP, JSON, header |
+| **Repository** | Thủ kho | Đọc / ghi database | Chứa luật nghiệp vụ |
+| **Entity** | Nguyên liệu xếp trong kho | Ánh xạ 1 bảng database (`User` ↔ `users`) | Được gửi thẳng ra API |
+| **DTO** | Tờ order và đĩa thức ăn đưa ra bàn | Hình dạng dữ liệu **nhận vào** (`RegisterRequest`) và **trả ra** (`UserProfileResponse`) | Lưu xuống database |
+| **Mapper** | Người bày món ra đĩa | Chuyển Entity → DTO | |
+
+Lợi ích: muốn đổi luật đăng ký → chỉ sửa `AuthService`. Muốn đổi tên trường JSON → chỉ sửa DTO. Mỗi chỗ sửa nằm gọn ở 1 nơi.
+
+#### A8.2. Vì sao không trả thẳng Entity ra API?
+
+Ví dụ Entity `User` có trường `password` (bản băm mật khẩu) và `accessStatus`. Nếu Controller trả thẳng `User` ra JSON:
+1. **Lộ dữ liệu nhạy cảm**: bản băm mật khẩu đi ra ngoài. (Dự án vẫn dán thêm `@JsonIgnore` lên `password` để phòng hờ, nhưng không dựa vào đó.)
+2. **Khó kiểm soát**: thêm 1 cột mới vào bảng là API tự lộ thêm 1 trường, không ai để ý.
+3. **Không phù hợp đầu vào**: đăng ký chỉ cần 3 trường (username, email, password), nhưng `User` có 12 trường. Nhận `User` làm đầu vào thì kẻ xấu có thể gửi kèm `"role": "ADMIN"`.
+
+Vì vậy dự án luôn: **nhận vào bằng DTO request, trả ra bằng DTO response**.
+
+#### A8.3. Tầng và thư mục
+
+```
+controller/   ← tầng Controller
+service/      ← tầng Service
+repository/   ← tầng Repository
+entity/       ← Entity
+dto/          ← DTO (dto/auth/ cho đăng ký đăng nhập, dto/user/ cho hồ sơ và admin)
+mapper/       ← Mapper
+enums/        ← các enum dùng chung
+security/     ← các class bảo mật (filter, JWT)
+config/       ← cấu hình Spring (bảo mật, CORS, file tĩnh)
+exception/    ← xử lý lỗi tập trung
+```
+
+---
+
+### A9. Database, MySQL và JPA / Hibernate
+
+#### A9.1. Bảng, dòng, cột
+
+**MySQL** lưu dữ liệu thành các **bảng**, giống sheet Excel. Bảng `users` (rút gọn vài cột):
+
+| id | username | email | password | account_status | role | access_status |
+|---|---|---|---|---|---|---|
+| 1 | admin | admin@gmail.com | `$2a$10$Xk...` | ACTIVE | ADMIN | ACCEPT |
+| 7 | lan.nguyen | lan@gmail.com | `$2a$10$9q...` | ACTIVE | USER | ACCEPT |
+| 8 | minh_99 | minh@gmail.com | `$2a$10$Lm...` | UNVERIFIED | USER | REFUSE |
+
+- **Cột (column)**: 1 loại thông tin (`email`).
+- **Dòng (row)**: 1 tài khoản.
+- **Khóa chính (primary key)**: cột định danh, mỗi dòng 1 giá trị riêng, không bao giờ trùng. Ở đây là `id`, MySQL **tự tăng** (1, 2, 3...) khi thêm dòng mới.
+- **Duy nhất (unique)**: không 2 dòng nào được trùng giá trị. `username` và `email` là unique → database **tự từ chối** dòng trùng, kể cả khi code quên kiểm tra.
+- **NOT NULL**: cột bắt buộc có giá trị.
+- **Khóa ngoại (foreign key)**: cột trỏ tới khóa chính của bảng khác. Bảng `otp_verifications` có cột `user_id` trỏ tới `users.id` → biết mã OTP này của ai.
+- **Index (chỉ mục)**: giống mục lục cuối sách, giúp tìm nhanh theo 1 cột mà không phải đọc hết bảng.
+
+Xem dữ liệu bằng SQL (chạy trong MySQL Workbench, hoặc dòng lệnh `mysql`):
+```sql
+SELECT id, username, email, account_status, role, access_status FROM users;
+```
+
+#### A9.2. ORM: không cần tự viết SQL
+
+**ORM** (Object-Relational Mapping) = cầu nối giữa **object Java** và **bảng database**:
+
+| Java | Database |
+|---|---|
+| 1 class có `@Entity` (ví dụ `User`) | 1 bảng (`users`) |
+| 1 object `User` | 1 dòng |
+| 1 field (`fullName`) | 1 cột (`full_name`) |
+
+Thư viện làm việc này là **Hibernate**; **JPA** là bộ quy tắc chung (các nhãn `@Entity`, `@Id`, `@Column`... thuộc JPA, package `jakarta.persistence`). Spring Data JPA ghép Hibernate vào Spring.
+
+Các nhãn ánh xạ gặp trong module User:
+
+| Nhãn | Ý nghĩa | Ví dụ |
+|---|---|---|
+| `@Entity` | Class này là 1 bảng | `public class User` |
+| `@Table(name = "users")` | Tên bảng thật | Không có thì bảng tên `user` |
+| `@Id` | Field này là khóa chính | `private Long id;` |
+| `@GeneratedValue(strategy = GenerationType.IDENTITY)` | Để MySQL tự tăng id | |
+| `@Column(nullable = false, unique = true, length = 50)` | Cột NOT NULL, unique, tối đa 50 ký tự | `username` |
+| `@Column(name = "full_name")` | Tên cột khác tên field | `fullName` ↔ `full_name` |
+| `@Enumerated(EnumType.STRING)` | Lưu enum bằng **chữ** (`"ACTIVE"`) thay vì số thứ tự (`1`) | `accountStatus` |
+| `@ManyToOne` + `@JoinColumn(name = "user_id")` | Nhiều OTP thuộc về 1 user, nối qua cột `user_id` | `OtpVerification.user` |
+| `@Index` (trong `@Table`) | Tạo chỉ mục | `idx_otp_user_purpose_verified` |
+
+#### A9.3. Ai tạo bảng?
+
+Khóa cấu hình `spring.jpa.hibernate.ddl-auto` quyết định:
+
+| Giá trị | Dùng ở | Hibernate làm gì lúc khởi động |
+|---|---|---|
+| `update` | Máy cá nhân | So sánh Entity với bảng thật: thiếu bảng → tạo; thiếu cột → thêm. **Không** xóa cột, **không** sửa cột đã có |
+| `validate` | VPS | Chỉ kiểm tra khớp chưa. Không khớp (ví dụ Entity có cột mà bảng không có) → **dừng, không khởi động** |
+
+Vì vậy: thêm field mới vào Entity → máy cá nhân tự có cột, nhưng **VPS phải tự chạy `ALTER TABLE` trước khi deploy** (mục 21.5).
+
+#### A9.4. Enum lưu thế nào?
+
+`@Enumerated(EnumType.STRING)` lưu tên giá trị (`'ACTIVE'`). Nếu dùng kiểu mặc định (`ORDINAL`) thì lưu số thứ tự (`UNVERIFIED`=0, `ACTIVE`=1...); chỉ cần ai đó chèn 1 giá trị mới vào giữa enum là toàn bộ dữ liệu cũ bị hiểu sai. Lưu bằng chữ thì an toàn và đọc database cũng dễ hiểu.
+
+Với MySQL, Hibernate tạo các cột này kiểu `ENUM('UNVERIFIED','ACTIVE','DISABLED','DELETED')`. Hệ quả: thêm giá trị mới vào enum Java → phải `ALTER TABLE ... MODIFY COLUMN ... ENUM(...)` liệt kê đủ mọi giá trị (mục 21.4).
+
+#### A9.5. Repository: SQL sinh từ tên method
+
+```java
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByEmail(String email);
+}
+```
+- `JpaRepository<User, Long>`: "repository cho Entity `User`, khóa chính kiểu `Long`". Kế thừa nó là **có sẵn miễn phí** các method: `save`, `findById`, `findAll`, `deleteById`, `count`, `existsById`...
+- `findByEmail`: Spring **đọc tên method** và tự sinh câu SQL. Không cần viết phần thân.
+
+Cách Spring "đọc" tên method:
+
+| Tên method | Spring hiểu là | SQL tương đương (viết gọn) |
+|---|---|---|
+| `findByEmail(email)` | Tìm theo `email` | `SELECT * FROM users WHERE email = ?` |
+| `existsByEmail(email)` | Có tồn tại không (trả `boolean`) | `SELECT 1 FROM users WHERE email = ? LIMIT 1` |
+| `existsByUsername(username)` | | `SELECT 1 FROM users WHERE username = ? LIMIT 1` |
+| `findByArtistRequestStatus(status)` | Tìm mọi dòng có trạng thái nghệ sĩ = `status` | `SELECT * FROM users WHERE artist_request_status = ?` |
+
+Một tên dài hơn trong `OtpVerificationRepository`:
+
+```
+findFirstByUserAndPurposeAndVerifiedFalseOrderByIdDesc(user, purpose)
+└──┬───┘  └┬─┘ └───┬───┘ └──────┬─────┘ └──────┬──────┘
+ lấy 1    user =  purpose =  verified =     sắp theo id
+ dòng đầu  ?      ?          false          giảm dần (mới nhất trước)
+```
+```sql
+SELECT * FROM otp_verifications
+WHERE user_id = ? AND purpose = ? AND verified = false
+ORDER BY id DESC
+LIMIT 1
+```
+Nghĩa: "lấy mã OTP **mới nhất**, **chưa dùng**, của user này, cho mục đích này".
+
+Dấu `?` là chỗ giá trị được điền vào **an toàn** (gọi là prepared statement), nên không bị tấn công SQL injection dù người dùng nhập ký tự lạ.
+
+Gõ sai tên field trong tên method (ví dụ `findByEmal`) → ứng dụng **không khởi động được**, log báo không tìm thấy thuộc tính `emal`.
+
+#### A9.6. `save()`: thêm mới hay cập nhật?
+
+```java
+userRepository.save(user);
+```
+- `user` chưa có `id` (vừa `new User()`) → Hibernate chạy `INSERT`, MySQL cấp id mới, Hibernate gán id đó vào object.
+- `user` đã có `id` (đọc từ database lên) → Hibernate chạy `UPDATE ... WHERE id = ?`.
+
+Cùng 1 method, Hibernate tự chọn.
+
+#### A9.7. Transaction và `@Transactional`
+
+**Transaction** (giao dịch) = gói nhiều thao tác database thành **1 khối "tất cả hoặc không gì cả"**. Ví dụ chuyển khoản: trừ tiền tài khoản A và cộng tiền tài khoản B phải cùng thành công; trừ xong mà cộng lỗi thì phải trả lại tiền cho A.
+
+Trong module User, đăng ký gồm 2 bước:
+1. `INSERT` tài khoản mới vào `users`.
+2. `INSERT` mã OTP vào `otp_verifications`, rồi gửi email.
+
+Nếu bước 2 gửi email thất bại mà bước 1 vẫn được lưu → database có 1 tài khoản "mồ côi" không ai nhận được mã. Vì vậy method `register` có nhãn `@Transactional`:
+
+```java
+@Transactional
+public void register(String username, String email, String password) { ... }
+```
+
+| Kết thúc method | Kết quả |
+|---|---|
+| Chạy hết, không lỗi | **Commit**: mọi thay đổi được ghi thật |
+| Ném ra 1 `RuntimeException` (ví dụ `EmailSendException`, `IllegalArgumentException`) | **Rollback**: hoàn tác **mọi** thay đổi database trong method |
+
+Ba điều cần nhớ:
+- Rollback **chỉ** hoàn tác **MySQL**. Redis, file đã lưu trên ổ đĩa, email đã gửi thì **không** quay lại được.
+- `register` gọi `otpService.generateAndSend(...)` cũng có `@Transactional`. Method bên trong **nhập chung** transaction của method bên ngoài (không mở cái mới), nên cả 2 cùng commit hoặc cùng rollback.
+- Method chỉ đọc (như `login`) không cần `@Transactional`.
+
+---
+
+### A10. Redis — bộ nhớ tạm siêu nhanh
+
+#### A10.1. Redis là gì?
+
+**Redis** là database lưu trong **RAM** (bộ nhớ), dạng cặp **khóa → giá trị** (key → value), giống 1 cuốn từ điển khổng lồ. Rất nhanh, và mỗi khóa có thể đặt **thời gian sống (TTL)**: hết giờ tự xóa.
+
+Rất hợp với dữ liệu **tạm thời**, đọc ghi **liên tục**. MySQL hợp với dữ liệu **lâu dài**.
+
+#### A10.2. Ba loại khóa module User cất trong Redis
+
+| Khóa | Giá trị | Sống bao lâu | Dùng để | Code |
+|---|---|---|---|---|
+| `session:{email}` ví dụ `session:lan@gmail.com` | Mã phiên đăng nhập hiện tại (chuỗi UUID) | 24 giờ (bằng thời hạn token) | Mỗi tài khoản chỉ đăng nhập 1 nơi; đá người dùng ra ngay khi cần | `SessionService` |
+| `otp-attempt:{id mã OTP}` ví dụ `otp-attempt:52` | Số lần đã thử nhập mã | 5 phút | Nhập sai quá 5 lần → khóa mã đó | `OtpService` |
+| `rate:auth:{IP}`, `rate:user:{email}`, `rate:ip:{IP}` | Số request đã gửi | 60 giây | Chặn gọi API quá nhiều (lỗi 429) | `RateLimitService` |
+
+#### A10.3. Câu lệnh Redis tương ứng
+
+Code Java dùng `StringRedisTemplate` (bean Spring Boot tạo sẵn). Mỗi method tương ứng 1 lệnh Redis:
+
+| Code Java | Lệnh Redis | Ý nghĩa |
+|---|---|---|
+| `opsForValue().set(key, value, Duration.ofMillis(...))` | `SET key value PX 86400000` | Ghi kèm thời gian sống |
+| `opsForValue().get(key)` | `GET key` | Đọc; khóa không tồn tại / hết hạn → `null` |
+| `opsForValue().increment(key)` | `INCR key` | Cộng 1; khóa chưa có thì coi như 0 rồi cộng thành 1 |
+| `expire(key, Duration...)` | `EXPIRE key 60` | Đặt thời gian sống |
+| `getExpire(key)` | `TTL key` | Còn sống bao nhiêu giây |
+| `delete(key)` | `DEL key` | Xóa |
+
+Tự xem Redis trên máy cá nhân (mở `redis-cli`):
+```
+KEYS session:*                 ← liệt kê phiên (chỉ dùng khi học, KEYS chậm nếu dữ liệu lớn)
+GET session:lan@gmail.com      ← mã phiên hiện tại của lan
+TTL session:lan@gmail.com      ← còn bao nhiêu giây
+DEL session:lan@gmail.com      ← xóa phiên → lan bị đăng xuất ngay
+```
+
+---
+
+### A11. Kiểm tra dữ liệu đầu vào (validation)
+
+Người dùng có thể gửi bất cứ thứ gì: để trống, email sai, mật khẩu 1 ký tự. Phải chặn **trước** khi vào Service.
+
+#### A11.1. Cách làm
+
+1. Dán nhãn kiểm tra lên các field của DTO request:
+```java
+public class RegisterRequest {
+    @NotBlank(message = "Username is required")
+    @Size(min = 5, max = 20, message = "Username must be between 5 and 20 characters")
+    @Pattern(regexp = "^[a-zA-Z0-9_.]+$",
+            message = "Username can only contain letters, numbers, dot and underscore")
+    private String username;
+    // ...
+}
+```
+2. Dán `@Valid` trước tham số trong Controller:
+```java
+public ResponseEntity<...> register(@Valid @RequestBody RegisterRequest request)
+```
+Spring kiểm tra **trước khi** chạy phần thân method. Sai → method **không chạy**, trả **400** kèm `message` lấy từ nhãn.
+
+#### A11.2. Các nhãn kiểm tra dùng trong module User
+
+| Nhãn | Kiểm tra | Ví dụ lỗi |
+|---|---|---|
+| `@NotBlank` | Chuỗi không `null`, không rỗng, không toàn dấu cách | `"username": "   "` |
+| `@NotNull` | Không `null` (dùng cho kiểu không phải chuỗi, ví dụ `Role`) | Thiếu `"role"` |
+| `@Email` | Đúng dạng email | `"email": "lan.gmail.com"` |
+| `@Size(min, max)` | Độ dài chuỗi trong khoảng | Mật khẩu 3 ký tự |
+| `@Pattern(regexp)` | Khớp biểu thức chính quy (regex) | Username có dấu cách |
+
+#### A11.3. Đọc hiểu 2 regex trong dự án
+
+```
+^[a-zA-Z0-9_.]+$          (username)
+^        bắt đầu chuỗi
+[...]    1 ký tự thuộc nhóm: chữ thường a-z, chữ hoa A-Z, số 0-9, gạch dưới _, dấu chấm .
++        lặp lại 1 lần trở lên
+$        kết thúc chuỗi
+→ "lan.nguyen_99" hợp lệ; "lan nguyen", "lân", "lan@" không hợp lệ.
+
+^\d{6}$                   (mã OTP; trong code Java viết "^\\d{6}$" vì \ phải viết thành \\)
+\d       1 chữ số
+{6}      đúng 6 lần
+→ "004213" hợp lệ; "4213", "12345a", "1234567" không hợp lệ.
+```
+
+#### A11.4. Kiểm tra định dạng khác kiểm tra nghiệp vụ
+
+| Loại | Ví dụ | Ở đâu |
+|---|---|---|
+| **Định dạng** (không cần database) | Email đúng dạng, mật khẩu đủ 6 ký tự | Nhãn trong DTO |
+| **Nghiệp vụ** (cần đọc database / trạng thái) | Email đã có người dùng chưa? Tài khoản đã xác thực chưa? | Service, ném `IllegalArgumentException` |
+
+Cả 2 loại đều trả 400, frontend cứ đọc `message`.
+
+---
+
+### A12. Xử lý lỗi tập trung
+
+Thay vì mỗi Controller tự `try/catch`, dự án gom về 1 class duy nhất: `GlobalExceptionHandler`, có nhãn `@RestControllerAdvice` ("người bắt lỗi chung cho mọi Controller").
+
+```
+Service: throw new IllegalArgumentException("Email already exists")
+   │ (lỗi bay lên)
+   ▼
+Controller: không bắt → lỗi bay tiếp
+   │
+   ▼
+GlobalExceptionHandler:
+   @ExceptionHandler(IllegalArgumentException.class)  ← "tôi phụ trách loại lỗi này"
+   → trả 400 + {"message": "Email already exists"}
+```
+
+Mỗi method có `@ExceptionHandler(LoạiLỗi.class)` phụ trách 1 loại lỗi. Spring chọn method phụ trách **đúng loại nhất** (loại cụ thể được ưu tiên hơn loại chung chung `Exception`).
+
+Kết quả: **mọi lỗi** của dự án đều có cùng 1 dạng `{"message": "..."}` → frontend chỉ cần 1 cách đọc. Bảng đầy đủ: mục 17.2 và C24.
+
+---
+
+### A13. Spring Security cơ bản
+
+#### A13.1. Hai câu hỏi bảo mật
+
+| Câu hỏi | Tên gọi | Trả lời sai thì |
+|---|---|---|
+| "Bạn là ai?" | **Authentication** (xác thực) | **401** |
+| "Bạn được làm gì?" | **Authorization** (phân quyền) | **403** |
+
+Ví dụ tòa nhà: bảo vệ cổng kiểm tra thẻ nhân viên (xác thực). Có thẻ rồi nhưng thẻ không mở được phòng giám đốc (phân quyền).
+
+#### A13.2. Filter và filter chain
+
+Trước khi tới Controller, mọi request phải đi qua **1 dãy trạm kiểm soát** gọi là **filter chain**. Mỗi trạm (filter) có thể:
+- Ghi thêm thông tin rồi cho đi tiếp (`filterChain.doFilter(request, response)`).
+- Hoặc chặn lại, tự trả response luôn (không gọi `doFilter`). Ví dụ `RateLimitFilter` trả 429.
+
+```
+request ─► [CORS] ─► [JwtAuthenticationFilter] ─► [RateLimitFilter] ─► ... ─► [AuthorizationFilter] ─► Controller
+            cho phép   đọc token, ghi nhận         đếm request,                 kiểm tra luật URL:
+            domain     "người gọi là ai"           quá giới hạn → 429           chưa đăng nhập → 401
+            khác
+```
+Thứ tự và vai trò từng trạm của dự án: mục 10 và C13.
+
+#### A13.3. SecurityContext — "tờ giấy ghi người đang gọi"
+
+Khi `JwtAuthenticationFilter` kiểm tra token hợp lệ, nó ghi vào **SecurityContext** 1 object `Authentication` = "request này của `lan@gmail.com`, quyền `ROLE_USER`". Tờ giấy này **chỉ tồn tại trong 1 request**; request sau phải gửi lại token để ghi lại từ đầu.
+
+Không ai ghi gì → request là **khách** (anonymous). Khách gọi API cần đăng nhập → 401.
+
+Controller lấy lại tờ giấy bằng cách khai báo tham số `Authentication authentication`; `authentication.getName()` trả về **email** người gọi.
+
+#### A13.4. Role và authority
+
+Spring Security gọi quyền là **authority**, quy ước role có tiền tố `ROLE_`: role `ADMIN` → authority `ROLE_ADMIN`. Viết `hasRole('ADMIN')` thì Spring tự thêm `ROLE_` khi so sánh.
+
+```java
+@PreAuthorize("hasRole('ADMIN')")    // dán trên AdminController
+```
+= "mọi method của class này chỉ chạy được nếu người gọi có `ROLE_ADMIN`". Không có → 403. Nhãn này chỉ có tác dụng khi `SecurityConfig` có `@EnableMethodSecurity`.
+
+#### A13.5. Stateless, CSRF, CORS
+
+- **Stateless** (không trạng thái): server không dùng "phiên" kiểu truyền thống (cookie `JSESSIONID`). Mỗi request tự mang token. Dự án vẫn lưu 1 mã phiên nhỏ trong Redis để thu hồi token khi cần (mục 9.2).
+- **CSRF**: kiểu tấn công lợi dụng **cookie** trình duyệt tự gửi kèm. Dự án gửi token qua **header**, trình duyệt không tự gửi header → tắt chống CSRF (`csrf.disable()`) là an toàn.
+- **CORS**: luật của **trình duyệt**: trang web ở domain A (ví dụ `music-spotify-gamma.vercel.app`) gọi API ở domain B (VPS) thì trình duyệt hỏi B trước (request `OPTIONS`, gọi là preflight) "có cho A gọi không?". Dự án trả lời "cho tất cả" (`CorsConfig`). App điện thoại và Postman **không** bị luật này chi phối.
+
+---
+
+### A14. Mật khẩu: băm bằng BCrypt
+
+#### A14.1. Không bao giờ lưu mật khẩu thật
+
+Nếu database lưu `matkhau123` mà bị lộ (hacker, nhân viên tò mò, file backup thất lạc) → lộ hết mật khẩu, và người dùng thường dùng chung mật khẩu cho Facebook, ngân hàng...
+
+Dự án lưu **bản băm** (hash):
+
+| | Mã hóa (encrypt) | Băm (hash) |
+|---|---|---|
+| Đảo ngược được? | Có, nếu có khóa | **Không** |
+| Ví dụ | Tin nhắn mã hóa | Vân tay: từ người lấy được vân tay, từ vân tay không dựng lại được người |
+
+#### A14.2. BCrypt
+
+Bản băm BCrypt dài 60 ký tự:
+```
+$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
+└┬┘└┬┘└──────────┬──────────┘└──────────────┬──────────────┘
+phiên  độ khó   "muối" (salt) 22 ký tự      kết quả băm 31 ký tự
+bản    10 = 2^10 vòng
+```
+- **Salt (muối)**: chuỗi ngẫu nhiên trộn vào trước khi băm, **mỗi lần băm 1 khác**. Vì vậy 2 người cùng mật khẩu `123456` vẫn có 2 bản băm khác nhau, và băm lại cùng 1 mật khẩu cũng ra chuỗi khác.
+- **Độ khó 10**: băm 1 lần mất cỡ vài chục mili giây. Người dùng không thấy chậm, nhưng kẻ thử đoán hàng tỷ mật khẩu thì tốn rất nhiều thời gian.
+
+#### A14.3. Vậy so sánh mật khẩu thế nào?
+
+```java
+passwordEncoder.encode("matkhau123")            // → "$2a$10$...": lúc đăng ký, đổi, đặt lại mật khẩu
+passwordEncoder.matches("matkhau123", hash)     // → true / false: lúc đăng nhập, kiểm tra mật khẩu hiện tại
+```
+`matches` lấy muối nằm sẵn trong `hash`, băm mật khẩu vừa nhập với đúng muối đó, rồi so 2 kết quả. **Không** có bước "giải mã".
+
+Hệ quả: **không ai**, kể cả Admin hay chủ dự án, xem được mật khẩu của người dùng. Quên thì chỉ có cách đặt lại (mục 11.4).
+
+#### A14.4. Vì sao giới hạn 72 ký tự?
+
+BCrypt chỉ xử lý tối đa **72 byte**. Phần dư bị bỏ qua (thư viện bản mới còn từ chối hẳn). DTO giới hạn `max = 72` để tránh chuyện này. Lưu ý: 1 chữ tiếng Việt có dấu chiếm 2–3 byte, nên mật khẩu **có dấu** dài gần 72 ký tự vẫn có thể vượt 72 byte. Khuyên người dùng đặt mật khẩu không dấu.
+
+---
+
+### A15. JWT — "thẻ ra vào" có chữ ký
+
+#### A15.1. Vì sao cần token?
+
+HTTP **không nhớ gì** giữa 2 request. Đăng nhập xong, request tiếp theo server không biết bạn là ai. Giải pháp: lúc đăng nhập, server phát cho bạn 1 **token** (thẻ ra vào). Mọi request sau, bạn đưa thẻ trong header:
+
+```
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJsYW5AZ21haWwuY29tIiwi...
+               └─┬──┘ └──────────────────────────┬──────────────────────────┘
+              chữ cố định                        token
+              + 1 dấu cách
+```
+
+#### A15.2. JWT gồm 3 phần, ngăn cách bởi dấu chấm
+
+```
+eyJhbGciOiJIUzUxMiJ9 . eyJzdWIiOiJsYW5AZ21haWwuY29tIiwianRpIjoi... . 7Hk2xQ9vR...
+└──────┬───────────┘   └──────────────────┬──────────────────────┘   └────┬─────┘
+    HEADER                             PAYLOAD                          SIGNATURE
+```
+
+Phần 1 và 2 chỉ là chữ được **mã hóa Base64URL** (một cách viết lại cho gọn, **không phải** mật mã). Ai cũng giải ra đọc được:
+
+```json
+HEADER:  { "alg": "HS512" }
+
+PAYLOAD: {
+  "sub": "lan@gmail.com",                          ← subject: token này của ai (email)
+  "jti": "3f6c2a1e-9b7d-4c1a-8e2f-5d6b7a8c9e0f",   ← JWT id: mã phiên đăng nhập
+  "iat": 1762740000,                               ← issued at: phát lúc nào (giây, tính từ 1/1/1970)
+  "exp": 1762826400                                ← expiration: hết hạn lúc nào (24 giờ sau)
+}
+```
+Vì ai cũng đọc được payload → **không bao giờ để thông tin bí mật** (mật khẩu...) trong token. Token của dự án chỉ có email và mã phiên.
+
+Thuật toán (`alg`) do độ dài khóa bí mật quyết định: khóa ≥ 64 byte → `HS512` (khuyên dùng); ≥ 48 byte → `HS384`; ≥ 32 byte → `HS256`; ngắn hơn 32 byte → thư viện báo lỗi **ngay lúc khởi động** (`WeakKeyException`).
+
+#### A15.3. Chữ ký: vì sao không làm giả được?
+
+```
+SIGNATURE = HMAC-SHA512( HEADER + "." + PAYLOAD , khóa bí mật app.jwt.secret )
+```
+Chỉ server biết khóa bí mật. Kẻ xấu sửa payload (`"sub": "admin@gmail.com"`) → không tính lại được chữ ký đúng (vì không có khóa) → server kiểm tra thấy chữ ký không khớp → token vô hiệu → 401.
+
+Hệ quả quan trọng: **ai có khóa bí mật thì tự tạo được token của bất kỳ ai**. Khóa chỉ nằm trong file cấu hình, không lên GitHub, không chia sẻ (mục 21.1).
+
+#### A15.4. Điểm yếu của JWT và cách dự án vá
+
+JWT thuần **không thu hồi được**: token hợp lệ cho tới lúc `exp`. Nếu Admin khóa tài khoản, token cũ vẫn dùng được thêm tới 24 giờ.
+
+Dự án vá bằng mã phiên `jti`: lúc đăng nhập lưu `session:{email} = jti` vào Redis. Mỗi request so `jti` trong token với Redis; xóa khóa Redis là token **mất hiệu lực ngay**. Chi tiết: mục 9.2, 9.3.
+
+⚠️ Đừng dán token thật lên các trang giải mã JWT công khai: token còn hạn = thẻ ra vào còn dùng được.
+
+---
+
+### A16. Mã OTP và gửi email
+
+#### A16.1. OTP
+
+**OTP** (One-Time Password) = mã dùng **1 lần**, sống **ngắn** (5 phút). Gửi vào email để chứng minh "bạn đúng là chủ email này". Module User dùng OTP cho 4 việc: xác thực đăng ký, quên mật khẩu, đổi mật khẩu, đổi email (mục 8).
+
+Mã được sinh bằng `SecureRandom` chứ không phải `Random`:
+- `Random`: dãy số "giả ngẫu nhiên", biết vài số trước có thể đoán số sau.
+- `SecureRandom`: ngẫu nhiên đủ mạnh cho mục đích bảo mật, không đoán được.
+
+```java
+String.format("%06d", RANDOM.nextInt(1_000_000))   // số từ 0 tới 999999, đệm đủ 6 chữ số
+```
+`1_000_000` chỉ là cách viết số 1000000 cho dễ đọc (Java cho phép dấu `_` trong số).
+
+#### A16.2. Gửi email qua SMTP
+
+**SMTP** là giao thức gửi email. Dự án gửi bằng máy chủ SMTP của Gmail:
+- `smtp.gmail.com`, cổng `587`, bật **STARTTLS** (mã hóa đường truyền).
+- Đăng nhập bằng **App Password** 16 ký tự (không phải mật khẩu Gmail thường, mục 21.2).
+
+Spring Boot thấy các khóa `spring.mail.*` trong file cấu hình → tự tạo bean `JavaMailSender`. `EmailService` chỉ việc nhận bean đó qua constructor và gọi `mailSender.send(message)`.
+
+Gửi email có thể **chậm** (vài giây) hoặc **lỗi** (sai App Password, Gmail chặn, mất mạng). Dự án đặt timeout 5 giây và gói mọi lỗi thành `EmailSendException` → 503 + rollback (mục 8.4, C15).
+
+---
+
+**Hết Phần A.** Giờ bạn đã có đủ "từ vựng" để đọc phần nghiệp vụ (mục 2 → 18) và phần đọc code (Phần C).
+
+---
+
+## PHẦN B — NGHIỆP VỤ: HỆ THỐNG LÀM GÌ
+
+Phần này mô tả **luật nghiệp vụ** và **luồng xử lý** của module User mà không cần đọc code. Gặp từ lạ (Controller, filter, transaction, token...) → tra Phần A. Muốn xem đoạn code thật tương ứng → Phần C.
 
 ---
 
@@ -138,6 +1225,8 @@ Quy ước:
 | **Quyền vào web (`accessStatus`)** | (MỚI) Cờ `ACCEPT` / `REFUSE` do **chủ dự án** đặt bằng SQL, quyết định ai được dùng web. Độc lập với `accountStatus` (mục 7.3a) |
 
 ### 3.2. Spring Boot
+
+Giải thích kỹ, có ví dụ: Phần A (A6 → A13).
 
 | Thuật ngữ | Giải thích |
 |---|---|
@@ -285,6 +1374,8 @@ src/main/java/com/winhmm/myspotify/
     ├── GlobalExceptionHandler.java ← Chuyển mọi lỗi thành JSON
     └── EmailSendException.java     ← Lỗi gửi email OTP → 503 + hoàn tác thay đổi database
 ```
+
+Giải thích từng file, từng dòng code: Phần C (C1 → C24). Bảng tra nhanh file → mục: 24.5.
 
 ### 5.3. Ai gọi ai
 
@@ -1319,6 +2410,2190 @@ Khi xóa **hẳn** 1 tài khoản bằng SQL (không qua API): phải xóa `play
 
 ---
 
+## PHẦN C — ĐỌC CODE TỪNG FILE CỦA MODULE USER
+
+Phần B (mục 2 → 18) nói **hệ thống làm gì**. Phần này nói **code viết ra sao**: mở từng file, đọc từng đoạn, giải thích từng dòng.
+
+### C0. Cách đọc phần này
+
+- Code trích ở đây là code thật trên nhánh `main`, đã **bỏ bớt comment** và dòng `import` cho gọn. File thật trong IntelliJ có comment tiếng Việt rất dài, đọc kèm càng dễ hiểu.
+- Chỗ ghi `// ...` là đoạn lặp lại hoặc không quan trọng, đã lược bớt.
+- Thứ tự đọc **từ dưới lên**: thứ nằm sát database trước (enum, entity, repository), rồi tới dữ liệu vào ra (DTO), tới logic (service), bảo mật, cuối cùng là cửa ngõ (controller) và xử lý lỗi. Đọc theo thứ tự này thì lúc tới Service, bạn đã biết hết mọi thứ nó dùng.
+
+```
+C1  MyspotifyApplication       (điểm khởi động)
+C2  enum                       (các giá trị cố định)
+C3  User                       (bảng users)
+C4  OtpVerification            (bảng otp_verifications)
+C5  Repository                 (đọc ghi database)
+C6  DTO request                (dữ liệu nhận vào)
+C7  DTO response + UserMapper  (dữ liệu trả ra)
+C8  SessionService             (phiên đăng nhập trong Redis)
+C9  JwtUtil                    (tạo, đọc token)
+C10 CustomUserDetailsService   (nạp user cho Spring Security)
+C11 JwtAuthenticationFilter    (kiểm tra token mỗi request)
+C12 RateLimitService + Filter  (chống spam)
+C13 SecurityConfig             (luật bảo mật tổng)
+C14 CorsConfig + WebMvcConfig
+C15 EmailService + EmailSendException
+C16 OtpService
+C17 AuthService
+C18 UserService
+C19 AdminService
+C20 FileStorageService (phần ảnh đại diện)
+C21 AuthController
+C22 UserController
+C23 AdminController
+C24 GlobalExceptionHandler
+C25 Theo dấu 1 request đăng ký từ đầu tới cuối
+C26 Ví dụ luyện tập: tự thêm 1 API mới
+C27 Bài tập tự kiểm tra (có đáp án)
+```
+
+---
+
+### C1. `MyspotifyApplication.java` — điểm khởi động
+
+```java
+@SpringBootApplication
+@EnableAsync
+public class MyspotifyApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(MyspotifyApplication.class, args);
+    }
+}
+```
+
+| Dòng | Giải thích |
+|---|---|
+| `@SpringBootApplication` | Gộp 3 nhãn: đây là class cấu hình; bật cấu hình tự động của Spring Boot (thấy thư viện mail thì tạo `JavaMailSender`, thấy Redis thì tạo `StringRedisTemplate`...); quét mọi class trong `com.winhmm.myspotify` và package con |
+| `@EnableAsync` | Cho phép method có `@Async` chạy ở luồng riêng (module Song dùng). Module User không dùng |
+| `public static void main(String[] args)` | Hàm Java chạy đầu tiên khi bấm Run |
+| `SpringApplication.run(...)` | Khởi động toàn bộ Spring: đọc cấu hình, tạo bean, nối database, mở cổng 8080 (xem A6.3) |
+
+---
+
+### C2. Các enum (`enums/`)
+
+```java
+public enum AccountStatus { UNVERIFIED, ACTIVE, DISABLED, DELETED }
+public enum Role { USER, ARTIST, ADMIN }
+public enum ArtistRequestStatus { NONE, PENDING, APPROVED, REJECTED }
+public enum AccessStatus { ACCEPT, REFUSE }
+public enum OtpPurpose { REGISTER, RESET_PASSWORD, CHANGE_PASSWORD, CHANGE_EMAIL }
+```
+(Trong file thật mỗi giá trị nằm 1 dòng, kèm comment giải thích.)
+
+| Enum | Dùng ở đâu | Ý nghĩa từng giá trị |
+|---|---|---|
+| `AccountStatus` | Cột `users.account_status` | Mục 7.1 |
+| `Role` | Cột `users.role` | Mục 2.3, 7.2 |
+| `ArtistRequestStatus` | Cột `users.artist_request_status` | Mục 7.3 |
+| `AccessStatus` | Cột `users.access_status` | Mục 7.3a |
+| `OtpPurpose` | Cột `otp_verifications.purpose` | Mã OTP này dùng cho việc gì (mục 8) |
+
+Vì sao `OtpPurpose` quan trọng? Nhờ nó, mã OTP gửi cho việc **đổi email** không thể đem đi dùng cho việc **đặt lại mật khẩu**: mỗi lần kiểm tra mã, code luôn tìm theo cặp (user, purpose).
+
+Thêm giá trị mới vào enum → phải sửa cả cột `ENUM` trong MySQL trên VPS (A9.4, mục 21.4).
+
+---
+
+### C3. `entity/User.java` — bảng `users`
+
+```java
+@Entity
+@Table(
+        name = "users",
+        indexes = {
+                @Index(name = "idx_users_artist_request_status", columnList = "artist_request_status")
+        }
+)
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true, length = 50)
+    private String username;
+
+    @Column(nullable = false, unique = true, length = 100)
+    private String email;
+
+    @JsonIgnore
+    @Column(nullable = false, length = 255)
+    private String password;
+
+    @Column(name = "full_name", length = 100)
+    private String fullName;
+
+    @Column(name = "avatar_url", length = 255)
+    private String avatarUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status", length = 20, nullable = false)
+    private AccountStatus accountStatus = AccountStatus.UNVERIFIED;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20, nullable = false)
+    private Role role = Role.USER;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "artist_request_status", length = 20, nullable = false)
+    private ArtistRequestStatus artistRequestStatus = ArtistRequestStatus.NONE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "access_status", length = 20, nullable = false)
+    private AccessStatus accessStatus = AccessStatus.REFUSE;
+
+    @Column(name = "artist_name", length = 100)
+    private String artistName;
+
+    @Column(length = 255)
+    private String bio;
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    // ... getter và setter cho cả 12 field, cùng 1 kiểu như trên (24 method)
+}
+```
+
+Giải thích từng phần:
+
+| Code | Giải thích |
+|---|---|
+| `@Entity` | "Class này ánh xạ 1 bảng." Hibernate sẽ quản lý nó |
+| `@Table(name = "users", ...)` | Tên bảng là `users` (số nhiều). Không ghi thì Hibernate đặt là `user`, mà `user` là từ khóa trong nhiều hệ database, dễ gây lỗi |
+| `@Index(name = "idx_users_artist_request_status", columnList = "artist_request_status")` | Tạo chỉ mục cho cột trạng thái nghệ sĩ, vì Admin thường lọc "ai đang chờ duyệt" (`findByArtistRequestStatus(PENDING)`). Có chỉ mục thì MySQL tìm nhanh, không phải đọc hết bảng |
+| `@Id` + `@GeneratedValue(strategy = GenerationType.IDENTITY)` | `id` là khóa chính, MySQL tự tăng (cột `AUTO_INCREMENT`) |
+| `private Long id;` | Dùng `Long` (chữ L hoa, là object) thay vì `long` (kiểu nguyên thủy), vì `Long` được phép là `null`. `id == null` nghĩa là "object này chưa được lưu lần nào" → `save()` sẽ `INSERT` (A9.6) |
+| `@Column(nullable = false, unique = true, length = 50)` trên `username` | Bắt buộc, không trùng, tối đa 50 ký tự. DTO chỉ cho 5–20 ký tự; database để rộng hơn cho thoải mái nếu sau này nới giới hạn |
+| `email`: `unique = true, length = 100` | Email là thứ dùng để **đăng nhập**, nên không được trùng |
+| `@JsonIgnore` trên `password` | Nhãn của Jackson: "đừng bao giờ đưa field này vào JSON". Lớp bảo vệ thứ 2, phòng khi ai đó lỡ trả thẳng Entity ra API |
+| `password`: `length = 255` | Bản băm BCrypt chỉ dài 60 ký tự; để 255 cho dư nếu sau này đổi thuật toán |
+| `fullName`, `avatarUrl` không có `nullable = false` | Được phép trống: lúc đăng ký chưa có họ tên, chưa có ảnh |
+| `@Enumerated(EnumType.STRING)` | Lưu enum bằng chữ (`'ACTIVE'`), xem A9.4 |
+| `= AccountStatus.UNVERIFIED` (giá trị gán sẵn) | Giá trị **mặc định trong Java**: vừa `new User()` là có sẵn. Tài khoản mới luôn bắt đầu ở "chưa xác thực" |
+| `role = Role.USER` | Mặc định là người nghe thường |
+| `artistRequestStatus = ArtistRequestStatus.NONE` | Mặc định chưa gửi yêu cầu làm nghệ sĩ |
+| `accessStatus = AccessStatus.REFUSE` | Mặc định **chưa được vào web**, chờ chủ dự án cho phép |
+| `artistName`, `bio` | Chỉ có giá trị khi đã gửi yêu cầu nghệ sĩ hoặc đã là ARTIST |
+| Getter / setter | Hibernate và code khác đọc ghi field qua đây (A5.2) |
+
+Bảng `users` **không có** cột thời gian tạo (`created_at`). Điều này giải thích 1 mẹo nhỏ trong `OtpService` (C16).
+
+---
+
+### C4. `entity/OtpVerification.java` — bảng `otp_verifications`
+
+```java
+@Entity
+@Table(
+        name = "otp_verifications",
+        indexes = {
+                @Index(name = "idx_otp_user_purpose_verified", columnList = "user_id, purpose, verified")
+        }
+)
+public class OtpVerification {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @Column(name = "otp_code", nullable = false, length = 10)
+    private String otpCode;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private OtpPurpose purpose;
+
+    @Column(name = "new_email", length = 100)
+    private String newEmail;
+
+    @Column(name = "expired_at", nullable = false)
+    private LocalDateTime expiredAt;
+
+    @Column(nullable = false)
+    private boolean verified = false;
+
+    // ... getter và setter (với boolean, getter tên là isVerified() thay vì getVerified())
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| `@Index(... columnList = "user_id, purpose, verified")` | Chỉ mục **3 cột cùng lúc**, khớp đúng câu tìm kiếm duy nhất của bảng này: "OTP mới nhất, chưa dùng, của user X, cho mục đích Y" (C5) |
+| `@ManyToOne` | Quan hệ **nhiều – một**: 1 user có thể có nhiều mã OTP (mỗi lần xin mã tạo 1 dòng mới), mỗi mã thuộc đúng 1 user |
+| `fetch = FetchType.LAZY` | **Tải lười**: đọc 1 dòng OTP lên thì **chưa** đọc kèm user. Chỉ khi code gọi `otp.getUser().getEmail()` thì Hibernate mới chạy thêm câu SQL lấy user. Tiết kiệm câu SQL không cần thiết |
+| `@JoinColumn(name = "user_id", nullable = false)` | Cột khóa ngoại tên `user_id`, trỏ tới `users.id`. Trong Java là cả object `User`, trong database chỉ là 1 con số |
+| `otpCode`, `length = 10` | Mã 6 chữ số, lưu dạng **chuỗi** (không phải số) để giữ được số 0 ở đầu: `"004213"`. Lưu số thì thành `4213` |
+| `purpose` | Mục đích: REGISTER / RESET_PASSWORD / CHANGE_PASSWORD / CHANGE_EMAIL |
+| `newEmail` | **Chỉ** dùng cho CHANGE_EMAIL: nhớ email mới người dùng muốn đổi sang, để bước 2 lấy ra. Các mục đích khác để `null` |
+| `expiredAt` | Thời điểm hết hạn = lúc tạo + 5 phút |
+| `boolean verified = false` | `true` nghĩa là "mã này **không còn dùng được**", gồm 2 trường hợp: đã dùng thành công, **hoặc** đã bị mã mới hơn thay thế. Dùng `boolean` nguyên thủy (không phải `Boolean`) vì cột này không bao giờ `null` |
+
+Dòng OTP cũ **không bị xóa**, chỉ đánh dấu `verified = true`. Bảng sẽ lớn dần theo thời gian (mục 22).
+
+---
+
+### C5. Repository — `UserRepository` và `OtpVerificationRepository`
+
+```java
+public interface UserRepository extends JpaRepository<User, Long> {
+
+    Optional<User> findByEmail(String email);
+
+    boolean existsByEmail(String email);
+
+    boolean existsByUsername(String username);
+
+    List<User> findByArtistRequestStatus(ArtistRequestStatus status);
+
+    List<User> findTop10ByRoleAndAccountStatusAndArtistNameContainingIgnoreCaseAndIdNot(
+            Role role, AccountStatus accountStatus, String keyword, Long excludeId);
+}
+```
+
+| Method | SQL tương đương (viết gọn) | Ai dùng |
+|---|---|---|
+| `findByEmail` | `SELECT * FROM users WHERE email = ?` | Hầu hết mọi nơi: đăng ký, đăng nhập, filter kiểm tra token, `me()` trong UserController... |
+| `existsByEmail` | `SELECT 1 ... WHERE email = ? LIMIT 1` | Đổi email: email mới đã có người dùng chưa |
+| `existsByUsername` | `SELECT 1 ... WHERE username = ? LIMIT 1` | Đăng ký: username trùng chưa |
+| `findByArtistRequestStatus` | `SELECT * FROM users WHERE artist_request_status = ?` | Admin xem yêu cầu nghệ sĩ đang chờ |
+| `findTop10ByRole...AndIdNot` | `SELECT * FROM users WHERE role = ? AND account_status = ? AND LOWER(artist_name) LIKE LOWER('%từ khóa%') AND id <> ? LIMIT 10` | **Module Song**: nghệ sĩ tìm nghệ sĩ khác để ghi tên "feat" (`ArtistSongService.searchArtists`) |
+
+Các method có sẵn từ `JpaRepository` mà module User dùng: `findById(id)` (tìm theo id, trả `Optional`), `findAll()` (lấy tất cả), `save(entity)` (thêm hoặc sửa).
+
+Phân tích tên dài nhất:
+```
+findTop10By  Role  And  AccountStatus  And  ArtistNameContainingIgnoreCase  And  IdNot
+└───┬────┘   └┬─┘       └─────┬─────┘       └─────────────┬─────────────┘       └─┬─┘
+lấy tối đa  role=?     account_status=?      artist_name chứa từ khóa,         id khác ?
+10 dòng                                      không phân biệt hoa thường        (bỏ chính mình)
+```
+Các tham số truyền vào **theo đúng thứ tự** xuất hiện trong tên.
+
+```java
+public interface OtpVerificationRepository extends JpaRepository<OtpVerification, Long> {
+    Optional<OtpVerification> findFirstByUserAndPurposeAndVerifiedFalseOrderByIdDesc(User user, OtpPurpose purpose);
+}
+```
+Chỉ 1 method, đã phân tích ở A9.5. Chú ý:
+- Tham số là cả object `User`, Spring tự hiểu là so sánh `user_id = user.getId()`.
+- `VerifiedFalse` không cần tham số: giá trị `false` đã nằm sẵn trong tên.
+- `OrderByIdDesc` + `First` = lấy dòng có id **lớn nhất** = dòng **mới nhất** (vì id tự tăng).
+
+---
+
+### C6. DTO request — dữ liệu nhận vào (`dto/auth/`, `dto/user/`)
+
+#### C6.1. Đọc kỹ 1 file mẫu: `RegisterRequest`
+
+```java
+public class RegisterRequest {
+
+    @NotBlank(message = "Username is required")
+    @Size(min = 5, max = 20, message = "Username must be between 5 and 20 characters")
+    @Pattern(regexp = "^[a-zA-Z0-9_.]+$",
+            message = "Username can only contain letters, numbers, dot and underscore")
+    private String username;
+
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email")
+    @Size(max = 100, message = "Email must not exceed 100 characters")
+    private String email;
+
+    @NotBlank(message = "Password is required")
+    @Size(min = 6, max = 72, message = "Password must be between 6 and 72 characters")
+    private String password;
+
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
+    // ... getter, setter cho email và password
+}
+```
+
+Chuyện gì xảy ra khi frontend gửi `{"username": "lan.nguyen", "email": "lan@gmail.com", "password": "matkhau123"}`:
+
+```
+1. Jackson tạo object rỗng:     new RegisterRequest()     (constructor mặc định, không tham số)
+2. Jackson điền từng trường:    setUsername("lan.nguyen")
+                                setEmail("lan@gmail.com")
+                                setPassword("matkhau123")
+3. @Valid chạy các nhãn kiểm tra trên từng field
+4. Hợp lệ → object được đưa vào method register(...) của Controller
+```
+
+Vì sao `max = 100` cho email? Để khớp `length = 100` của cột `users.email`. Không kiểm tra ở đây thì email 150 ký tự sẽ đi tới tận database mới bị MySQL từ chối, ra lỗi khó hiểu.
+
+#### C6.2. Tất cả DTO request của module User
+
+| DTO | Dùng cho API | Field và luật kiểm tra |
+|---|---|---|
+| `RegisterRequest` | Đăng ký | `username` 5–20 ký tự, chỉ `a-z A-Z 0-9 _ .`; `email` đúng dạng, ≤ 100; `password` 6–72 |
+| `VerifyOtpRequest` | Xác thực OTP đăng ký | `email` đúng dạng; `otpCode` đúng 6 chữ số |
+| `LoginRequest` | Đăng nhập | `email` đúng dạng; `password` không trống (**không** kiểm tra độ dài, để không lộ luật mật khẩu cho kẻ đoán) |
+| `ForgotPasswordRequest` | Quên mật khẩu | `email` đúng dạng |
+| `ResetPasswordRequest` | Đặt lại mật khẩu | `email`; `otpCode` 6 số; `newPassword` 6–72 |
+| `UpdateProfileRequest` | Sửa họ tên | `fullName` không trống, ≤ 100 |
+| `RequestChangePasswordOtpRequest` | Xin OTP đổi mật khẩu | `currentPassword` không trống |
+| `ChangePasswordRequest` | Đổi mật khẩu | `otpCode` 6 số; `newPassword` 6–72 |
+| `RequestUpdateEmailOtpRequest` | Xin OTP đổi email | `newEmail` đúng dạng, ≤ 100 |
+| `UpdateEmailRequest` | Đổi email | `otpCode` 6 số |
+| `AccountActionRequest` | Vô hiệu hóa / xóa tài khoản | `password` không trống |
+| `ArtistRequest` | Gửi yêu cầu nghệ sĩ **và** sửa hồ sơ nghệ sĩ (dùng chung) | `artistName` không trống, ≤ 100; `bio` ≤ 255, được bỏ trống |
+| `AssignRoleRequest` | Admin đổi role | `role` không `null`, kiểu `Role` |
+
+Chú ý `AssignRoleRequest` có field kiểu **enum** `Role`. Gửi `{"role": "ADMIN"}` thì Jackson tự đổi chữ `"ADMIN"` thành `Role.ADMIN`. Gửi `{"role": "BOSS"}` (không có trong enum) thì Jackson **không đổi được** → lỗi đọc JSON → 400 `"Invalid request data"` (không phải message của `@NotNull`).
+
+---
+
+### C7. DTO response và `UserMapper` — dữ liệu trả ra
+
+#### C7.1. `LoginResponse`
+
+```java
+public class LoginResponse {
+    private String token;
+    private Long userId;
+    private String username;
+    private Role role;
+
+    public LoginResponse(String token, Long userId, String username, Role role) {
+        this.token = token;
+        this.userId = userId;
+        this.username = username;
+        this.role = role;
+    }
+    // ... chỉ có getter (không cần setter: object tạo 1 lần bằng constructor rồi trả ra luôn)
+}
+```
+Jackson gọi `getToken()`, `getUserId()`... để viết JSON `{"token": "...", "userId": 7, "username": "...", "role": "USER"}`. Enum `Role` được viết thành chữ `"USER"`.
+
+#### C7.2. `UserProfileResponse`
+
+10 field: `id`, `username`, `email`, `fullName`, `avatarUrl`, `accountStatus`, `role`, `artistRequestStatus`, `artistName`, `bio`. Constructor nhận đủ 10 giá trị, chỉ có getter.
+
+So với Entity `User` (12 field), response **bỏ** 2 field:
+- `password`: bí mật.
+- `accessStatus`: chỉ chủ dự án quản lý; người đang đăng nhập được thì chắc chắn đang là `ACCEPT`, trả ra cũng không có thông tin gì thêm.
+
+#### C7.3. `UserMapper`
+
+```java
+public class UserMapper {
+
+    private UserMapper() {}
+
+    public static UserProfileResponse toUserProfileResponse(User user) {
+        return new UserProfileResponse(
+                user.getId(),
+                user.getUsername(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getAvatarUrl(),
+                user.getAccountStatus(),
+                user.getRole(),
+                user.getArtistRequestStatus(),
+                user.getArtistName(),
+                user.getBio()
+        );
+    }
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| `private UserMapper() {}` | Constructor `private` → **không ai `new UserMapper()` được**. Class này chỉ là "hộp đựng hàm", không cần object |
+| `public static ...` | `static` = gọi thẳng bằng tên class: `UserMapper.toUserProfileResponse(user)`, không cần object |
+| Không có `@Component` | Mapper **không phải bean**. Nó không cần đồ nghề gì (không có field), nên không cần Spring quản lý |
+| Thân hàm | Lấy từng giá trị từ Entity, truyền vào constructor của DTO **đúng thứ tự** 10 tham số. Sai thứ tự (ví dụ đổi chỗ `username` và `email`) thì Java không báo lỗi vì cùng kiểu `String`, nhưng JSON sẽ sai → cẩn thận khi sửa |
+
+---
+
+### C8. `service/SessionService.java` — phiên đăng nhập trong Redis
+
+```java
+@Service
+public class SessionService {
+
+    private static final String KEY_PREFIX = "session:";
+
+    private final StringRedisTemplate redisTemplate;
+    private final long expirationMs;
+
+    public SessionService(StringRedisTemplate redisTemplate,
+                          @Value("${app.jwt.expiration-ms}") long expirationMs) {
+        this.redisTemplate = redisTemplate;
+        this.expirationMs = expirationMs;
+    }
+
+    private String key(String email) {
+        return KEY_PREFIX + email;
+    }
+
+    public String createSession(String email) {
+        String sessionId = UUID.randomUUID().toString();
+        redisTemplate.opsForValue().set(key(email), sessionId, Duration.ofMillis(expirationMs));
+        return sessionId;
+    }
+
+    public boolean isValidSession(String email, String sessionId) {
+        if(sessionId == null) {
+            return false;
+        }
+        String currentSessionId = redisTemplate.opsForValue().get(key(email));
+        return sessionId.equals(currentSessionId);
+    }
+
+    public void deleteSession(String email) {
+        redisTemplate.delete(key(email));
+    }
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| `KEY_PREFIX = "session:"` | Mọi khóa phiên đều bắt đầu bằng `session:`, để không đụng các khóa khác (`rate:`, `otp-attempt:`) trong cùng Redis |
+| Constructor có `@Value("${app.jwt.expiration-ms}")` | Vừa nhận bean `StringRedisTemplate`, vừa nhận 1 giá trị cấu hình. Phiên sống **đúng bằng** thời hạn token (24 giờ), token hết hạn thì phiên cũng tự biến mất |
+| `key(email)` | Hàm nhỏ ghép khóa: `"session:" + "lan@gmail.com"` → `"session:lan@gmail.com"`. Để `private` vì chỉ dùng trong class |
+| `createSession` | Sinh **UUID** (chuỗi ngẫu nhiên 36 ký tự, gần như không bao giờ trùng), ghi `SET session:{email} = UUID` sống 24 giờ, rồi trả UUID về để đưa vào token (trường `jti`) |
+| Ghi đè | `set` lên khóa đã có thì **giá trị cũ mất**. Đăng nhập lần 2 → UUID mới đè UUID cũ → token của lần đăng nhập 1 hết khớp → máy cũ bị đá ra. Đây chính là cơ chế "mỗi tài khoản 1 nơi" (mục 9.2) |
+| `isValidSession` | Token không có `jti` → không hợp lệ. Có thì đọc Redis, so 2 chuỗi. Khóa đã bị xóa hoặc hết hạn → `get` trả `null` → `equals` trả `false` |
+| `sessionId.equals(currentSessionId)` | Viết `sessionId.equals(...)` chứ không viết `currentSessionId.equals(...)`, vì `currentSessionId` có thể `null` (gọi method trên `null` → lỗi `NullPointerException`), còn `sessionId` đã chắc chắn khác `null` ở dòng trên |
+| `deleteSession` | Xóa khóa → mọi token đang có của tài khoản này **mất hiệu lực ngay** ở request tiếp theo. Được gọi khi: đăng xuất, đổi mật khẩu, đặt lại mật khẩu, đổi email, tự vô hiệu hóa, tự xóa, bị Admin khóa |
+
+---
+
+### C9. `security/JwtUtil.java` — tạo và đọc token
+
+```java
+@Component
+public class JwtUtil {
+
+    private final SecretKey key;
+    private final long expirationMs;
+
+    public JwtUtil(@Value("${app.jwt.secret}") String secret,
+                   @Value("${app.jwt.expiration-ms}") long expirationMs) {
+        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        this.expirationMs = expirationMs;
+    }
+
+    public String generateToken(User user, String sessionId) {
+        return Jwts.builder()
+                .subject(user.getEmail())
+                .id(sessionId)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expirationMs))
+                .signWith(key)
+                .compact();
+    }
+
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parser().verifyWith(key).build().parseSignedClaims(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public String getEmailFromToken(String token) {
+        return Jwts.parser().verifyWith(key).build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getSubject();
+    }
+
+    public String getSessionIdFromToken(String token) {
+        return Jwts.parser().verifyWith(key).build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getId();
+    }
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| `@Component` | Bean bình thường. Dùng `@Component` thay vì `@Service` vì đây là "công cụ" chứ không phải logic nghiệp vụ. Với Spring, 2 nhãn này **hoạt động giống hệt nhau**, chỉ khác ý nghĩa cho người đọc |
+| `Keys.hmacShaKeyFor(secret.getBytes(UTF_8))` | Biến chuỗi bí mật trong file cấu hình thành **khóa ký** (`SecretKey`). Khóa ngắn hơn 32 byte → báo lỗi ngay lúc khởi động (A15.2). Làm 1 lần trong constructor, dùng lại mãi |
+| `Jwts.builder()` | Bắt đầu "lắp ráp" 1 token, mỗi dòng `.xxx(...)` thêm 1 thông tin (kiểu viết nối chuỗi method này gọi là builder) |
+| `.subject(user.getEmail())` | Trường `sub` = email: token này của ai |
+| `.id(sessionId)` | Trường `jti` = mã phiên (UUID từ `SessionService.createSession`) |
+| `.issuedAt(new Date())` | Trường `iat` = thời điểm phát |
+| `.expiration(new Date(System.currentTimeMillis() + expirationMs))` | Trường `exp` = bây giờ + 24 giờ. `System.currentTimeMillis()` = số mili giây từ 1/1/1970 tới giờ |
+| `.signWith(key)` | Ký bằng khóa bí mật, thuật toán tự chọn theo độ dài khóa (HS512 với khóa ≥ 64 byte) |
+| `.compact()` | Ghép thành chuỗi `header.payload.signature` |
+| `validateToken` | `parseSignedClaims` kiểm tra **cùng lúc**: đúng cấu trúc, chữ ký đúng, chưa hết hạn. Bất kỳ sai sót nào → thư viện ném lỗi → `catch` → `false`. Không phân biệt "sai chữ ký" hay "hết hạn": với dự án, sai kiểu gì cũng là "không hợp lệ" |
+| `getEmailFromToken`, `getSessionIdFromToken` | Đọc lại `sub` và `jti`. Mỗi hàm tự kiểm tra chữ ký lại 1 lần nữa (`verifyWith(key)`), nên không bao giờ đọc nhầm dữ liệu từ token giả |
+
+---
+
+### C10. `security/CustomUserDetailsService.java` — nạp user cho Spring Security
+
+Spring Security không biết gì về Entity `User` của dự án. Nó chỉ hiểu kiểu `UserDetails` của nó (gồm: tên đăng nhập, mật khẩu, quyền, có bị vô hiệu không). Class này là "phiên dịch viên" giữa 2 bên.
+
+```java
+@Service
+public class CustomUserDetailsService implements UserDetailsService {
+
+    private final UserRepository userRepository;
+
+    public CustomUserDetailsService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    @Override
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        return org.springframework.security.core.userdetails.User
+                .withUsername(user.getEmail())
+                .password(user.getPassword())
+                .roles(user.getRole().name())
+                .disabled(user.getAccountStatus() != AccountStatus.ACTIVE
+                        || user.getAccessStatus() != AccessStatus.ACCEPT)
+                .build();
+    }
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| `implements UserDetailsService` | Interface của Spring Security, bắt buộc có method `loadUserByUsername` |
+| `@Override` | "Method này là bản cài đặt của method trong interface". Viết sai tên thì Java báo lỗi ngay |
+| `loadUserByUsername(String email)` | Tên method do Spring đặt (`Username`), nhưng dự án truyền **email** vào, vì dự án đăng nhập bằng email |
+| `org.springframework.security.core.userdetails.User` | Viết **đầy đủ tên package**, vì trùng tên class `User` của dự án (`com.winhmm.myspotify.entity.User`). Không viết đầy đủ thì Java không biết `User` nào |
+| `.withUsername(user.getEmail())` | "Tên đăng nhập" trong mắt Spring = email. Đây là lý do `authentication.getName()` ở Controller trả về **email** |
+| `.password(...)` | Bản băm. Dự án không dùng tới ở đây (tự so mật khẩu trong `AuthService.login`), nhưng Spring yêu cầu phải có |
+| `.roles(user.getRole().name())` | `Role.ADMIN.name()` = chuỗi `"ADMIN"` → Spring tự thêm tiền tố → quyền `ROLE_ADMIN` (A13.4) |
+| `.disabled(...)` | Đánh dấu "bị vô hiệu" nếu **1 trong 2**: tài khoản không ở trạng thái ACTIVE, **hoặc** không được phép vào web. `||` nghĩa là "hoặc" |
+| `.build()` | Tạo ra object `UserDetails` |
+
+Class này được gọi ở **mọi request có token** (C11). Vì nó đọc MySQL mỗi lần, nên khóa tài khoản hay thu hồi quyền vào web đều có tác dụng **ngay request tiếp theo**.
+
+---
+
+### C11. `security/JwtAuthenticationFilter.java` — kiểm tra token mỗi request
+
+```java
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    public static final String SESSION_ERROR = "sessionError";
+
+    private final JwtUtil jwtUtil;
+    private final CustomUserDetailsService userDetailsService;
+    private final SessionService sessionService;
+
+    public JwtAuthenticationFilter(JwtUtil jwtUtil,
+                                   CustomUserDetailsService userDetailsService,
+                                   SessionService sessionService) {
+        this.jwtUtil = jwtUtil;
+        this.userDetailsService = userDetailsService;
+        this.sessionService = sessionService;
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+
+        String header = request.getHeader("Authorization");                        // ①
+
+        if (header != null && header.startsWith("Bearer ")) {                      // ②
+            String token = header.substring(7);                                     // ③
+
+            if (jwtUtil.validateToken(token)) {                                     // ④
+                try {
+                    String email = jwtUtil.getEmailFromToken(token);                // ⑤
+                    String sessionId = jwtUtil.getSessionIdFromToken(token);
+
+                    if (!sessionService.isValidSession(email, sessionId)) {          // ⑥
+                        request.setAttribute(SESSION_ERROR,
+                                "Your session has ended. Your account may have been logged in on another device");
+                    } else {
+                        UserDetails userDetails = userDetailsService.loadUserByUsername(email); // ⑦
+
+                        if (userDetails.isEnabled()) {                               // ⑧
+                            SecurityContextHolder.getContext().setAuthentication(
+                                    new UsernamePasswordAuthenticationToken(
+                                            userDetails, null, userDetails.getAuthorities()));
+                        }
+                    }
+                } catch (Exception e) {}                                             // ⑨
+            }
+        }
+
+        filterChain.doFilter(request, response);                                    // ⑩
+    }
+}
+```
+
+| Bước | Giải thích |
+|---|---|
+| `extends OncePerRequestFilter` | Kế thừa 1 loại filter có sẵn của Spring, đảm bảo **mỗi request chỉ chạy filter này 1 lần**. Chỉ cần viết method `doFilterInternal` |
+| `SESSION_ERROR = "sessionError"` | Tên 1 "ghi chú" dán vào request (bước ⑥), để `SecurityConfig` đọc lại khi viết lỗi 401. `public static` để class khác dùng chung đúng tên |
+| ① | Đọc header `Authorization` |
+| ② | Không có header, hoặc không bắt đầu bằng `"Bearer "` (có dấu cách) → bỏ qua cả khối `if`, đi thẳng tới ⑩ với tư cách **khách** |
+| ③ | `substring(7)`: cắt bỏ 7 ký tự đầu (`B-e-a-r-e-r-dấu cách`), còn lại đúng chuỗi token |
+| ④ | Token sai chữ ký / hết hạn / sai cấu trúc → bỏ qua, coi như khách |
+| ⑤ | Đọc email và mã phiên trong token |
+| ⑥ | Mã phiên không khớp Redis (đăng nhập nơi khác, đã đăng xuất, bị khóa...) → **dán ghi chú lỗi** vào request, **không** ghi nhận đăng nhập. Request vẫn đi tiếp như khách; nếu API cần đăng nhập thì 401 kèm đúng ghi chú này |
+| ⑦ | Đọc user từ MySQL qua C10 |
+| ⑧ | Chỉ ghi nhận đăng nhập nếu tài khoản **không bị vô hiệu** (ACTIVE và ACCEPT). `UsernamePasswordAuthenticationToken(userDetails, null, quyền)` = tờ giấy "người gọi là ai, quyền gì" (A13.3). Tham số giữa (`null`) là mật khẩu, không cần vì đã xác thực bằng token |
+| ⑨ | Bất kỳ lỗi gì (ví dụ user đã bị xóa khỏi database → `UsernameNotFoundException`) → **nuốt lỗi**, coi như khách. Filter **không bao giờ tự trả lỗi**; quyết định 401 hay không để cho trạm cuối (luật URL trong `SecurityConfig`). Nhờ vậy API công khai như `/api/auth/login` vẫn chạy được dù người dùng gửi kèm 1 token hỏng |
+| ⑩ | **Luôn** chuyển request cho trạm tiếp theo. Quên dòng này thì mọi request "chết" giữa đường, không bao giờ tới Controller |
+
+Filter **không có** `@Component`. Vì sao: xem C13.
+
+---
+
+### C12. `RateLimitService` và `RateLimitFilter` — chống gọi quá nhiều
+
+#### C12.1. `service/RateLimitService.java`
+
+```java
+@Service
+public class RateLimitService {
+
+    private final StringRedisTemplate redisTemplate;
+    private final int windowSeconds;
+    private final int userRequests;
+    private final int authRequests;
+
+    public RateLimitService (
+            StringRedisTemplate redisTemplate,
+            @Value("${app.rate-limit.window-seconds}") int windowSeconds,
+            @Value("${app.rate-limit.user-requests}") int userRequests,
+            @Value("${app.rate-limit.auth-requests}") int authRequests
+    ) { /* gán 4 field */ }
+
+    public boolean tryAcquire(String key, int limit) {
+        Long count = redisTemplate.opsForValue().increment(key);
+        if(count != null && count == 1) {
+            redisTemplate.expire(key, Duration.ofSeconds(windowSeconds));
+        }
+        return count != null && count <= limit;
+    }
+
+    public long getRetryAfterSeconds(String key) {
+        Long ttl = redisTemplate.getExpire(key);
+        if(ttl == null || ttl < 1) {
+            return 1;
+        } else {
+            return ttl;
+        }
+    }
+
+    public int getUserRequests() { return userRequests; }
+    public int getAuthRequests() { return authRequests; }
+}
+```
+
+Cách đếm kiểu "cửa sổ cố định" (fixed window), ví dụ giới hạn 10 lần / 60 giây:
+
+```
+Request 1  → INCR rate:auth:1.2.3.4 → 1  → là lần đầu → EXPIRE 60 giây → cho qua
+Request 2  → INCR                   → 2  → cho qua
+...
+Request 10 → INCR                   → 10 → cho qua (10 ≤ 10)
+Request 11 → INCR                   → 11 → CHẶN (11 > 10) → 429
+... 60 giây kể từ request 1 trôi qua → Redis tự xóa khóa → đếm lại từ đầu
+```
+
+| Code | Giải thích |
+|---|---|
+| `increment(key)` | Lệnh `INCR`: cộng 1 và trả về số mới, **nguyên tử** (atomic): 100 request cùng lúc thì Redis vẫn xếp hàng cộng lần lượt, không bao giờ 2 request cùng đọc ra 1 số |
+| `count == 1` → `expire` | Chỉ đặt hạn ở **lần đầu tiên** của cửa sổ. Nếu lần nào cũng đặt lại hạn, người dùng gọi đều đều sẽ bị gia hạn mãi, không bao giờ được đếm lại |
+| `count <= limit` | Còn trong giới hạn → `true` (cho qua) |
+| `getRetryAfterSeconds` | Đọc thời gian còn lại của khóa (`TTL`) để báo người dùng "chờ bao lâu". Tối thiểu trả 1 giây |
+
+#### C12.2. `security/RateLimitFilter.java`
+
+```java
+public class RateLimitFilter extends OncePerRequestFilter {
+
+    // ... field + constructor nhận RateLimitService
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return "OPTIONS".equalsIgnoreCase(request.getMethod())
+                || path.startsWith("/uploads/")
+                || path.startsWith("/actuator/")
+                || path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs");
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+        String path = request.getRequestURI();
+        String ip = request.getRemoteAddr();
+        String key;
+        int limit;
+
+        if(path.startsWith("/api/auth/")) {
+            key = "rate:auth:" + ip;
+            limit = rateLimitService.getAuthRequests();
+        } else {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if(auth != null && auth.isAuthenticated()
+                    && !(auth instanceof AnonymousAuthenticationToken)) {
+                key = "rate:user:" + auth.getName();
+            } else {
+                key = "rate:ip:" + ip;
+            }
+            limit = rateLimitService.getUserRequests();
+        }
+
+        boolean allowed;
+        try {
+            allowed = rateLimitService.tryAcquire(key, limit);
+        } catch (Exception e) {
+            allowed = true;
+        }
+
+        if(!allowed) {
+            long retryAfter = rateLimitService.getRetryAfterSeconds(key);
+            response.setStatus(429);
+            response.setHeader("Retry-After", String.valueOf(retryAfter));
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write(
+                    "{\"message\":\"Too many requests. Please try again in "
+                            + retryAfter + " seconds\"}"
+            );
+            return;
+        }
+
+        filterChain.doFilter(request, response);
+    }
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| `shouldNotFilter` | Trả `true` = **bỏ qua** filter cho request này. Bỏ qua: request `OPTIONS` của CORS (trình duyệt tự gửi, không tính), file tĩnh `/uploads/...` (1 trang có thể tải hàng chục ảnh), trang kiểm tra sức khỏe, trang Swagger |
+| `request.getRemoteAddr()` | Địa chỉ IP người gọi |
+| Nhánh `/api/auth/` | Đăng ký, đăng nhập, quên mật khẩu: đếm theo **IP**, giới hạn chặt (**10**). Chống đoán mật khẩu và chống spam email OTP |
+| Nhánh còn lại, đã đăng nhập | Đếm theo **email** (`auth.getName()`), giới hạn **100**. Đếm theo tài khoản công bằng hơn: nhiều người chung 1 mạng Wi-Fi (chung IP) không ảnh hưởng nhau |
+| `!(auth instanceof AnonymousAuthenticationToken)` | Phòng hờ trường hợp SecurityContext chứa 1 "khách vô danh" (Spring Security có loại `Authentication` riêng cho khách). Khách thì không đếm theo email được |
+| Nhánh còn lại, là khách | Đếm theo IP, giới hạn 100 |
+| `try { ... } catch → allowed = true` | Redis bị tắt / lỗi → **cho qua** thay vì chặn hết. Thà mất tạm tính năng chống spam còn hơn cả web ngừng chạy |
+| Bị chặn | Tự viết response 429: header `Retry-After` + JSON message, rồi `return` **không** gọi `doFilter` → request dừng ở đây, không tới Controller |
+| Vị trí | Đứng **sau** `JwtAuthenticationFilter` (C13). Phải vậy thì lúc chạy, SecurityContext đã có thông tin người dùng để đếm theo email |
+
+---
+
+### C13. `config/SecurityConfig.java` — luật bảo mật tổng
+
+```java
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
+public class SecurityConfig {
+
+    private final JwtUtil jwtUtil;
+    private final CustomUserDetailsService userDetailsService;
+    private final SessionService sessionService;
+    private final RateLimitService rateLimitService;
+
+    // ... constructor nhận 4 bean trên
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable())                                          // ①
+                .cors(Customizer.withDefaults())                                       // ②
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // ③
+                .authorizeHttpRequests(auth -> auth                                    // ④
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/auth/**", "/uploads/**", "/actuator/health",
+                                "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
+                                "/error").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .exceptionHandling(ex -> ex                                            // ⑤
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            Object sessionError = request.getAttribute(JwtAuthenticationFilter.SESSION_ERROR);
+                            String message = (sessionError != null)
+                                    ? sessionError.toString()
+                                    : "Unauthorized, please login";
+                            writeJsonError(response, 401, message);
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) ->
+                                writeJsonError(response, 403, "You do not have permission to access this resource"))
+                )
+                .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, userDetailsService, sessionService), // ⑥
+                        UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new RateLimitFilter(rateLimitService),                 // ⑦
+                        JwtAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    private void writeJsonError(HttpServletResponse response, int status,
+                                String message) throws IOException {
+        response.setStatus(status);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write("{\"message\":\"" + message + "\"}");
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {                                         // ⑧
+        return new BCryptPasswordEncoder();
+    }
+}
+```
+
+| Phần | Giải thích |
+|---|---|
+| `@Configuration` | Class chứa các method `@Bean` (A7.3) |
+| `@EnableWebSecurity` | Bật Spring Security với cấu hình viết ở đây |
+| `@EnableMethodSecurity` | Bật `@PreAuthorize`. **Thiếu nhãn này thì `@PreAuthorize("hasRole('ADMIN')")` trên AdminController bị bỏ qua**, USER thường gọi được API admin |
+| `@Bean SecurityFilterChain filterChain(HttpSecurity http)` | Spring đưa vào 1 "bảng điều khiển" `http`, ta chỉnh từng mục, cuối cùng `http.build()` tạo ra dãy filter |
+| ① `csrf.disable()` | Tắt chống CSRF (lý do ở A13.5) |
+| ② `cors(Customizer.withDefaults())` | Bật CORS, dùng bean `CorsConfigurationSource` trong `CorsConfig` (C14) |
+| ③ `STATELESS` | Không tạo phiên kiểu cookie `JSESSIONID` |
+| ④ Luật URL | Đọc **từ trên xuống, luật nào khớp trước thì dùng luật đó**. (1) Mọi request `OPTIONS` → cho qua. (2) Các đường dẫn công khai → cho qua (`permitAll`). (3) **Mọi thứ còn lại** → phải đăng nhập (`authenticated`). Vì vậy luật chung `anyRequest()` phải đặt **cuối cùng**; đặt lên đầu thì khóa luôn cả trang đăng nhập |
+| `/**` | Ký hiệu "mọi đường dẫn con, bao nhiêu cấp cũng được". `/api/auth/**` khớp `/api/auth/login`, `/api/auth/a/b/c` |
+| `/error` | Đường dẫn nội bộ Spring dùng khi có lỗi; không mở thì lỗi thật bị che thành 401 |
+| ⑤ `authenticationEntryPoint` | Được gọi khi **khách** gọi API cần đăng nhập → viết **401**. Có ghi chú `sessionError` (C11 bước ⑥) thì dùng ghi chú đó, không thì dùng câu chung `"Unauthorized, please login"` |
+| ⑤ `accessDeniedHandler` | Được gọi khi **đã đăng nhập nhưng thiếu quyền** → viết **403** |
+| `writeJsonError` | Tự viết JSON `{"message":"..."}` cùng dạng với `GlobalExceptionHandler`, để frontend đọc lỗi 1 kiểu duy nhất |
+| ⑥ `addFilterBefore(new JwtAuthenticationFilter(...), UsernamePasswordAuthenticationFilter.class)` | Chèn filter kiểm tra token vào **trước** filter đăng nhập bằng form mặc định của Spring |
+| ⑦ `addFilterAfter(new RateLimitFilter(...), JwtAuthenticationFilter.class)` | Chèn filter rate limit ngay **sau** filter token (lý do ở C12.2) |
+| Vì sao `new` chứ không dán `@Component` lên 2 filter? | Spring Boot có thói quen: **bean nào là Filter thì tự đăng ký thêm 1 lần ở tầng Tomcat**, nằm **ngoài** dãy của Spring Security. Khi đó filter nằm ở 2 nơi: dễ chạy **sai vị trí** (ví dụ `RateLimitFilter` chạy trước khi biết người gọi là ai → mọi request bị đếm theo IP) hoặc chạy **2 lần**. Tạo bằng `new` ở đây thì chúng chỉ nằm trong dãy Spring Security, đúng 1 lần, đúng vị trí. Đồ nghề cần thiết thì truyền qua constructor bằng tay |
+| ⑧ `@Bean PasswordEncoder` | Tạo bean BCrypt (độ khó mặc định 10). `AuthService`, `UserService` nhận bean này qua constructor. Muốn đổi thuật toán chỉ sửa 1 dòng này |
+
+Thứ tự đầy đủ của 1 request qua dãy filter: mục 10.
+
+---
+
+### C14. `CorsConfig` và `WebMvcConfig`
+
+#### C14.1. `config/CorsConfig.java`
+
+```java
+@Configuration
+public class CorsConfig {
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setExposedHeaders(List.of(
+                "Authorization", "Content-Disposition", "Content-Range",
+                "Accept-Ranges", "Content-Length", "Retry-After"));
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+}
+```
+
+| Dòng | Giải thích |
+|---|---|
+| `setAllowedOriginPatterns(List.of("*"))` | Trang web ở **domain nào** cũng được gọi API (localhost lúc dev, Vercel lúc chạy thật). Dùng "pattern" vì kiểu `setAllowedOrigins("*")` không đi chung được với `setAllowCredentials(true)` |
+| `setAllowedMethods(...)` | Các method được phép |
+| `setAllowedHeaders("*")` | Frontend gửi header nào cũng được (`Authorization`, `Content-Type`...) |
+| `setExposedHeaders(...)` | Mặc định JavaScript trên trình duyệt **không đọc được** phần lớn header của response. Liệt kê ở đây thì đọc được. Liên quan module User: `Retry-After` (lỗi 429). Các header còn lại phục vụ phát nhạc của module Song |
+| `setAllowCredentials(true)` | Cho phép gửi kèm thông tin đăng nhập |
+| `setMaxAge(3600L)` | Trình duyệt nhớ kết quả "hỏi trước" (preflight) trong 1 giờ, đỡ phải hỏi lại mỗi request |
+| `registerCorsConfiguration("/**", config)` | Áp dụng cho mọi đường dẫn |
+
+#### C14.2. `config/WebMvcConfig.java`
+
+```java
+@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {
+    @Value("${app.upload-dir}")
+    private String uploadDir;
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        String location = Paths.get(uploadDir).toAbsolutePath().toUri().toString();
+        if (!location.endsWith("/")) {
+            location += "/";
+        }
+        registry.addResourceHandler("/uploads/**")
+                .addResourceLocations(location)
+                .setCachePeriod(3600);
+    }
+}
+```
+Dịch: "request tới `/uploads/...` thì lấy **file thật** trong thư mục `app.upload-dir` trên ổ đĩa trả về". Ví dụ `avatarUrl = "/uploads/avatars/9f1c...e2.jpg"` → mở `http://<server>:8080/uploads/avatars/9f1c...e2.jpg` là thấy ảnh. `setCachePeriod(3600)`: trình duyệt được giữ ảnh trong bộ nhớ đệm 1 giờ.
+
+`@Value` ở đây gắn thẳng trên **field** (không qua constructor). Cách này cũng chạy được; dự án dùng constructor ở hầu hết nơi khác.
+
+---
+
+### C15. `EmailService` và `EmailSendException`
+
+#### C15.1. `service/EmailService.java`
+
+```java
+@Service
+public class EmailService {
+
+    private final JavaMailSender mailSender;
+    private static final Logger log = LoggerFactory.getLogger(EmailService.class);
+
+    @Value("${spring.mail.username}")
+    private String fromEmail;
+
+    public EmailService(JavaMailSender mailSender) {
+        this.mailSender = mailSender;
+    }
+
+    public void sendOtp(String toEmail, String otpCode) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom("MySpotify <" + fromEmail + ">");
+            message.setTo(toEmail);
+            message.setSubject("MySpotify - Mã xác thực OTP");
+            message.setText(
+                    "Xin chào,\n\n"
+                            + "Mã OTP của bạn là: " + otpCode + "\n\n"
+                            + "Mã có hiệu lực trong 5 phút và chỉ sử dụng được 1 lần.\n\n"
+                            + "Nếu bạn không yêu cầu mã này, hãy bỏ qua email.\n\n"
+                            + "MySpotify"
+            );
+            mailSender.send(message);
+        } catch (Exception e) {
+            log.error("Could not send OTP email to {}: {}", toEmail, e.getMessage());
+            throw new EmailSendException("Could not send OTP email, please try again later", e);
+        }
+    }
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| `JavaMailSender mailSender` | Bean do Spring Boot tự tạo từ các khóa `spring.mail.*` (A16.2) |
+| `Logger log` | Công cụ ghi log (nhật ký) ra file / màn hình. `log.error(...)` ghi 1 dòng mức lỗi. `{}` là chỗ điền giá trị theo thứ tự |
+| `@Value("${spring.mail.username}") fromEmail` | Địa chỉ Gmail dùng để gửi, đọc từ cấu hình |
+| `SimpleMailMessage` | Email **chữ thường** (không có HTML, không có ảnh) |
+| `setFrom("MySpotify <" + fromEmail + ">")` | Người nhận thấy tên người gửi là "MySpotify" thay vì chỉ thấy địa chỉ Gmail |
+| `\n` | Ký tự xuống dòng |
+| `try ... catch (Exception e)` | Bắt **mọi** lỗi khi gửi: sai App Password, quá thời gian 5 giây, Gmail từ chối, mất mạng... |
+| `log.error(...)` | Ghi lý do thật vào log cho người làm backend xem. Người dùng **không** thấy chi tiết này |
+| `throw new EmailSendException(..., e)` | Ném lỗi riêng của dự án, kèm lỗi gốc `e` (để log còn truy được nguyên nhân) |
+
+#### C15.2. `exception/EmailSendException.java`
+
+```java
+public class EmailSendException extends RuntimeException {
+    public EmailSendException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
+```
+- `extends RuntimeException`: là `RuntimeException` → `@Transactional` **rollback** khi gặp nó (A9.7). Nhờ vậy gửi email lỗi thì tài khoản vừa tạo / mã OTP vừa lưu đều bị hoàn tác.
+- `super(message, cause)`: gọi constructor của lớp cha để lưu message và lỗi gốc.
+- `GlobalExceptionHandler` có 1 method riêng cho loại lỗi này → trả **503** kèm message (C24).
+
+Vì sao cần 1 loại lỗi riêng thay vì dùng lại `IllegalArgumentException`? Vì 2 loại lỗi **khác bản chất**: `IllegalArgumentException` = "người dùng làm sai" (400), còn lỗi email = "server gặp sự cố, người dùng không có lỗi, thử lại sau" (503). Frontend dựa vào mã để hiển thị cho đúng.
+
+---
+
+### C16. `service/OtpService.java` — tạo, gửi, kiểm tra mã OTP
+
+Đây là file "khó" nhất của module, đọc chậm.
+
+#### C16.1. Khai báo
+
+```java
+@Service
+public class OtpService {
+
+    private final OtpVerificationRepository otpVerificationRepository;
+    private final EmailService emailService;
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final int OTP_EXPIRE_MINUTES = 5;
+    private static final int RESEND_COOLDOWN_SECONDS = 60;
+    private final StringRedisTemplate redisTemplate;
+    private static final int MAX_FAILED_ATTEMPTS = 5;
+
+    // ... constructor nhận 3 bean: OtpVerificationRepository, EmailService, StringRedisTemplate
+```
+
+| Hằng số | Giá trị | Ý nghĩa |
+|---|---|---|
+| `RANDOM` | `new SecureRandom()` | Bộ sinh số ngẫu nhiên an toàn (A16.1). `static` → cả ứng dụng dùng chung 1 cái |
+| `OTP_EXPIRE_MINUTES` | 5 | Mã sống 5 phút |
+| `RESEND_COOLDOWN_SECONDS` | 60 | Phải chờ 60 giây mới được xin mã mới |
+| `MAX_FAILED_ATTEMPTS` | 5 | Mỗi mã được thử tối đa 5 lần |
+
+Muốn đổi các con số này → sửa ở đây, mọi nơi dùng tự đổi theo. (Nhớ sửa cả câu "5 phút" trong nội dung email ở `EmailService`.)
+
+#### C16.2. Hai cửa vào `generateAndSend`
+
+```java
+    @Transactional
+    public void generateAndSend(User user, OtpPurpose purpose) {
+        createAndSend(user, purpose, null, user.getEmail());
+    }
+
+    @Transactional
+    public void generateAndSend(User user, OtpPurpose purpose, String newEmail) {
+        createAndSend(user, purpose, newEmail, newEmail);
+    }
+```
+Hai method **cùng tên, khác số tham số** (Java gọi là **overload**). Java tự chọn bản nào tùy lúc gọi truyền 2 hay 3 tham số.
+
+| Bản | Dùng cho | Gửi mã tới | Lưu `newEmail` |
+|---|---|---|---|
+| 2 tham số | REGISTER, RESET_PASSWORD, CHANGE_PASSWORD | Email **hiện tại** của user | `null` |
+| 3 tham số | CHANGE_EMAIL | Email **mới** (để chứng minh người dùng sở hữu email mới) | Email mới |
+
+Cả 2 đều gọi 1 hàm chung `createAndSend` (tránh viết lặp code).
+
+#### C16.3. `createAndSend` — 5 bước
+
+```java
+    private void createAndSend(User user, OtpPurpose purpose, String newEmail, String toEmail) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // BƯỚC 1: kiểm tra thời gian chờ 60 giây
+        Optional<OtpVerification> latest = otpVerificationRepository
+                .findFirstByUserAndPurposeAndVerifiedFalseOrderByIdDesc(user, purpose);
+        if(latest.isPresent()) {
+            LocalDateTime createdAt = latest.get().getExpiredAt().minusMinutes(OTP_EXPIRE_MINUTES);
+            if(createdAt.plusSeconds(RESEND_COOLDOWN_SECONDS).isAfter(now)) {
+                throw new IllegalArgumentException(
+                        "Please wait " + RESEND_COOLDOWN_SECONDS + " seconds before requesting a new OTP");
+            }
+        }
+
+        // BƯỚC 2: vô hiệu mọi mã cũ chưa dùng
+        Optional<OtpVerification> old = latest;
+        while(old.isPresent()) {
+            OtpVerification otp = old.get();
+            otp.setVerified(true);
+            otpVerificationRepository.save(otp);
+            old = otpVerificationRepository
+                    .findFirstByUserAndPurposeAndVerifiedFalseOrderByIdDesc(user, purpose);
+        }
+
+        // BƯỚC 3: sinh mã 6 chữ số
+        String otpCode = String.format("%06d", RANDOM.nextInt(1_000_000));
+
+        // BƯỚC 4: lưu mã mới
+        OtpVerification otp = new OtpVerification();
+        otp.setUser(user);
+        otp.setOtpCode(otpCode);
+        otp.setPurpose(purpose);
+        otp.setNewEmail(newEmail);
+        otp.setExpiredAt(now.plusMinutes(OTP_EXPIRE_MINUTES));
+        otp.setVerified(false);
+        otpVerificationRepository.save(otp);
+
+        // BƯỚC 5: gửi email
+        emailService.sendOtp(toEmail, otpCode);
+    }
+```
+(Chú thích `// BƯỚC ...` do tài liệu thêm vào cho dễ theo dõi.)
+
+**Bước 1 — mẹo tính "thời điểm tạo mã".** Bảng không có cột `created_at` (C4). Nhưng `expiredAt` luôn = lúc tạo + 5 phút, nên **lúc tạo = `expiredAt` − 5 phút**. Ví dụ:
+
+```
+Mã cũ: expiredAt = 10:05:00  →  createdAt = 10:00:00  →  hết thời gian chờ lúc 10:01:00
+Bây giờ 10:00:40  → 10:01:00 vẫn sau bây giờ (isAfter = true)  → báo "Please wait 60 seconds..."
+Bây giờ 10:01:05  → 10:01:00 đã qua                            → cho tạo mã mới
+```
+Message luôn ghi "60 seconds" dù có thể chỉ còn vài giây; frontend nên tự đếm ngược 60 giây kể từ lúc gửi thành công (mục 19.3).
+
+**Bước 2 — vì sao là vòng `while` chứ không chỉ sửa 1 mã?** Bình thường chỉ có tối đa 1 mã chưa dùng. Nhưng nếu 2 request xin mã gửi tới cùng 1 lúc, có thể lọt 2 mã. Vòng lặp "cứ còn mã chưa dùng là đánh dấu tiếp" đảm bảo sau bước này **không còn mã cũ nào dùng được**. Vòng lặp dừng được vì trong cùng transaction, trước mỗi lần tìm Hibernate ghi các thay đổi đang chờ xuống database, nên lần tìm sau không thấy lại mã vừa đánh dấu.
+
+**Bước 3** — xem A16.1.
+
+**Bước 4** — `verified = false`: mã mới, chưa dùng. `save` → `INSERT`.
+
+**Bước 5** — gửi email **sau cùng**. Gửi lỗi → `EmailSendException` → transaction rollback: mã mới bị xóa, các mã cũ ở bước 2 được **trả lại trạng thái chưa dùng**. Người dùng có thể bấm gửi lại.
+
+#### C16.4. `verifyAndConsume` — kiểm tra và "tiêu" mã
+
+```java
+    public OtpVerification verifyAndConsume(User user, String otpCode, OtpPurpose purpose) {
+        OtpVerification otp = otpVerificationRepository
+                .findFirstByUserAndPurposeAndVerifiedFalseOrderByIdDesc(user, purpose)
+                .orElseThrow(() -> new IllegalArgumentException("Otp code does not exist"));    // ①
+
+        if(otp.getExpiredAt().isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("Otp code has expired");                         // ②
+        }
+
+        String attemptKey = "otp-attempt:" + otp.getId();
+        Long attempts = redisTemplate.opsForValue().increment(attemptKey);                      // ③
+        if(attempts != null && attempts == 1) {
+            redisTemplate.expire(attemptKey, Duration.ofMinutes(OTP_EXPIRE_MINUTES));
+        }
+        if(attempts == null || attempts > MAX_FAILED_ATTEMPTS) {
+            throw new IllegalArgumentException("Too many wrong attempts, please request a new OTP"); // ④
+        }
+
+        if(!otp.getOtpCode().equals(otpCode)) {
+            throw new IllegalArgumentException("Otp code does not match");                      // ⑤
+        }
+
+        redisTemplate.delete(attemptKey);                                                       // ⑥
+        otp.setVerified(true);
+        return otpVerificationRepository.save(otp);
+    }
+```
+
+| Bước | Giải thích |
+|---|---|
+| ① | Không có mã nào chưa dùng cho (user, mục đích) này → chưa từng xin mã, hoặc mã đã dùng rồi |
+| ② | `expiredAt` trước bây giờ → mã đã quá 5 phút |
+| ③ | **Tăng bộ đếm trước, so mã sau.** Lệnh `INCR` của Redis là nguyên tử (C12.1). Nếu làm ngược lại (so mã trước, sai mới tăng đếm), kẻ xấu gửi 20 lần đoán **cùng 1 lúc** thì cả 20 đều đọc được "đếm = 0" → cả 20 được so mã. Tăng trước thì 20 request nhận lần lượt các số 1, 2, ..., 20 → chỉ 5 request đầu được so. Test tự động `OtpRaceConditionTest` kiểm tra đúng điều này: 20 lần nhập sai song song, chỉ đúng 5 lần được so mã |
+| `attempts == 1` → `expire` | Bộ đếm sống 5 phút (bằng tuổi thọ mã), sau đó Redis tự dọn |
+| ④ | Từ lần thứ **6** trở đi bị chặn, **kể cả khi nhập đúng**. Cách duy nhất: xin mã mới (mã mới có id mới → khóa đếm mới, bắt đầu lại từ 0) |
+| ⑤ | So 2 chuỗi. Sai → báo lỗi; bộ đếm Redis **vẫn giữ** số lần vừa tăng (Redis không bị rollback, A9.7) |
+| ⑥ | Đúng mã → xóa bộ đếm, đánh dấu mã đã dùng (`verified = true`) → không dùng lại được lần 2. Trả object mã về cho nơi gọi (đổi email cần đọc `getNewEmail()` từ đây) |
+
+Method này **không có** `@Transactional` riêng: nó luôn được gọi từ 1 method đã có `@Transactional` (`verifyOtp`, `resetPassword`, `changePassword`, `updateEmail`) nên chạy chung transaction của method đó.
+
+Redis bị tắt → bước ③ ném lỗi kết nối → **500**. Nghĩa là mọi thao tác nhập OTP cần Redis chạy.
+
+---
+
+### C17. `service/AuthService.java` — đăng ký, xác thực, đăng nhập, quên mật khẩu
+
+Constructor nhận 5 bean: `UserRepository`, `OtpService`, `PasswordEncoder`, `JwtUtil`, `SessionService` (đã giải thích ở A7.2).
+
+#### C17.1. `register` — đăng ký
+
+```java
+    @Transactional
+    public void register(String username, String email, String password) {
+        Optional<User> existing = userRepository.findByEmail(email);
+
+        if (existing.isPresent()) {                                                 // NHÁNH A: email đã có trong database
+            User oldUser = existing.get();
+            if (oldUser.getAccountStatus() != AccountStatus.UNVERIFIED) {
+                throw new IllegalArgumentException("Email already exists");          // A1
+            }
+            if (!oldUser.getUsername().equalsIgnoreCase(username)
+                    && userRepository.existsByUsername(username)) {
+                throw new IllegalArgumentException("Username already exists");       // A2
+            }
+            oldUser.setUsername(username);                                           // A3
+            oldUser.setPassword(passwordEncoder.encode(password));
+            userRepository.save(oldUser);
+            otpService.generateAndSend(oldUser, OtpPurpose.REGISTER);
+            return;
+        }
+
+        if (userRepository.existsByUsername(username)) {                            // NHÁNH B: email mới hoàn toàn
+            throw new IllegalArgumentException("Username already exists");          // B1
+        }
+
+        User user = new User();                                                      // B2
+        user.setUsername(username);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setAccountStatus(AccountStatus.UNVERIFIED);
+        user.setRole(Role.USER);
+        user.setAccessStatus(AccessStatus.REFUSE);
+        userRepository.save(user);
+        otpService.generateAndSend(user, OtpPurpose.REGISTER);                       // B3
+    }
+```
+
+Vì sao có **nhánh A**? Tình huống: Lan đăng ký nhưng không nhận được email, hoặc quên nhập mã, bỏ đó vài ngày. Database đã có dòng của Lan ở trạng thái `UNVERIFIED`. Nếu báo "Email already exists" thì Lan **mắc kẹt vĩnh viễn**: không đăng ký lại được, cũng không đăng nhập được. Nên dự án cho **đăng ký đè** lên dòng chưa xác thực.
+
+| Bước | Giải thích |
+|---|---|
+| A1 | Email đã có và tài khoản **đã xác thực** (hoặc đã khóa, đã xóa) → không cho đăng ký đè |
+| A2 | Đổi sang username khác mà username mới thuộc **người khác** → báo trùng. `equalsIgnoreCase` = so không phân biệt hoa thường: giữ username cũ (hoặc chỉ đổi hoa thường) thì không cần kiểm tra |
+| A3 | Ghi đè username, mật khẩu mới (đã băm), `save` → `UPDATE`, gửi mã mới. Vẫn chịu luật chờ 60 giây: đăng ký đè quá nhanh → `Please wait 60 seconds...` |
+| `return;` | Kết thúc method sớm, không chạy xuống nhánh B |
+| B1 | Username đã có người dùng → báo trùng |
+| B2 | Tạo user mới. Các dòng `setAccountStatus`, `setRole`, `setAccessStatus` thật ra trùng giá trị mặc định trong Entity (C3), viết lại cho rõ ý |
+| `passwordEncoder.encode(password)` | **Không bao giờ** lưu mật khẩu gốc (A14) |
+| B3 | Gửi mã. Gửi lỗi → `EmailSendException` → **rollback**: dòng user vừa `INSERT` bị hoàn tác, như chưa từng đăng ký |
+
+Hai người đăng ký cùng username **cùng 1 tích tắc**: cả 2 qua được `existsByUsername` (lúc đó chưa ai lưu), người lưu sau bị MySQL từ chối vì cột unique → **409** `Data already exists` (mục 17.3).
+
+#### C17.2. `verifyOtp` — xác thực mã đăng ký
+
+```java
+    @Transactional
+    public void verifyOtp(String email, String otpCode) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Email does not exist"));
+        if (user.getAccountStatus() != AccountStatus.UNVERIFIED) {
+            throw new IllegalArgumentException("Account is already verified");
+        }
+        otpService.verifyAndConsume(user, otpCode, OtpPurpose.REGISTER);
+        user.setAccountStatus(AccountStatus.ACTIVE);
+        userRepository.save(user);
+    }
+```
+Tìm user → phải đang `UNVERIFIED` → kiểm tra mã (C16.4) → chuyển `ACTIVE`. Chú ý: `accessStatus` **vẫn là `REFUSE`**, chưa đăng nhập được cho tới khi chủ dự án cho phép (mục 7.3a).
+
+#### C17.3. `login` — đăng nhập
+
+```java
+    public LoginResponse login(String email, String password) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Email or password is incorrect")); // ①
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new IllegalArgumentException("Email or password is incorrect");                    // ②
+        }
+        if (user.getAccountStatus() == AccountStatus.UNVERIFIED) {
+            throw new IllegalArgumentException("Account is not verified yet");                       // ③
+        }
+        if (user.getAccountStatus() == AccountStatus.DISABLED) {
+            throw new IllegalArgumentException("Account has been disabled");                         // ④
+        }
+        if (user.getAccountStatus() == AccountStatus.DELETED) {
+            throw new IllegalArgumentException("Account has been deleted");                          // ⑤
+        }
+        if (user.getAccessStatus() != AccessStatus.ACCEPT) {
+            throw new IllegalArgumentException("Account has not been approved yet");                 // ⑥
+        }
+        String sessionId = sessionService.createSession(user.getEmail());                           // ⑦
+        String token = jwtUtil.generateToken(user, sessionId);                                       // ⑧
+        return new LoginResponse(token, user.getId(), user.getUsername(), user.getRole());          // ⑨
+    }
+```
+
+| Bước | Giải thích |
+|---|---|
+| ①② | Sai email **hoặc** sai mật khẩu → **cùng 1 câu**. Báo riêng thì kẻ xấu thử hàng loạt email sẽ biết email nào đã đăng ký |
+| Thứ tự ①② trước ③–⑥ | Trạng thái tài khoản chỉ được tiết lộ cho người **nhập đúng mật khẩu**. Người lạ đoán email sẽ không biết tài khoản đó bị khóa hay chưa xác thực |
+| ③④⑤ | Lần lượt theo `accountStatus` |
+| ⑥ | Chưa được chủ dự án cho vào web |
+| ⑦ | Tạo phiên mới trong Redis (đè phiên cũ nếu có → máy cũ bị đá ra, C8) |
+| ⑧ | Tạo token chứa email + mã phiên (C9) |
+| ⑨ | Trả về token và vài thông tin để frontend hiển thị ngay (khỏi gọi thêm API hồ sơ) |
+
+Không có `@Transactional`: method này **không ghi** gì vào MySQL.
+
+#### C17.4. `forgotPassword` và `resetPassword`
+
+```java
+    @Transactional
+    public void forgotPassword(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Email does not exist"));
+        if(user.getAccountStatus() != AccountStatus.ACTIVE) {
+            throw new IllegalArgumentException("Account is not active");
+        }
+        otpService.generateAndSend(user, OtpPurpose.RESET_PASSWORD);
+    }
+
+    @Transactional
+    public void resetPassword(String email, String otpCode, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Email does not exist"));
+        otpService.verifyAndConsume(user, otpCode, OtpPurpose.RESET_PASSWORD);
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        sessionService.deleteSession(user.getEmail());
+    }
+```
+- `forgotPassword`: chỉ tài khoản đang hoạt động mới được gửi mã đặt lại. (Khác `login`, ở đây báo thẳng `Email does not exist`: là điểm đánh đổi giữa tiện cho người dùng và che giấu email, xem mục 22.)
+- `resetPassword`: kiểm tra mã → băm mật khẩu mới → lưu → **xóa phiên**: nếu ai đó đang dùng tài khoản (có thể chính là kẻ đã đoán ra mật khẩu cũ), họ bị đá ra ngay.
+
+---
+
+### C18. `service/UserService.java` — người dùng tự quản lý tài khoản
+
+Constructor nhận 5 bean: `UserRepository`, `OtpService`, `PasswordEncoder`, `SessionService`, `FileStorageService`. Hằng số `AVATAR_FOLDER = "avatars"`.
+
+#### C18.1. Các hàm nhỏ dùng chung
+
+```java
+    public User getProfile(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User does not exist"));
+    }
+
+    public User getByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User does not exist"));
+    }
+
+    private void checkPassword(User user, String rawPassword) {
+        if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
+            throw new IllegalArgumentException("Password does not match");
+        }
+    }
+
+    private void checkActive(User user) {
+        if (user.getAccountStatus() != AccountStatus.ACTIVE) {
+            throw new IllegalArgumentException("Account is not active");
+        }
+    }
+```
+- `getProfile`: tìm theo id. Hầu hết method khác mở đầu bằng hàm này.
+- `getByEmail`: Controller dùng để đổi email (lấy từ token) ra id (C22).
+- `checkPassword`: dùng trước các thao tác nguy hiểm (xin mã đổi mật khẩu, vô hiệu hóa, xóa). `private` vì chỉ dùng trong class.
+- `checkActive`: thật ra filter đã chỉ cho tài khoản ACTIVE đi qua (C10, C11), nên qua HTTP hàm này hầu như không bao giờ báo lỗi. Nó là **lớp bảo vệ thứ 2**, phòng khi sau này có nơi khác gọi thẳng vào service.
+
+#### C18.2. Sửa họ tên, đổi mật khẩu
+
+```java
+    public User updateProfile(Long userId, String fullName) {
+        User user = getProfile(userId);
+        user.setFullName(fullName);
+        return userRepository.save(user);
+    }
+
+    @Transactional
+    public void requestChangePasswordOtp(Long userId, String currentPassword) {
+        User user = getProfile(userId);
+        checkPassword(user, currentPassword);
+        otpService.generateAndSend(user, OtpPurpose.CHANGE_PASSWORD);
+    }
+
+    @Transactional
+    public void changePassword(Long userId, String otpCode, String newPassword) {
+        User user = getProfile(userId);
+        otpService.verifyAndConsume(user, otpCode, OtpPurpose.CHANGE_PASSWORD);
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        sessionService.deleteSession(user.getEmail());
+    }
+```
+- `updateProfile` trả về `User` đã lưu, để Controller trả lại hồ sơ mới cho frontend hiển thị.
+- Đổi mật khẩu cần **2 lớp**: biết mật khẩu hiện tại (bước 1) **và** đọc được email (bước 2). Kẻ mượn máy lúc bạn quên đăng xuất không đổi được mật khẩu nếu không vào được email của bạn.
+- Đổi xong → xóa phiên → phải đăng nhập lại bằng mật khẩu mới (mục 19.4).
+
+#### C18.3. Đổi ảnh đại diện
+
+```java
+    public User updateAvatar(Long userId, MultipartFile file) {
+        User user = getProfile(userId);
+        String oldAvatarUrl = user.getAvatarUrl();
+        String newAvatarUrl = fileStorageService.saveImage(file, AVATAR_FOLDER);   // ①
+
+        try {
+            user.setAvatarUrl(newAvatarUrl);
+            User saved = userRepository.save(user);                                // ②
+            fileStorageService.delete(oldAvatarUrl);                                // ③
+            return saved;
+        } catch (RuntimeException e) {
+            fileStorageService.delete(newAvatarUrl);                                // ④
+            throw e;
+        }
+    }
+```
+| Bước | Giải thích |
+|---|---|
+| `MultipartFile file` | Kiểu của Spring đại diện cho 1 file gửi lên bằng form-data |
+| ① | Kiểm tra và lưu file mới xuống ổ đĩa trước (C20). File không hợp lệ → lỗi ngay, chưa đụng database |
+| ② | Ghi đường dẫn mới vào database |
+| ③ | Thành công rồi mới xóa ảnh cũ. Làm ngược (xóa cũ trước) mà bước ② lỗi thì người dùng **mất cả 2 ảnh** |
+| ④ | Bước ② lỗi → xóa file mới vừa lưu (tránh rác trên ổ đĩa), rồi ném lại lỗi (`throw e`) cho `GlobalExceptionHandler` xử lý |
+
+Đây là ví dụ của việc "rollback bằng tay": ổ đĩa không có transaction như MySQL (A9.7), nên phải tự dọn.
+
+#### C18.4. Đổi email (2 bước)
+
+```java
+    @Transactional
+    public void requestUpdateEmailOtp(Long userId, String newEmail) {
+        User user = getProfile(userId);
+        if (newEmail.equalsIgnoreCase(user.getEmail())) {
+            throw new IllegalArgumentException("New email must be different from current email");
+        }
+        if (userRepository.existsByEmail(newEmail)) {
+            throw new IllegalArgumentException("Email already exists");
+        }
+        otpService.generateAndSend(user, OtpPurpose.CHANGE_EMAIL, newEmail);
+    }
+
+    @Transactional
+    public void updateEmail(Long userId, String otpCode) {
+        User user = getProfile(userId);
+        OtpVerification otp = otpService.verifyAndConsume(user, otpCode, OtpPurpose.CHANGE_EMAIL);
+        if (userRepository.existsByEmail(otp.getNewEmail())) {
+            throw new IllegalArgumentException("Email already exists");
+        }
+        sessionService.deleteSession(user.getEmail());
+        user.setEmail(otp.getNewEmail());
+        userRepository.save(user);
+    }
+```
+| Điểm | Giải thích |
+|---|---|
+| Bước 1 gửi mã tới **email mới** | Bản `generateAndSend` 3 tham số (C16.2). Chứng minh bạn thật sự sở hữu email mới |
+| Bước 2 chỉ cần mã, không cần gửi lại email mới | Email mới đã nằm trong dòng OTP (`otp.getNewEmail()`). Frontend không thể "tráo" sang 1 email khác ở bước 2 |
+| Kiểm tra trùng **lần 2** ở bước 2 | Trong 5 phút chờ nhập mã, có thể người khác vừa đăng ký đúng email đó. Báo lỗi → rollback → mã OTP được trả lại trạng thái chưa dùng |
+| `deleteSession(user.getEmail())` **trước** `setEmail(...)` | Khóa phiên là `session:{email cũ}`. Đổi email rồi mới xóa thì sẽ xóa nhầm `session:{email mới}` (không tồn tại), phiên cũ vẫn sống |
+| Sau khi đổi | Token cũ chứa email cũ → hết dùng được → đăng nhập lại bằng **email mới** |
+
+#### C18.5. Vô hiệu hóa, xóa tài khoản
+
+```java
+    public void disableAccount(Long userId, String currentPassword) {
+        User user = getProfile(userId);
+        checkActive(user);
+        checkPassword(user, currentPassword);
+        user.setAccountStatus(AccountStatus.DISABLED);
+        userRepository.save(user);
+        sessionService.deleteSession(user.getEmail());
+    }
+
+    public void deleteAccount(Long userId, String currentPassword) {
+        // giống hệt disableAccount, chỉ khác: setAccountStatus(AccountStatus.DELETED)
+    }
+```
+Hai method gần như **giống hệt nhau**, khác đúng 1 giá trị trạng thái. Khác biệt **nghiệp vụ** nằm ở chỗ khác: `DISABLED` thì Admin mở lại được (AD3), `DELETED` thì **không API nào** mở lại được (mục 12.7, 12.8).
+
+Không có `@Transactional` vì chỉ có 1 lần ghi MySQL (`save`), không cần gói nhiều thao tác.
+
+#### C18.6. Nghệ sĩ
+
+```java
+    public void requestBecomeArtist(Long userId, String artistName, String bio) {
+        User user = getProfile(userId);
+        checkActive(user);
+        if (user.getRole() != Role.USER) {
+            throw new IllegalArgumentException("Only users with role USER can request to become an artist");
+        }
+        if (user.getArtistRequestStatus() != ArtistRequestStatus.NONE
+                && user.getArtistRequestStatus() != ArtistRequestStatus.REJECTED) {
+            throw new IllegalArgumentException("An artist request already exists or has been approved");
+        }
+        user.setArtistName(artistName);
+        user.setBio(bio);
+        user.setArtistRequestStatus(ArtistRequestStatus.PENDING);
+        userRepository.save(user);
+    }
+
+    public User updateArtistProfile(Long userId, String artistName, String bio) {
+        User user = getProfile(userId);
+        if (user.getRole() != Role.ARTIST) {
+            throw new IllegalArgumentException("Only artists can update artist profile");
+        }
+        user.setArtistName(artistName);
+        user.setBio(bio);
+        return userRepository.save(user);
+    }
+```
+- Gửi yêu cầu: chỉ USER (không phải ARTIST, ADMIN), và trạng thái phải là `NONE` (chưa gửi bao giờ) **hoặc** `REJECTED` (bị từ chối, được gửi lại). `&&` nghĩa là "và": báo lỗi khi **khác cả 2**.
+- Sửa hồ sơ nghệ sĩ: chỉ ARTIST.
+
+---
+
+### C19. `service/AdminService.java` — Admin quản lý người dùng
+
+Constructor nhận `UserRepository`, `SessionService`.
+
+```java
+    private User findUser(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User does not exist"));
+    }
+
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
+```
+`getAllUsers` trả **tất cả** tài khoản, mọi trạng thái (kể cả DELETED, UNVERIFIED), không phân trang (mục 22).
+
+#### C19.1. Khóa và mở khóa
+
+```java
+    public void lockAccount(Long userId) {
+        User user = findUser(userId);
+        if(user.getRole() == Role.ADMIN) {
+            throw new IllegalArgumentException("Cannot lock an admin account");
+        }
+        if(user.getAccountStatus() != AccountStatus.ACTIVE) {
+            throw new IllegalArgumentException("Only active accounts can be locked");
+        }
+        user.setAccountStatus(AccountStatus.DISABLED);
+        userRepository.save(user);
+        sessionService.deleteSession(user.getEmail());
+    }
+
+    public void unlockAccount(Long userId) {
+        User user = findUser(userId);
+        if(user.getAccountStatus() != AccountStatus.DISABLED) {
+            throw new IllegalArgumentException("Only disabled accounts can be unlocked");
+        }
+        user.setAccountStatus(AccountStatus.ACTIVE);
+        userRepository.save(user);
+    }
+```
+- Không khóa được Admin (kể cả Admin tự khóa mình) → tránh tình huống không còn ai quản trị.
+- Khóa → xóa phiên → người bị khóa bị đá ra **ngay** request tiếp theo.
+- Mở khóa: chỉ từ `DISABLED`. Vì người dùng **tự vô hiệu hóa** cũng ra `DISABLED`, Admin mở khóa được cả trường hợp đó (mục 14.3).
+
+#### C19.2. Duyệt / từ chối nghệ sĩ
+
+```java
+    public List<User> getPendingArtistRequests() {
+        return userRepository.findByArtistRequestStatus(ArtistRequestStatus.PENDING);
+    }
+
+    public void approveArtistRequest(Long userId) {
+        User user = findUser(userId);
+        if(user.getArtistRequestStatus() != ArtistRequestStatus.PENDING) {
+            throw new IllegalArgumentException("No pending artist request for this user");
+        }
+        if(user.getRole() != Role.USER) {
+            throw new IllegalArgumentException("Only users with role USER can become an artist");
+        }
+        if(user.getAccountStatus() != AccountStatus.ACTIVE) {
+            throw new IllegalArgumentException("Account is not active");
+        }
+        user.setArtistRequestStatus(ArtistRequestStatus.APPROVED);
+        user.setRole(Role.ARTIST);
+        userRepository.save(user);
+    }
+
+    public void rejectArtistRequest(Long userId) {
+        User user = findUser(userId);
+        if(user.getArtistRequestStatus() != ArtistRequestStatus.PENDING) {
+            throw new IllegalArgumentException("No pending artist request for this user");
+        }
+        user.setArtistRequestStatus(ArtistRequestStatus.REJECTED);
+        user.setArtistName(null);
+        user.setBio(null);
+        userRepository.save(user);
+    }
+```
+- Duyệt: kiểm tra 3 điều kiện (đang chờ, đang là USER, đang hoạt động), rồi đổi **cùng lúc** 2 thứ: trạng thái yêu cầu → `APPROVED`, role → `ARTIST`.
+- Từ chối: xóa nghệ danh và tiểu sử đã gửi, để lần gửi lại bắt đầu sạch.
+- Duyệt xong **không** xóa phiên. Người dùng không cần đăng nhập lại: ở request tiếp theo, filter đọc lại user từ MySQL (C10) và thấy ngay quyền `ROLE_ARTIST`.
+
+#### C19.3. Đổi role
+
+```java
+    public void assignRole(Long userId, Role role) {
+        User user = findUser(userId);
+        if(role == null) {
+            throw new IllegalArgumentException("Role is required");                          // ①
+        }
+        if(role == Role.ARTIST) {
+            throw new IllegalArgumentException(
+                    "ARTIST role can only be granted by approving an artist request");       // ②
+        }
+        if(user.getRole() == Role.ADMIN) {
+            throw new IllegalArgumentException("Cannot change role of an admin account");    // ③
+        }
+        if(user.getAccountStatus() == AccountStatus.DELETED
+                || user.getAccountStatus() == AccountStatus.UNVERIFIED) {
+            throw new IllegalArgumentException("Cannot assign role to a deleted or unverified account"); // ④
+        }
+        if(user.getRole() == role) {
+            throw new IllegalArgumentException("User already has this role");               // ⑤
+        }
+        if(user.getRole() == Role.ARTIST || user.getArtistRequestStatus() == ArtistRequestStatus.PENDING) {
+            user.setArtistName(null);                                                        // ⑥
+            user.setBio(null);
+            user.setArtistRequestStatus(ArtistRequestStatus.NONE);
+        }
+        user.setRole(role);
+        userRepository.save(user);
+    }
+```
+| Bước | Giải thích |
+|---|---|
+| ① | Phòng hờ. Qua HTTP thì `@NotNull` trong DTO đã chặn trước |
+| ② | ARTIST phải đi qua quy trình gửi yêu cầu + duyệt, không gán tắt được |
+| ③ | Admin không đổi role của Admin (kể cả chính mình). Muốn hạ Admin → chỉ chủ dự án làm bằng SQL |
+| ④ | Không đổi role tài khoản đã xóa hoặc chưa xác thực |
+| ⑤ | Đã đúng role đó rồi |
+| ⑥ | Đang là ARTIST bị hạ xuống, **hoặc** đang có yêu cầu nghệ sĩ chờ duyệt → xóa sạch thông tin nghệ sĩ, đưa trạng thái về `NONE`. Thực tế chỉ còn 2 hướng đổi: ARTIST/USER → USER/ADMIN (mục 14.4) |
+
+---
+
+### C20. `service/FileStorageService.java` — phần lưu ảnh đại diện
+
+File này dùng chung với module Song (lưu nhạc, ảnh bìa, video). Module User chỉ dùng 2 method: `saveImage` và `delete`.
+
+```java
+    private static final long MAX_IMAGE_SIZE = 2L * 1024 * 1024;   // 2 MB tính bằng byte
+    private static final String URL_PREFIX = "/uploads/";
+
+    @Value("${app.upload-dir}")
+    private String uploadDir;
+
+    public String saveImage(MultipartFile file, String folder) {
+        if(file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Image file is required");                    // ①
+        }
+        if(file.getSize() > MAX_IMAGE_SIZE) {
+            throw new IllegalArgumentException("Image must not exceed 2MB");                 // ②
+        }
+        String contentType = file.getContentType();
+        String extension;
+        if("image/jpeg".equals(contentType)) {
+            extension = ".jpg";
+        } else if("image/png".equals(contentType)) {
+            extension = ".png";
+        } else if("image/webp".equals(contentType)) {
+            extension = ".webp";
+        } else {
+            throw new IllegalArgumentException("Only JPG, PNG or WEBP images are allowed");  // ③
+        }
+        if(!isRealImage(file, extension)) {
+            throw new IllegalArgumentException("Invalid or corrupted image file");           // ④
+        }
+        return saveFile(file, folder, extension);                                            // ⑤
+    }
+```
+
+| Bước | Giải thích |
+|---|---|
+| `2L * 1024 * 1024` | 1 KB = 1024 byte, 1 MB = 1024 KB. Chữ `L` = kiểu `long` (số nguyên lớn) |
+| ① | Không gửi file, hoặc file rỗng 0 byte |
+| ② | Quá 2 MB. (File cực lớn vượt giới hạn chung của server thì bị chặn sớm hơn với **413**, chưa tới được đây) |
+| ③ | Đọc **loại file** (content type) do trình duyệt / Postman khai báo. Đuôi file lưu xuống do server tự quyết, **không** lấy theo tên file người dùng gửi |
+| ④ | Nhưng content type có thể bị khai man. Nên kiểm tra thêm **"chữ ký" ở đầu file** (magic bytes, xem dưới) |
+| ⑤ | Lưu và trả về đường dẫn dạng `/uploads/avatars/<tên ngẫu nhiên>.jpg` |
+
+**Magic bytes** — vài byte đầu tiên của mỗi loại file luôn cố định:
+
+| Loại | Mấy byte đầu (hệ 16) | Code kiểm tra |
+|---|---|---|
+| JPG | `FF D8 FF` | `head[0] == 0xFF && head[1] == 0xD8 && head[2] == 0xFF` |
+| PNG | `89 50 4E 47 0D 0A 1A 0A` (`.PNG....`) | So 8 byte đầu |
+| WEBP | `RIFF` ở byte 0–3, `WEBP` ở byte 8–11 | So từng ký tự |
+
+Đổi tên file `virus.exe` thành `anh.jpg` → content type có thể là `image/jpeg`, nhưng byte đầu không phải `FF D8 FF` → bị chặn ở ④.
+
+```java
+    private String saveFile(MultipartFile file, String folder, String extension) {
+        String fileName = UUID.randomUUID() + extension;
+        try {
+            Path dir = Paths.get(uploadDir, folder);
+            Files.createDirectories(dir);
+            Files.copy(file.getInputStream(), dir.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+        } catch(IOException e) {
+            throw new RuntimeException("Could not save file", e);
+        }
+        return URL_PREFIX + folder + "/" + fileName;
+    }
+
+    public void delete(String url) {
+        if(url == null || !url.startsWith(URL_PREFIX)) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(toPath(url));
+        } catch(IOException ignored) {}
+    }
+```
+- Tên file = **UUID ngẫu nhiên** + đuôi. Không dùng tên gốc của người dùng: tên gốc có thể trùng nhau, có ký tự lạ, hoặc chứa `../` để ghi file ra ngoài thư mục cho phép.
+- `Files.createDirectories(dir)`: thư mục `uploads/avatars` chưa có thì tự tạo.
+- `delete`: đường dẫn `null` (người dùng chưa từng có ảnh) hoặc không bắt đầu bằng `/uploads/` → bỏ qua. Xóa lỗi → bỏ qua (không vì 1 file rác mà làm hỏng cả thao tác đổi ảnh).
+
+---
+
+### C21. `controller/AuthController.java` — cửa ngõ không cần đăng nhập
+
+```java
+@RestController
+@RequestMapping("/api/auth")
+public class AuthController {
+
+    private final AuthService authService;
+
+    public AuthController(AuthService authService) {
+        this.authService = authService;
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<Map<String, String>> register(@Valid @RequestBody RegisterRequest request) {
+        authService.register(request.getUsername(), request.getEmail(), request.getPassword());
+        return ResponseEntity.ok(Map.of("message", "Registration successful, the account is awaiting OTP verification"));
+    }
+
+    @PostMapping("/verify-otp")
+    public ResponseEntity<Map<String, String>> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        authService.verifyOtp(request.getEmail(), request.getOtpCode());
+        return ResponseEntity.ok(Map.of("message", "Verification successful, the account has been activated"));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        LoginResponse response = authService.login(request.getEmail(), request.getPassword());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request.getEmail());
+        return ResponseEntity.ok(Map.of("message", "OTP code has been sent to your email"));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, String>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request.getEmail(), request.getOtpCode(), request.getNewPassword());
+        return ResponseEntity.ok(Map.of("message", "Password has been reset successfully"));
+    }
+}
+```
+
+Giải thích các nhãn (gặp lại ở mọi Controller):
+
+| Code | Giải thích |
+|---|---|
+| `@RestController` | "Class này nhận request HTTP, và **giá trị return của mọi method được viết thành JSON** vào body response". (Khác với `@Controller` thường, vốn trả về tên 1 trang HTML) |
+| `@RequestMapping("/api/auth")` | Tiền tố chung: mọi đường dẫn trong class bắt đầu bằng `/api/auth` |
+| `@PostMapping("/register")` | Method này xử lý `POST` tới `/api/auth` + `/register` = `/api/auth/register`. Tương tự có `@GetMapping`, `@PutMapping`, `@DeleteMapping` |
+| `@RequestBody` | "Lấy **body** của request, dùng Jackson đổi JSON thành object `RegisterRequest`" |
+| `@Valid` | Chạy các nhãn kiểm tra trong DTO trước (A11) |
+| `ResponseEntity<Map<String, String>>` | Kiểu trả về: 1 response có mã trạng thái + body. Body là `Map` chuỗi → chuỗi (thành `{"message": "..."}`) |
+| `ResponseEntity.ok(...)` | Mã **200** + body |
+| Chỉ 2 dòng mỗi method | Đúng vai "bồi bàn" (A8.1): nhận phiếu, chuyển cho đầu bếp, đưa món ra. Không có `if` nghiệp vụ nào ở đây |
+| Lỗi đi đâu? | Service ném `IllegalArgumentException` → Controller **không bắt** → bay lên `GlobalExceptionHandler` (C24) |
+
+Không có `@PreAuthorize`, và cả `/api/auth/**` đã được mở trong `SecurityConfig` (C13) → **không cần token**.
+
+| API | Gọi | Trả về khi thành công |
+|---|---|---|
+| `POST /api/auth/register` | `AuthService.register` | 200 `Registration successful, the account is awaiting OTP verification` |
+| `POST /api/auth/verify-otp` | `AuthService.verifyOtp` | 200 `Verification successful, the account has been activated` |
+| `POST /api/auth/login` | `AuthService.login` | 200 + `LoginResponse` (token...) |
+| `POST /api/auth/forgot-password` | `AuthService.forgotPassword` | 200 `OTP code has been sent to your email` |
+| `POST /api/auth/reset-password` | `AuthService.resetPassword` | 200 `Password has been reset successfully` |
+
+---
+
+### C22. `controller/UserController.java` — người dùng đã đăng nhập
+
+```java
+@RestController
+@RequestMapping("/api/users")
+public class UserController {
+
+    private final UserService userService;
+    private final SessionService sessionService;
+
+    // ... constructor nhận 2 bean trên
+
+    private Long me(Authentication authentication) {
+        return userService.getByEmail(authentication.getName()).getId();
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, String>> logout(Authentication authentication) {
+        sessionService.deleteSession(authentication.getName());
+        return ResponseEntity.ok(Map.of("message", "Logout successful"));
+    }
+
+    @GetMapping("/me/profile")
+    public ResponseEntity<UserProfileResponse> getProfile(Authentication authentication) {
+        User user = userService.getProfile(me(authentication));
+        return ResponseEntity.ok(UserMapper.toUserProfileResponse(user));
+    }
+
+    @PutMapping("/me/profile")
+    public ResponseEntity<UserProfileResponse> updateProfile(Authentication authentication,
+                                                             @Valid @RequestBody UpdateProfileRequest request) {
+        User user = userService.updateProfile(me(authentication), request.getFullName());
+        return ResponseEntity.ok(UserMapper.toUserProfileResponse(user));
+    }
+
+    @PostMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<UserProfileResponse> updateAvatar(Authentication authentication,
+                                                            @RequestParam("file") MultipartFile file) {
+        User user = userService.updateAvatar(me(authentication), file);
+        return ResponseEntity.ok(UserMapper.toUserProfileResponse(user));
+    }
+
+    // ... 8 method còn lại cùng 1 khuôn: me(authentication) → gọi UserService → trả message hoặc hồ sơ
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| Tham số `Authentication authentication` | Spring **tự điền** tờ giấy "người đang gọi là ai" mà `JwtAuthenticationFilter` đã ghi vào SecurityContext (A13.3). Frontend không gửi gì thêm, chỉ cần token |
+| `authentication.getName()` | Trả về **email** (vì C10 đặt "tên đăng nhập" = email) |
+| `me(...)` | Hàm nhỏ: email → tìm user → lấy id. Mọi API `/me/...` mở đầu bằng hàm này. `private` + không có nhãn `@GetMapping`... → không phải API, chỉ là hàm nội bộ |
+| `logout` | Không cần tìm user, xóa thẳng khóa `session:{email}` trong Redis là xong. Token cũ hết dùng được |
+| `UserMapper.toUserProfileResponse(user)` | Đổi Entity → DTO trước khi trả ra (C7.3, A8.2) |
+| `consumes = MediaType.MULTIPART_FORM_DATA_VALUE` | API này **chỉ nhận** form-data (A3.2). Gửi JSON vào đây → lỗi 415 |
+| `@RequestParam("file") MultipartFile file` | Lấy ngăn tên `file` trong form-data. Không có ngăn đó → 400 `File is required` (C24) |
+
+Bảng đủ 12 API:
+
+| API | Gọi | Trả về khi thành công |
+|---|---|---|
+| `POST /logout` | `SessionService.deleteSession` | `Logout successful` |
+| `GET /me/profile` | `UserService.getProfile` | Hồ sơ (`UserProfileResponse`) |
+| `PUT /me/profile` | `UserService.updateProfile` | Hồ sơ mới |
+| `POST /me/change-password/request-otp` | `UserService.requestChangePasswordOtp` | `OTP code has been sent to your email` |
+| `PUT /me/change-password` | `UserService.changePassword` | `Password has been changed successfully` |
+| `POST /me/avatar` | `UserService.updateAvatar` | Hồ sơ mới (có `avatarUrl` mới) |
+| `POST /me/email/request-otp` | `UserService.requestUpdateEmailOtp` | `OTP code has been sent to your new email` |
+| `PUT /me/email` | `UserService.updateEmail` | `Email has been updated, please login again` |
+| `PUT /me/disable` | `UserService.disableAccount` | `Account has been disabled` |
+| `PUT /me/delete` | `UserService.deleteAccount` | `Account has been deleted` |
+| `POST /me/artist-request` | `UserService.requestBecomeArtist` | `Artist request has been submitted` |
+| `PUT /me/artist-profile` | `UserService.updateArtistProfile` | Hồ sơ mới |
+
+(Mọi đường dẫn trên đều có tiền tố `/api/users`.)
+
+Không có `@PreAuthorize` → mọi role đều gọi được. Nhưng `SecurityConfig` bắt `/api/users/**` phải đăng nhập (luật `anyRequest().authenticated()`).
+
+---
+
+### C23. `controller/AdminController.java` — chỉ ADMIN
+
+```java
+@PreAuthorize("hasRole('ADMIN')")
+@RestController
+@RequestMapping("/api/admin")
+public class AdminController {
+
+    private final AdminService adminService;
+
+    // ... constructor
+
+    @GetMapping("/users")
+    public ResponseEntity<List<UserProfileResponse>> getAllUsers() {
+        List<UserProfileResponse> result = adminService.getAllUsers()
+                .stream()
+                .map(UserMapper::toUserProfileResponse)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
+
+    @PutMapping("/users/{userId}/lock")
+    public ResponseEntity<Map<String, String>> lockAccount(@PathVariable Long userId) {
+        adminService.lockAccount(userId);
+        return ResponseEntity.ok(Map.of("message", "Account has been locked"));
+    }
+
+    @PutMapping("/users/{userId}/role")
+    public ResponseEntity<Map<String, String>> assignRole(@PathVariable Long userId,
+                                                          @Valid @RequestBody AssignRoleRequest request) {
+        adminService.assignRole(userId, request.getRole());
+        return ResponseEntity.ok(Map.of("message", "Role has been assigned successfully"));
+    }
+
+    // ... unlock, artist-requests, approve, reject cùng 1 khuôn
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| `@PreAuthorize("hasRole('ADMIN')")` trên **class** | Áp dụng cho **mọi method** trong class. Người gọi không có `ROLE_ADMIN` → **403**, method không chạy (A13.4) |
+| `@PathVariable Long userId` | Lấy giá trị từ chỗ trống `{userId}` trên đường dẫn: `/api/admin/users/42/lock` → `userId = 42`. Tên tham số phải trùng tên trong ngoặc nhọn. Gửi chữ thay vì số (`/users/abc/lock`) → 400 `Invalid parameter: userId` |
+| `.stream().map(UserMapper::toUserProfileResponse).collect(...)` | Đổi **cả danh sách** Entity thành danh sách DTO (A5.11) |
+| Controller không kiểm tra "người bị khóa có phải Admin không" | Đó là luật nghiệp vụ → nằm trong `AdminService` (C19) |
+
+| API (tiền tố `/api/admin`) | Gọi | Trả về khi thành công |
+|---|---|---|
+| `GET /users` | `getAllUsers` | Danh sách hồ sơ |
+| `PUT /users/{userId}/lock` | `lockAccount` | `Account has been locked` |
+| `PUT /users/{userId}/unlock` | `unlockAccount` | `Account has been unlocked` |
+| `GET /artist-requests` | `getPendingArtistRequests` | Danh sách hồ sơ đang chờ duyệt |
+| `PUT /artist-requests/{userId}/approve` | `approveArtistRequest` | `Artist request has been approved` |
+| `PUT /artist-requests/{userId}/reject` | `rejectArtistRequest` | `Artist request has been rejected` |
+| `PUT /users/{userId}/role` | `assignRole` | `Role has been assigned successfully` |
+
+---
+
+### C24. `exception/GlobalExceptionHandler.java` — biến mọi lỗi thành JSON
+
+```java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    private Map<String, String> body(String message, String fallback) {
+        return Map.of("message", message != null ? message : fallback);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException e) {
+        return ResponseEntity.badRequest().body(body(e.getMessage(), "Invalid request data"));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException e) {
+        ObjectError error = e.getBindingResult().getAllErrors().get(0);
+        if (error instanceof FieldError fieldError && fieldError.isBindingFailure()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Invalid value for " + fieldError.getField()));
+        }
+        return ResponseEntity.badRequest().body(body(error.getDefaultMessage(), "Invalid request data"));
+    }
+
+    // ... các handler khác, xem bảng dưới
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, String>> handleOther(Exception e) {
+        if (e instanceof ErrorResponse errorResponse) {
+            HttpStatusCode status = errorResponse.getStatusCode();
+            String detail = errorResponse.getBody().getDetail();
+            return ResponseEntity.status(status).body(body(detail, "Request error"));
+        }
+        log.error("Lỗi không mong muốn", e);
+        return ResponseEntity.internalServerError()
+                .body(Map.of("message", "Internal server error"));
+    }
+
+    @ExceptionHandler(EmailSendException.class)
+    public ResponseEntity<Map<String, String>> handleEmailSend(EmailSendException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("message", e.getMessage()));
+    }
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| `@RestControllerAdvice` | "Class này đứng sau **mọi** Controller, bắt lỗi chúng ném ra, và kết quả viết thành JSON" |
+| `body(message, fallback)` | Hàm nhỏ: có message thì dùng, `null` thì dùng câu dự phòng. (`Map.of` không cho giá trị `null`, gặp `null` là lỗi, nên phải có hàm này) |
+| `a != null ? a : b` | Toán tử 3 ngôi: "nếu `a` khác `null` thì lấy `a`, không thì lấy `b`" |
+| `getAllErrors().get(0)` | DTO sai nhiều chỗ cùng lúc thì **chỉ báo 1 lỗi** (lỗi đầu tiên trong danh sách, không cố định là trường nào). Frontend nên tự kiểm tra trước để báo đủ |
+| `e instanceof ErrorResponse errorResponse` | "Nếu lỗi này thuộc loại `ErrorResponse` thì đặt tên nó là `errorResponse` để dùng". Các lỗi có sẵn của Spring như sai đường dẫn (404), sai method (405) đều thuộc loại này → giữ đúng mã của chúng |
+| `log.error(...)` + 500 | Lỗi thật sự không lường trước → ghi **toàn bộ chi tiết** vào log, nhưng chỉ trả câu chung chung cho người dùng (không lộ chi tiết bên trong server) |
+
+Bảng đầy đủ các handler và khi nào module User gặp:
+
+| Loại lỗi | Mã | message | Module User gặp khi |
+|---|---|---|---|
+| `IllegalArgumentException` | 400 | Message do Service đặt | Mọi lỗi nghiệp vụ (`Email already exists`...) |
+| `MethodArgumentNotValidException` | 400 | Message trong nhãn kiểm tra của DTO | `@Valid` không qua |
+| `HttpMessageNotReadableException` | 400 | `Invalid request data` | JSON sai cú pháp; thiếu body; `"role": "BOSS"` |
+| `MissingServletRequestPartException` | 400 | `File is required` | Đổi ảnh mà không gửi ngăn `file` |
+| `MethodArgumentTypeMismatchException` | 400 | `Invalid parameter: userId` | `/api/admin/users/abc/lock` |
+| `AuthenticationException` | 401 | `Unauthorized, please login` | Hiếm, lỗi xác thực ném ra bên trong Controller |
+| `AccessDeniedException` | 403 | `You do not have permission to access this resource` | USER gọi API admin: `@PreAuthorize` ném lỗi này bên trong lúc gọi method, nên `GlobalExceptionHandler` bắt (không phải `accessDeniedHandler` của `SecurityConfig`). Hai nơi cố ý trả cùng 1 câu |
+| `DataIntegrityViolationException` | 409 | `Data already exists` | 2 người đăng ký trùng username / email cùng lúc (mục 17.3) |
+| `MaxUploadSizeExceededException` | 413 | `File is too large` | File vượt giới hạn chung của server |
+| `MailException` | 503 | `Could not send email, please try again later` | **Không gặp** trong module User (vì `EmailService` đã gói lỗi thành `EmailSendException`). Để dành cho nơi khác gửi email trực tiếp |
+| `OptimisticLockingFailureException` | 409 | `This data was changed by someone else, please reload and try again` | Không gặp, dùng cho module Song |
+| `EmailSendException` | 503 | `Could not send OTP email, please try again later` | Gửi OTP thất bại |
+| `ErrorResponse` (lỗi sẵn của Spring) | Theo lỗi | Mô tả của Spring | `GET /api/auth/login` → 405; đường dẫn không tồn tại (khi có token) → 404 |
+| `Exception` (còn lại) | 500 | `Internal server error` | Lỗi code, Redis tắt khi đang nhập OTP... |
+
+Spring chọn handler theo **loại lỗi cụ thể nhất**, không theo thứ tự viết trong file. Ví dụ `EmailSendException` vừa là `RuntimeException` vừa là `Exception`, nhưng vẫn vào `handleEmailSend` vì đó là handler đúng loại nhất.
+
+Lỗi 401 / 403 **ở tầng filter** (chưa tới Controller) không đi qua class này mà do `SecurityConfig` tự viết (C13 ⑤), cùng dạng JSON.
+
+---
+
+### C25. Theo dấu 1 request đăng ký từ đầu tới cuối
+
+Ghép tất cả lại: chuyện gì xảy ra khi bấm **Send** trong Postman.
+
+```http
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+
+{ "username": "minh_99", "email": "minh@gmail.com", "password": "matkhau123" }
+```
+
+```
+① TOMCAT (cổng 8080) nhận request, đưa vào dãy filter của Spring Security
+
+② CORS filter
+   Postman không gửi header Origin → không phải request từ trình duyệt khác domain → cho qua
+
+③ JwtAuthenticationFilter (C11)
+   Không có header Authorization → bỏ qua, request là "khách"
+
+④ RateLimitFilter (C12)
+   Đường dẫn bắt đầu /api/auth/ → khóa rate:auth:127.0.0.1, giới hạn 10
+   Redis:  INCR rate:auth:127.0.0.1   → 1
+           EXPIRE rate:auth:127.0.0.1 60
+   1 ≤ 10 → cho qua
+
+⑤ AuthorizationFilter: luật URL (C13 ④)
+   /api/auth/** là permitAll → khách vẫn được đi tiếp
+
+⑥ DispatcherServlet (bộ điều phối của Spring)
+   Tìm method khớp POST + /api/auth/register → AuthController.register
+
+⑦ Jackson: JSON → new RegisterRequest(), gọi 3 setter (C6.1)
+   @Valid: username 7 ký tự, đúng ký tự cho phép ✔ · email đúng dạng ✔ · mật khẩu 10 ký tự ✔
+   (sai bất kỳ điều gì → dừng ở đây, 400)
+
+⑧ AuthController.register → authService.register("minh_99", "minh@gmail.com", "matkhau123")
+   Vì có @Transactional: Spring mở transaction        → MySQL: BEGIN
+
+⑨ AuthService.register (C17.1)
+   MySQL: SELECT * FROM users WHERE email = 'minh@gmail.com'           → không có → nhánh B
+   MySQL: SELECT 1 FROM users WHERE username = 'minh_99' LIMIT 1       → không có
+   BCrypt: băm "matkhau123" → "$2a$10$..." (mất vài chục mili giây)
+   MySQL: INSERT INTO users (username, email, password, account_status, role,
+                             artist_request_status, access_status, ...)
+          VALUES ('minh_99', 'minh@gmail.com', '$2a$10$...', 'UNVERIFIED', 'USER',
+                  'NONE', 'REFUSE', ...)                              → MySQL cấp id = 8
+
+⑩ OtpService.generateAndSend(user 8, REGISTER) → nhập chung transaction (C16)
+   MySQL: SELECT * FROM otp_verifications
+          WHERE user_id = 8 AND purpose = 'REGISTER' AND verified = false
+          ORDER BY id DESC LIMIT 1                                    → không có → không phải chờ
+   SecureRandom → "004213"
+   MySQL: INSERT INTO otp_verifications (user_id, otp_code, purpose, new_email, expired_at, verified)
+          VALUES (8, '004213', 'REGISTER', NULL, '<bây giờ + 5 phút>', false)
+
+⑪ EmailService.sendOtp("minh@gmail.com", "004213") (C15)
+   Kết nối smtp.gmail.com:587 → gửi email (thường 1–3 giây)
+
+⑫ register chạy xong, không lỗi                      → MySQL: COMMIT (2 dòng mới được ghi thật)
+
+⑬ Controller: ResponseEntity.ok(Map.of("message", "Registration successful, ..."))
+   Jackson: Map → JSON
+
+⑭ Response:  200  {"message": "Registration successful, the account is awaiting OTP verification"}
+```
+
+Sau request này:
+
+| Nơi | Có gì |
+|---|---|
+| MySQL `users` | Dòng id 8: `minh_99`, `UNVERIFIED`, `USER`, `NONE`, `REFUSE` |
+| MySQL `otp_verifications` | 1 dòng: mã `004213`, `REGISTER`, `verified = false`, hết hạn sau 5 phút |
+| Redis | `rate:auth:127.0.0.1 = 1` (sống 60 giây) |
+| Hộp thư minh@gmail.com | Email chứa mã `004213` |
+
+Nếu ở bước ⑪ Gmail lỗi:
+```
+EmailService ném EmailSendException
+   → bay qua OtpService, AuthService (không ai bắt)
+   → Spring thấy RuntimeException rời khỏi method @Transactional → MySQL: ROLLBACK
+        (dòng user 8 và dòng OTP đều biến mất, như chưa từng đăng ký)
+   → GlobalExceptionHandler.handleEmailSend → 503 {"message": "Could not send OTP email, please try again later"}
+   (Redis vẫn giữ rate:auth = 1: Redis không bị rollback)
+```
+
+So sánh với 1 request **đã đăng nhập**, ví dụ `GET /api/users/me/profile` kèm token:
+```
+JwtAuthenticationFilter:  kiểm tra chữ ký token (không cần database)
+                          Redis: GET session:minh@gmail.com          → so với jti trong token
+                          MySQL: SELECT * FROM users WHERE email = ? (CustomUserDetailsService)
+RateLimitFilter:          Redis: INCR rate:user:minh@gmail.com
+UserController.me():      MySQL: SELECT * FROM users WHERE email = ?
+UserService.getProfile(): findById(8) → thường Hibernate lấy luôn bản đã đọc ở dòng trên, không chạy SELECT lần nữa
+UserMapper → JSON → 200
+```
+Mỗi request đã đăng nhập tốn khoảng 2 lần đọc Redis và 2 câu SELECT. Đây là cái giá của việc "khóa là có tác dụng ngay" (mục 22, dòng 13).
+
+---
+
+### C26. Ví dụ luyện tập: tự thêm 1 API mới
+
+> ⚠️ **Đây là bài tập**, code dưới đây **không có** trong dự án. Mục đích: thấy rõ 1 tính năng mới chạy qua những tầng nào, theo thứ tự nào.
+
+**Yêu cầu giả định:** Admin muốn xem danh sách tài khoản **theo trạng thái**, ví dụ chỉ xem các tài khoản `DISABLED`.
+API: `GET /api/admin/users/status/{status}`, ví dụ `GET /api/admin/users/status/DISABLED`.
+
+**Bước 1 — Repository:** cần câu SQL `SELECT * FROM users WHERE account_status = ?`. Đặt tên method theo luật A9.5:
+```java
+// UserRepository.java — thêm 1 dòng
+List<User> findByAccountStatus(AccountStatus status);
+```
+
+**Bước 2 — Service:** luật nghiệp vụ (ở đây đơn giản, chỉ gọi repository):
+```java
+// AdminService.java — thêm method
+public List<User> getUsersByStatus(AccountStatus status) {
+    return userRepository.findByAccountStatus(status);
+}
+```
+
+**Bước 3 — Controller:** cửa ngõ HTTP. `AdminController` đã có `@PreAuthorize("hasRole('ADMIN')")` trên class → tự động chỉ Admin gọi được, không cần viết thêm gì về quyền:
+```java
+// AdminController.java — thêm method
+@GetMapping("/users/status/{status}")
+public ResponseEntity<List<UserProfileResponse>> getUsersByStatus(@PathVariable AccountStatus status) {
+    List<UserProfileResponse> result = adminService.getUsersByStatus(status)
+            .stream()
+            .map(UserMapper::toUserProfileResponse)
+            .collect(Collectors.toList());
+    return ResponseEntity.ok(result);
+}
+```
+Spring tự đổi chữ `"DISABLED"` trên đường dẫn thành `AccountStatus.DISABLED`. Gõ sai (`/status/abc`) → 400 `Invalid parameter: status` (C24).
+
+**Bước 4 — Có cần sửa database không?** Không: chỉ đọc cột đã có. (Nếu thêm field vào Entity thì phải `ALTER TABLE` trên VPS, A9.3.)
+
+**Bước 5 — Test bằng Postman:**
+
+| Thử | Kết quả mong đợi |
+|---|---|
+| Token Admin, `/status/DISABLED` | 200 + danh sách |
+| Token Admin, `/status/abc` | 400 `Invalid parameter: status` |
+| Token USER | 403 |
+| Không token | 401 |
+
+**Bước 6 — Đưa lên GitHub** (mỗi tính năng 1 nhánh, mục 21.5):
+```bash
+git checkout -b admin-users-by-status
+git add .
+git commit -m "Add admin API to list users by status"
+git push -u origin admin-users-by-status
+```
+Rồi lên GitHub tạo Pull Request vào `main`, chờ CI xanh, nhờ người khác xem rồi mới merge.
+
+Thứ tự **Repository → Service → Controller → Test** là thứ tự nên làm cho mọi tính năng: viết từ dưới lên, mỗi tầng chỉ dùng tầng ngay dưới nó.
+
+---
+
+### C27. Bài tập tự kiểm tra (có đáp án)
+
+Tự trả lời trước, rồi mới xem đáp án ở dưới.
+
+1. Trong `AuthService` không có chỗ nào viết `new UserRepository()` hay `new OtpService()`. Vậy 2 object đó từ đâu ra?
+2. Gửi `POST /api/auth/login` với body `{"Email": "lan@gmail.com", "password": "123456"}` thì nhận được gì?
+3. Lan đăng nhập trên laptop, rồi đăng nhập tiếp trên điện thoại. Laptop gọi 1 API bất kỳ thì sao?
+4. Admin khóa tài khoản Lan khi Lan đang mở web. Lan bị chặn ở lúc nào, nhận message gì?
+5. Chủ dự án chạy `UPDATE users SET access_status = 'REFUSE' WHERE email = 'lan@gmail.com'` khi Lan đang đăng nhập. Request tiếp theo của Lan nhận gì? Vì sao message khác câu 4?
+6. Vì sao cột `otp_code` kiểu chuỗi chứ không phải số?
+7. Nhập sai mã OTP 5 lần, lần thứ 6 nhập **đúng**. Kết quả? Phải làm gì?
+8. Đăng ký đúng hết, nhưng Gmail đang lỗi. Sau request đó, bảng `users` có thêm dòng nào không?
+9. Trong `updateEmail`, vì sao `deleteSession(user.getEmail())` phải đứng **trước** `user.setEmail(...)`?
+10. USER thường gọi `GET /api/admin/users` nhận mã gì? Không gửi token thì mã gì?
+11. Vì sao Controller không trả thẳng Entity `User` ra JSON?
+12. Muốn thêm giá trị `LOCKED` vào enum `AccountStatus` rồi deploy lên VPS, ngoài sửa code Java còn phải làm gì?
+13. Lỡ gõ `findByEmial` trong `UserRepository`. Chuyện gì xảy ra?
+14. Từ 1 máy, gửi 11 request đăng nhập trong 30 giây. Request thứ 11 nhận gì?
+
+**Đáp án**
+
+1. Spring tạo sẵn (bean) và truyền vào qua constructor: Dependency Injection (A7).
+2. **400 `Email is required`**: tên trường JSON phân biệt hoa thường, `"Email"` không khớp `email` → field `email` còn `null` → `@NotBlank` báo lỗi (A3.3).
+3. **401 `Your session has ended. Your account may have been logged in on another device`**: đăng nhập trên điện thoại ghi đè `session:lan@gmail.com` bằng mã phiên mới, mã trong token của laptop hết khớp (C8, C11 bước ⑥).
+4. Ngay **request tiếp theo**, vì `lockAccount` xóa phiên trong Redis. Message: `Your session has ended...` (C19.1).
+5. **401 `Unauthorized, please login`**. Phiên trong Redis **vẫn còn** (SQL không chạy code Java nên không ai xóa phiên), nên qua được bước kiểm tra phiên. Nhưng `CustomUserDetailsService` thấy `accessStatus ≠ ACCEPT` → đánh dấu bị vô hiệu → filter không ghi nhận đăng nhập → khách → câu 401 chung (C10, C11 bước ⑧).
+6. Để giữ số 0 ở đầu: `"004213"`. Lưu số thì thành `4213` (C4).
+7. **400 `Too many wrong attempts, please request a new OTP`**, vì bộ đếm tăng **trước** khi so mã. Phải xin mã mới (C16.4).
+8. **Không.** `EmailSendException` là `RuntimeException` → `@Transactional` rollback cả dòng user lẫn dòng OTP. Người dùng nhận 503 (C25).
+9. Khóa phiên là `session:{email}`. Đổi email trước thì sẽ xóa nhầm khóa của email mới, phiên cũ vẫn sống (C18.4).
+10. **403** (biết bạn là ai nhưng không đủ quyền). Không token: **401** (A2.5, A13.1).
+11. Lộ bản băm mật khẩu, lộ cột mới thêm, và không kiểm soát được hình dạng API (A8.2).
+12. Chạy `ALTER TABLE users MODIFY COLUMN account_status ENUM(...)` liệt kê **đủ** các giá trị trên VPS **trước khi** merge, vì VPS dùng `ddl-auto=validate`. Và rà lại mọi chỗ code dùng `AccountStatus` (`login`, `CustomUserDetailsService`, `AdminService`...) để xử lý giá trị mới (A9.3, A9.4, mục 21.4).
+13. Ứng dụng **không khởi động được**: Spring không tìm thấy field `emial` trong `User` để sinh câu SQL (A9.5).
+14. **429** `Too many requests. Please try again in <n> seconds`, kèm header `Retry-After` (C12).
+
+---
+
+## PHẦN D — FRONTEND, TEST, CẤU HÌNH VÀ PHỤ LỤC
+
+---
+
 ## 19. HƯỚNG DẪN RIÊNG CHO FRONTEND
 
 ### 19.1. Lưu token
@@ -1574,6 +4849,123 @@ ALTER TABLE users ADD COLUMN access_status ENUM('ACCEPT','REFUSE') NOT NULL DEFA
 UPDATE users SET access_status = 'ACCEPT' WHERE email IN ('admin@gmail.com', 'lan@gmail.com');
 ```
 
+### 21.7. Chạy dự án lần đầu trên máy của bạn (MỚI)
+
+Dành cho thành viên mới muốn chạy backend trên máy cá nhân (Windows) để học và thử.
+
+#### 21.7.1. Cần cài gì?
+
+| Phần mềm | Dùng để | Ghi chú |
+|---|---|---|
+| **Git** | Tải code về | Có sẵn Git Bash (dùng cho vài lệnh bên dưới) |
+| **IntelliJ IDEA** (bản Community miễn phí là đủ) | Mở, chạy code | IntelliJ tự đề nghị tải JDK nếu máy chưa có |
+| **JDK 17 trở lên** | Chạy Java | `pom.xml` đặt Java 17; VPS chạy JDK 25 |
+| **MySQL 8** + MySQL Workbench | Database chính | Nhớ mật khẩu user `root` đặt lúc cài |
+| **Redis** | Phiên đăng nhập, bộ đếm | Redis không có bản chính thức cho Windows. Cách dễ: dùng Docker Desktop (`docker run -d --name redis -p 6379:6379 redis`), hoặc cài trong WSL, hoặc dùng Memurai (bản tương thích Redis cho Windows) |
+| **MongoDB** | Lịch sử nghe (module Song) | Xin chuỗi kết nối từ trưởng nhóm, hoặc tự tạo MongoDB Atlas miễn phí. Xem `SONG_MODULE.md` mục 24.2 |
+| **Postman** | Gọi thử API | |
+
+#### 21.7.2. Các bước
+
+**Bước 1 — Tải code và mở bằng IntelliJ**
+```bash
+git clone https://github.com/Winhmm/myspotify_backend.git
+```
+IntelliJ → **Open** → chọn thư mục `myspotify_backend` → chờ Maven tải thư viện (lần đầu vài phút, thanh tiến trình ở góc dưới).
+
+**Bước 2 — Tạo database rỗng** (chạy trong MySQL Workbench):
+```sql
+CREATE DATABASE myspotify_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+`utf8mb4` để lưu được tiếng Việt có dấu và emoji. **Không cần tạo bảng**: lần chạy đầu Hibernate tự tạo (`ddl-auto=update`, A9.3).
+
+**Bước 3 — Tạo file cấu hình** `src/main/resources/application.properties`.
+File này **không có** trên GitHub (nằm trong `.gitignore`) nên phải tự tạo. Cách tốt nhất: **xin file mẫu từ trưởng nhóm** rồi sửa các giá trị của máy mình. Khung tối thiểu (thay mọi chỗ `<...>`):
+
+```properties
+# Database MySQL trên máy bạn
+spring.datasource.url=jdbc:mysql://localhost:3306/myspotify_db
+spring.datasource.username=root
+spring.datasource.password=<mật khẩu MySQL của bạn>
+spring.jpa.hibernate.ddl-auto=update
+
+# JWT: chuỗi ngẫu nhiên dài ít nhất 64 ký tự, tự tạo riêng cho máy bạn
+app.jwt.secret=<chuỗi bí mật>
+app.jwt.expiration-ms=86400000
+
+# Redis
+spring.data.redis.host=localhost
+spring.data.redis.port=6379
+
+# Gmail gửi OTP (xem 21.2 để lấy App Password)
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=<gmail dùng để gửi>
+spring.mail.password=<App Password 16 ký tự, viết liền>
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+spring.mail.properties.mail.smtp.connectiontimeout=5000
+spring.mail.properties.mail.smtp.timeout=5000
+spring.mail.properties.mail.smtp.writetimeout=5000
+
+# Rate limit
+app.rate-limit.window-seconds=60
+app.rate-limit.user-requests=100
+app.rate-limit.auth-requests=10
+
+# File upload
+app.upload-dir=uploads
+spring.servlet.multipart.max-file-size=100MB
+spring.servlet.multipart.max-request-size=110MB
+
+# MongoDB (module Song), xem SONG_MODULE.md mục 24.2
+spring.mongodb.uri=<chuỗi kết nối MongoDB, có tên database>
+spring.data.mongodb.auto-index-creation=true
+```
+Nhắc lại: ghi chú `#` phải nằm trên **dòng riêng**, không viết ở cuối dòng giá trị (21.1).
+
+Tạo nhanh chuỗi bí mật JWT (mở **Git Bash**):
+```bash
+openssl rand -base64 64
+```
+Dán kết quả (viết liền trên 1 dòng) vào `app.jwt.secret`. Mỗi máy 1 chuỗi riêng, **không** dùng chung chuỗi của VPS.
+
+**Bước 4 — Chạy.** Mở `MyspotifyApplication.java` → bấm nút ▶ xanh cạnh `main`. Chờ tới dòng log:
+```
+Started MyspotifyApplication in ... seconds
+```
+
+**Bước 5 — Kiểm tra server sống.** Mở trình duyệt:
+- `http://localhost:8080/actuator/health` → thấy `{"status":"UP"}`.
+- `http://localhost:8080/swagger-ui.html` → trang liệt kê mọi API.
+
+Thấy `{"status":"DOWN"}` → server chạy nhưng 1 trong các kết nối (MySQL, Redis, MongoDB) đang hỏng, xem log để biết cái nào.
+
+**Bước 6 — Tạo tài khoản đầu tiên** (Postman, base URL `http://localhost:8080`):
+1. `POST /api/auth/register` với email thật của bạn.
+2. Mở email lấy mã → `POST /api/auth/verify-otp`.
+3. Cho phép vào web và (tùy chọn) nâng thành Admin, trong MySQL Workbench:
+   ```sql
+   UPDATE users SET access_status = 'ACCEPT', role = 'ADMIN' WHERE email = '<email của bạn>';
+   ```
+4. `POST /api/auth/login` → nhận token → dùng cho các API khác (mục 20).
+
+Muốn thử module Song trên database mới: thêm 25 thể loại nhạc theo `SONG_MODULE.md` mục 24.2a.
+
+#### 21.7.3. Lỗi khởi động hay gặp
+
+| Log báo | Nguyên nhân | Cách sửa |
+|---|---|---|
+| `Could not resolve placeholder 'app.jwt.secret'` (hoặc khóa khác) | Thiếu khóa trong file cấu hình, hoặc file đặt sai chỗ / sai tên | Kiểm tra đúng đường dẫn `src/main/resources/application.properties` và đủ khóa |
+| `Access denied for user 'root'@'localhost'` | Sai mật khẩu MySQL | Sửa `spring.datasource.password` |
+| `Unknown database 'myspotify_db'` | Chưa tạo database | Làm lại bước 2 |
+| `Communications link failure` | MySQL chưa chạy | Bật dịch vụ MySQL (Windows: Services → MySQL80 → Start) |
+| `WeakKeyException` | Chuỗi bí mật JWT quá ngắn (< 32 byte) | Tạo lại bằng `openssl rand -base64 64` |
+| `Port 8080 was already in use` | Đang có 1 bản khác chạy (thường là bấm Run 2 lần) | Tắt bản cũ (nút ■ đỏ), hoặc thêm `server.port=8081` |
+| Gọi API báo 500, log có `RedisConnectionFailureException` | Redis chưa chạy | Bật Redis |
+| Đăng ký báo 503, log có `Could not send OTP email to ...` kèm `535 ... Username and Password not accepted` | Sai Gmail hoặc App Password | Làm lại 21.2, kiểm tra không có dấu cách |
+| Đăng nhập báo `Account has not been approved yet` | Chưa chạy câu `UPDATE ... access_status = 'ACCEPT'` | Làm bước 6.3 |
+
 ---
 
 ## 22. GIỚI HẠN ĐÃ BIẾT VÀ HƯỚNG PHÁT TRIỂN
@@ -1598,10 +4990,24 @@ UPDATE users SET access_status = 'ACCEPT' WHERE email IN ('admin@gmail.com', 'la
 | 16 | (MỚI) Thu hồi quyền vào web không xóa phiên trong Redis | Token cũ dùng lại được ngay nếu được `ACCEPT` lại trong lúc token còn hạn | Xóa phiên khi thu hồi (cần API để có chỗ gọi `SessionService`) |
 | 17 | (MỚI) Bài hát, playlist công khai của người bị thu hồi quyền vào web vẫn hiển thị | Khác với khi bị Admin khóa | Tùy nghiệp vụ: thêm `accessStatus` vào điều kiện hiển thị nếu muốn ẩn |
 | 18 | (MỚI) Admin không có công cụ xử lý playlist công khai có tên phản cảm | Chỉ có cách khóa cả tài khoản | API Admin ẩn / xóa playlist |
+| 19 | (MỚI) DTO giới hạn mật khẩu 72 **ký tự**, còn BCrypt chỉ xử lý 72 **byte** (A14.4) | Mật khẩu tiếng Việt có dấu, dài gần 72 ký tự có thể vượt 72 byte và bị thư viện từ chối | Kiểm tra theo số byte, hoặc khuyên người dùng đặt mật khẩu không dấu |
 
 ---
 
 ## 23. CÂU HỎI THƯỜNG GẶP
+
+**H: Mình chưa học Spring Boot, nên bắt đầu đọc từ đâu?**
+Đ: Đọc Phần A (A1 → A16) một lượt, rồi theo lộ trình đầu tiên ở mục 1. Song song, tự chạy dự án trên máy (21.7) và gọi thử vài API bằng Postman (mục 20): vừa gọi vừa mở MySQL và Redis xem dữ liệu đổi thế nào là cách hiểu nhanh nhất.
+
+**H: Sửa code xong có phải tắt ứng dụng rồi chạy lại không?**
+Đ: Dự án có thư viện `spring-boot-devtools`: sửa code rồi bấm **Build → Build Project** (`Ctrl + F9`) là ứng dụng tự khởi động lại nhanh. Sửa file cấu hình `.properties`, thêm thư viện vào `pom.xml`, hoặc không chắc → cứ bấm ■ tắt rồi ▶ chạy lại.
+
+**H: Đọc code thấy `@Service`, `@RestController`... mà không thấy ai gọi `new`, vậy object ở đâu ra?**
+Đ: Spring tạo sẵn lúc khởi động và tự truyền vào constructor (Dependency Injection), xem A7.
+
+**H: `UserRepository` chỉ là interface, không có code bên trong, sao chạy được?**
+Đ: Spring đọc tên method (`findByEmail`...) và tự sinh câu SQL lúc chạy, xem A9.5.
+
 
 **H: Không nhận được email OTP?**
 Đ: Kiểm tra thư mục Spam / Quảng cáo. Đợi đủ 60 giây rồi gọi lại API đăng ký (hoặc forgot-password) để nhận mã mới. Nếu API trả 503 → server gửi mail lỗi, báo backend kiểm tra App Password Gmail.
@@ -1774,3 +5180,32 @@ Cố ý **không** trả: `password` (bản băm), `accessStatus` (thông tin qu
 | Cho phép / thu hồi quyền vào web 1 người | Không sửa code — chạy SQL `UPDATE users SET access_status = ...` |
 | Message lỗi gửi email | `service/EmailService.java` (`EmailSendException`) + `exception/GlobalExceptionHandler.java` |
 | Thêm trạng thái / role | `enums/*.java` + `ALTER TABLE` trên local và VPS |
+
+### 24.5. Bản đồ file → mục giải thích
+
+| File | Nghiệp vụ (Phần B) | Giải thích code (Phần C) |
+|---|---|---|
+| `MyspotifyApplication.java` | | C1, A6.3 |
+| `enums/AccountStatus`, `Role`, `ArtistRequestStatus`, `AccessStatus`, `OtpPurpose` | 7 | C2 |
+| `entity/User.java` | 6.1 | C3 |
+| `entity/OtpVerification.java` | 6.2, 8 | C4 |
+| `repository/UserRepository.java`, `OtpVerificationRepository.java` | | C5, A9.5 |
+| `dto/auth/*`, `dto/user/*` (request) | 24.2 | C6 |
+| `LoginResponse`, `UserProfileResponse`, `mapper/UserMapper.java` | 24.2 | C7 |
+| `service/SessionService.java` | 9.2, 9.3 | C8 |
+| `security/JwtUtil.java` | 9.1 | C9, A15 |
+| `security/CustomUserDetailsService.java` | 10 | C10 |
+| `security/JwtAuthenticationFilter.java` | 10 | C11 |
+| `service/RateLimitService.java`, `security/RateLimitFilter.java` | 15 | C12 |
+| `config/SecurityConfig.java` | 10, 16 | C13, A13 |
+| `config/CorsConfig.java`, `config/WebMvcConfig.java` | 16, 19.6 | C14 |
+| `service/EmailService.java`, `exception/EmailSendException.java` | 8.4 | C15 |
+| `service/OtpService.java` | 8 | C16 |
+| `service/AuthService.java` | 9.4, 11 | C17 |
+| `service/UserService.java` | 12, 13 | C18 |
+| `service/AdminService.java` | 13, 14 | C19 |
+| `service/FileStorageService.java` (ảnh đại diện) | 12.4 | C20 |
+| `controller/AuthController.java` | 4.1, 11 | C21 |
+| `controller/UserController.java` | 4.2, 12, 13 | C22 |
+| `controller/AdminController.java` | 4.3, 13, 14 | C23 |
+| `exception/GlobalExceptionHandler.java` | 17 | C24, A12 |
