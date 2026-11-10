@@ -1,46 +1,104 @@
-# MODULE PLAYLIST — TÀI LIỆU NGHIỆP VỤ, API VÀ HƯỚNG DẪN FRONTEND
+# MODULE PLAYLIST — TÀI LIỆU NGHIỆP VỤ, API, HƯỚNG DẪN FRONTEND VÀ GIẢI THÍCH CODE
 
-> Dự án: **MySpotify Backend** (Spring Boot 4, Java 25, MySQL, Redis, MongoDB)
+> Dự án: **MySpotify Backend** (Spring Boot 4.1, Java 17 trong `pom.xml` — VPS chạy JDK 25, MySQL, Redis, MongoDB)
 > Package gốc: `com.winhmm.myspotify`
 > Trạng thái: **đã xong và đã deploy** (merge vào `main` qua Pull Request #11).
-> Đối tượng đọc: bạn bè trong nhóm (backend, frontend, tester), **không cần biết trước Spring Boot**.
-> Tài liệu liên quan: `docs/SONG_MODULE.md` (bài hát, trạng thái bài, nghe nhạc), `docs/USER_MODULE.md` (tài khoản, đăng nhập).
+> Cập nhật lần cuối: **10/11/2026** — khớp với code trên nhánh `main`.
+> Đối tượng đọc: bạn bè trong nhóm (backend, frontend, tester), **kể cả người chưa từng học Spring Boot**.
+> Tài liệu liên quan:
+> - `docs/USER_MODULE.md` (tài khoản, đăng nhập). **Phần A của tài liệu đó là kiến thức nền chung.**
+> - `docs/SONG_MODULE.md` (bài hát, trạng thái bài, nghe nhạc). **Phần A của tài liệu đó là kiến thức nền về truy vấn, upload file.**
 
 ---
 
 ## MỤC LỤC
 
-1. [Cách đọc tài liệu này](#1-cách-đọc-tài-liệu-này)
-2. [Module Playlist giải quyết bài toán gì?](#2-module-playlist-giải-quyết-bài-toán-gì)
-3. [Từ điển thuật ngữ](#3-từ-điển-thuật-ngữ)
-4. [Danh sách chức năng và API](#4-danh-sách-chức-năng-và-api)
-5. [Kiến trúc và vị trí các file](#5-kiến-trúc-và-vị-trí-các-file)
-6. [Dữ liệu: MySQL và ổ đĩa](#6-dữ-liệu-mysql-và-ổ-đĩa)
-7. [Quy tắc nghiệp vụ chi tiết](#7-quy-tắc-nghiệp-vụ-chi-tiết)
-8. [Chi tiết từng API](#8-chi-tiết-từng-api)
-9. [Cấu trúc JSON trả về](#9-cấu-trúc-json-trả-về)
-10. [Xử lý lỗi](#10-xử-lý-lỗi)
-11. [Hướng dẫn cho Frontend](#11-hướng-dẫn-cho-frontend)
-12. [Hướng dẫn test bằng Postman](#12-hướng-dẫn-test-bằng-postman)
-13. [Bảo mật và phân quyền](#13-bảo-mật-và-phân-quyền)
-14. [Xử lý đồng thời (nhiều request cùng lúc)](#14-xử-lý-đồng-thời-nhiều-request-cùng-lúc)
-15. [Cấu hình, deploy và database](#15-cấu-hình-deploy-và-database)
-16. [Giới hạn đã biết và hướng phát triển](#16-giới-hạn-đã-biết-và-hướng-phát-triển)
-17. [Câu hỏi thường gặp](#17-câu-hỏi-thường-gặp)
-18. [Phụ lục](#18-phụ-lục)
+**Mở đầu**
+- 0. [Có gì mới trong bản cập nhật này](#0-có-gì-mới-trong-bản-cập-nhật-này)
+- 1. [Cách đọc tài liệu này](#1-cách-đọc-tài-liệu-này)
+
+**PHẦN A — Kiến thức nền riêng cho module Playlist**
+- A1. Bảng nối có thêm thông tin: dùng 1 entity riêng thay vì `@ManyToMany`
+- A2. Ràng buộc duy nhất trên nhiều cột: `@UniqueConstraint`
+- A3. `JOIN FETCH`: đọc kèm dữ liệu liên quan trong cùng 1 câu SQL
+- A4. Dùng lại điều kiện của repository khác, và truy vấn trả về 1 cột
+- A5. Xóa hàng loạt và thứ tự xóa khi có khóa ngoại
+- A6. Báo lỗi 403 từ trong Service: `AccessDeniedException`
+- A7. `Boolean` khác `boolean`, và tên trường bắt đầu bằng `is`
+- A8. Service trả thẳng DTO
+
+**PHẦN B — Nghiệp vụ và API**
+- 2. [Module Playlist giải quyết bài toán gì?](#2-module-playlist-giải-quyết-bài-toán-gì)
+- 3. [Từ điển thuật ngữ](#3-từ-điển-thuật-ngữ)
+- 4. [Danh sách chức năng và API](#4-danh-sách-chức-năng-và-api)
+- 5. [Kiến trúc và vị trí các file](#5-kiến-trúc-và-vị-trí-các-file)
+- 6. [Dữ liệu: MySQL và ổ đĩa](#6-dữ-liệu-mysql-và-ổ-đĩa)
+- 7. [Quy tắc nghiệp vụ chi tiết](#7-quy-tắc-nghiệp-vụ-chi-tiết)
+- 8. [Chi tiết từng API](#8-chi-tiết-từng-api)
+- 9. [Cấu trúc JSON trả về](#9-cấu-trúc-json-trả-về)
+- 10. [Xử lý lỗi](#10-xử-lý-lỗi)
+
+**PHẦN C — Đọc code từng file**
+- C0. Cách đọc phần này
+- C1. `Playlist` · C2. `PlaylistSong` · C3. `PlaylistRepository` · C4. `PlaylistSongRepository`
+- C5. DTO request · C6. DTO response · C7. `PlaylistMapper`
+- C8 → C13. `PlaylistService` (hàm phụ trợ, tạo, xem, sửa, thêm / bỏ bài, xóa)
+- C14. `PlaylistController`
+- C15. Theo dấu: tạo → thêm bài → bài bị ẩn → xem lại → xóa
+- C16. Ví dụ luyện tập: tự thêm 1 API mới
+- C17. Bài tập tự kiểm tra (có đáp án)
+
+**PHẦN D — Frontend, test, vận hành và phụ lục**
+- 11. [Hướng dẫn cho Frontend](#11-hướng-dẫn-cho-frontend)
+- 12. [Hướng dẫn test bằng Postman](#12-hướng-dẫn-test-bằng-postman)
+- 13. [Bảo mật và phân quyền](#13-bảo-mật-và-phân-quyền)
+- 14. [Xử lý đồng thời (nhiều request cùng lúc)](#14-xử-lý-đồng-thời-nhiều-request-cùng-lúc)
+- 15. [Cấu hình, deploy và database](#15-cấu-hình-deploy-và-database) (mới: 15.4 chạy thử trên máy của bạn)
+- 16. [Giới hạn đã biết và hướng phát triển](#16-giới-hạn-đã-biết-và-hướng-phát-triển)
+- 17. [Câu hỏi thường gặp](#17-câu-hỏi-thường-gặp)
+- 18. [Phụ lục](#18-phụ-lục) (mới: 18.5 bản đồ file → mục giải thích)
+
+---
+
+## 0. CÓ GÌ MỚI TRONG BẢN CẬP NHẬT NÀY
+
+### 0.1. Bản 10/11/2026 (bản này): viết thêm cho người chưa học Spring Boot
+
+Code module Playlist **không thay đổi**. Bản này chỉ bổ sung phần giải thích:
+
+| # | Bổ sung | Dành cho | Ở đâu |
+|---|---|---|---|
+| 1 | **Phần A — 8 kiến thức nền riêng của module**: bảng nối có cột thêm, ràng buộc duy nhất nhiều cột, `JOIN FETCH`, dùng lại điều kiện truy vấn, xóa hàng loạt + `flush()`, 403 từ Service, `Boolean` và tên trường `is...`, Service trả DTO. Kiến thức chung trỏ sang Phần A của `USER_MODULE.md` và `SONG_MODULE.md` | Người chưa học Spring Boot | A1 → A8 |
+| 2 | **Phần C — Đọc code cả 12 file** của module, giải thích từng dòng và lý do | Người sẽ đọc / sửa code | C0 → C14 |
+| 3 | **Theo dấu** 1 playlist từ lúc tạo → thêm bài → bài bị ẩn → người khác thử sửa → xóa, kèm câu SQL từng bước | Mọi người | C15 |
+| 4 | **Bài luyện tập** tự thêm API bật / tắt công khai | Người mới tập code | C16 |
+| 5 | **14 câu hỏi tự kiểm tra** có đáp án | Người mới | C17 |
+| 6 | **Chạy thử trên máy cá nhân**, bản đồ "file → mục giải thích", vài câu hỏi thường gặp | Thành viên mới | 15.4, 17, 18.5 |
+
+Phần B (mục 2 → 10) và Phần D (mục 11 → 18) giữ nguyên nội dung bản trước.
 
 ---
 
 ## 1. CÁCH ĐỌC TÀI LIỆU NÀY
 
-Tài liệu dài, không cần đọc hết một lần. Chọn lộ trình theo vai trò:
+Tài liệu chia 4 phần:
+
+| Phần | Trả lời câu hỏi |
+|---|---|
+| **A** (A1 → A8) | "Những kỹ thuật riêng của module này là gì?" (cần đọc Phần A của `USER_MODULE.md`, `SONG_MODULE.md` trước) |
+| **B** (mục 2 → 10) | "Module làm gì, API nào, JSON ra sao, lỗi gì?" |
+| **C** (C0 → C17) | "Code viết ra sao, từng dòng nghĩa là gì?" |
+| **D** (mục 11 → 18) | "Frontend làm thế nào, test thế nào, bảo mật, vận hành, tra cứu" |
+
+Lộ trình gợi ý:
 
 | Bạn là | Đọc theo thứ tự | Có thể bỏ qua |
 |---|---|---|
-| **Người mới hoàn toàn** | 2 → 3 → 4 → 7 → 8 | 5, 14, 15 |
-| **Frontend** | 2 → 4 → 7 → **11** → 9 → 8 → 10 | 5, 6, 14, 15 |
-| **Tester** | 2 → 4 → 7 → 8 → 10 → **12** | 5, 15 |
-| **Backend sắp sửa code** | Đọc hết, đặc biệt 5, 6, 7, 13, 14, 16 | |
+| **Chưa học Spring Boot, muốn hiểu và code được** | `USER_MODULE.md` Phần A → `SONG_MODULE.md` Phần A → A1 → A8 → 2 → 4 → 7 → 8 → C0 → C17 → 15.4 (tự chạy thử) | |
+| **Người mới, chỉ cần hiểu hệ thống** | 2 → 3 → 4 → 7 → 8 | Phần A, Phần C, 5, 14, 15 |
+| **Frontend** | 2 → 4 → 7 → **11** → 9 → 8 → 10 | Phần A, Phần C, 5, 6, 14, 15 |
+| **Tester** | 2 → 4 → 7 → 8 → 10 → **12** → C17 | Phần C (trừ C17), 5, 15 |
+| **Backend sắp sửa code** | Đọc hết, đặc biệt 5, 6, 7, 13, 14, 16 và Phần C | |
 | **Đưa cho AI viết code frontend** | Đưa nguyên mục 11 (có sẵn hướng dẫn cho AI ở 11.0) kèm mục 8, 9, 10 | |
 
 Quy ước trong tài liệu:
@@ -49,6 +107,207 @@ Quy ước trong tài liệu:
 - **"Người dùng"** = bất kỳ ai đã đăng nhập: USER, ARTIST hay ADMIN đều tạo và nghe playlist được.
 - **"Chủ playlist"** = người đã tạo playlist đó.
 - **"Bài đang phát hành"** = bài người nghe đang nghe được (giải thích ở mục 3.2 và 7.3).
+- Viết "`SONG_MODULE.md` C13" nghĩa là mục C13 của tài liệu module Song; viết "C13" không kèm tên file là mục của tài liệu này.
+
+---
+
+## PHẦN A — KIẾN THỨC NỀN RIÊNG CHO MODULE PLAYLIST
+
+Module Playlist nhỏ hơn module Song, và dùng lại gần như toàn bộ kiến thức đã giải thích ở 2 tài liệu kia:
+
+| Kiến thức | Đọc ở |
+|---|---|
+| HTTP, JSON, form-data, bean, các tầng, JPA cơ bản, `@Transactional`, Redis, validation, xử lý lỗi, Spring Security, JWT | `USER_MODULE.md` Phần A (A1 → A16) |
+| Quan hệ giữa các bảng, tải lười (LAZY) và N+1, JPQL `@Query`, `@Modifying`, `@PrePersist`, upload file bằng `@ModelAttribute`, Builder | `SONG_MODULE.md` Phần A (A2 → A18) |
+
+Phần A ở đây chỉ giải thích **8 điều mới** mà module Playlist dùng.
+
+---
+
+### A1. Bảng nối có thêm thông tin: dùng 1 entity riêng thay vì `@ManyToMany`
+
+Module Song nối bài hát với nghệ sĩ feat bằng `@ManyToMany` (`SONG_MODULE.md` A2.2). Bảng trung gian `song_featured_artists` chỉ có **2 cột** (song_id, artist_id), Hibernate tự quản lý, không có class Java riêng.
+
+Playlist cũng là quan hệ nhiều – nhiều (1 playlist nhiều bài, 1 bài nằm trong nhiều playlist), nhưng mỗi dòng nối cần **thêm thông tin**: bài được thêm **lúc nào** (`added_at`), dùng để sắp thứ tự bài. `@ManyToMany` không chứa được cột thêm này. Nên dự án **tự tạo 1 entity** cho bảng nối:
+
+```
+                                  playlist_songs  (entity PlaylistSong)
+playlists                    ┌────┬─────────────┬─────────┬─────────────────────┐        songs
+┌────┬────────────┐          │ id │ playlist_id │ song_id │ added_at            │        ┌────┬──────────┐
+│ id │ name       │          ├────┼─────────────┼─────────┼─────────────────────┤        │ id │ title    │
+├────┼────────────┤          │ 1  │ 3           │ 40      │ 2026-11-10 21:00:00 │ ─────► │ 40 │ Chiều Mưa│
+│ 3  │ Nhạc chill │ ◄─────── │ 2  │ 3           │ 12      │ 2026-11-10 21:05:00 │ ─────► │ 12 │ Hẹn Hò   │
+└────┴────────────┘          └────┴─────────────┴─────────┴─────────────────────┘        └────┴──────────┘
+```
+Thay cho 1 quan hệ nhiều – nhiều là **2 quan hệ nhiều – một**: nhiều dòng `PlaylistSong` thuộc 1 `Playlist`; nhiều dòng `PlaylistSong` trỏ tới 1 `Song`.
+
+| | `@ManyToMany` (feat của Song) | Entity riêng (`PlaylistSong`) |
+|---|---|---|
+| Bảng nối có cột thêm? | Không | **Có** (`added_at`, và `id` riêng) |
+| Thêm 1 dòng nối | Gán lại cả tập `setFeaturedArtists(...)` rồi `save(song)` | `save(new PlaylistSong(playlist, song))` |
+| Có repository riêng? | Không | Có (`PlaylistSongRepository`) |
+| Phù hợp khi | Chỉ cần biết "ai nối với ai" | Mỗi lần nối có thêm dữ liệu riêng |
+
+---
+
+### A2. Ràng buộc duy nhất trên **nhiều cột**: `@UniqueConstraint`
+
+`@Column(unique = true)` (`USER_MODULE.md` A9.1) chỉ chặn trùng **1 cột**. Ở đây cần: **cặp** (playlist, bài) không được trùng. Bài 40 được nằm trong playlist 3 và playlist 7, nhưng không được nằm 2 lần trong playlist 3.
+
+```java
+@Table(
+        name = "playlist_songs",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_playlist_songs_playlist_song", columnNames = {"playlist_id", "song_id"})
+        }
+)
+```
+| playlist_id | song_id | Được không? |
+|---|---|---|
+| 3 | 40 | ✔ |
+| 7 | 40 | ✔ (playlist khác) |
+| 3 | 12 | ✔ (bài khác) |
+| 3 | 40 | ✘ **trùng cặp** → MySQL từ chối → **409** `Data already exists` |
+
+Service vẫn tự kiểm tra trước (`existsByPlaylistIdAndSongId`) để báo câu dễ hiểu hơn. Ràng buộc trong database là **lưới an toàn cuối cùng** khi 2 request trùng nhau xảy ra cùng 1 lúc (mục 14).
+
+---
+
+### A3. `JOIN FETCH`: đọc kèm dữ liệu liên quan trong **cùng 1 câu SQL**
+
+`SONG_MODULE.md` A3 giải thích: quan hệ LAZY chỉ được tải khi chạm tới, mỗi lần chạm thêm 1 câu SQL (vấn đề N+1). Module Song chấp nhận điều này. Module Playlist **chủ động tránh** ở những chỗ biết chắc sẽ cần dữ liệu liên quan:
+
+```java
+@Query("SELECT p FROM Playlist p JOIN FETCH p.owner WHERE p.id = :playlistId")
+Optional<Playlist> findWithOwnerById(@Param("playlistId") Long playlistId);
+```
+- `JOIN p.owner` thường: chỉ dùng bảng `users` để **lọc**, chủ playlist vẫn chưa được tải.
+- `JOIN FETCH p.owner`: lọc **và** đổ luôn dữ liệu chủ playlist vào object `Playlist`. Code gọi `playlist.getOwner().getId()` ngay sau đó **không** phát sinh thêm câu SQL nào.
+
+```
+Không JOIN FETCH:   SELECT * FROM playlists WHERE id = 3            ← câu 1
+                    (gọi getOwner().getUsername())
+                    SELECT * FROM users WHERE id = 7                ← câu 2
+
+Có JOIN FETCH:      SELECT p.*, u.* FROM playlists p
+                    JOIN users u ON u.id = p.user_id
+                    WHERE p.id = 3                                  ← chỉ 1 câu
+```
+
+Danh sách "playlist của tôi" có thể tới 50 playlist: không có `JOIN FETCH` thì đọc chủ của từng cái là 50 câu SQL phụ; có `JOIN FETCH` thì 0. Tương tự, `findPlayableSongs` dùng `JOIN FETCH ps.song` để lấy luôn các bài trong cùng câu với danh sách dòng nối.
+
+---
+
+### A4. Dùng lại điều kiện của repository khác, và truy vấn trả về **1 cột**
+
+#### A4.1. Dùng chung `PUBLISHED_CONDITION`
+
+Playlist chỉ hiện bài **đang phát hành**. Điều kiện này đã được viết thành hằng số ở `SongRepository` (`SONG_MODULE.md` C5.1). Playlist **dùng lại**, không viết lại:
+```java
+@Query("SELECT ps FROM PlaylistSong ps JOIN FETCH ps.song s "
+        + "WHERE ps.playlist.id = :playlistId AND " + SongRepository.PUBLISHED_CONDITION
+        + " ORDER BY ps.addedAt ASC, ps.id ASC")
+```
+Điều kiện được viết với bí danh `s` cho bài hát, nên câu ở đây **bắt buộc** đặt bí danh bài là `s` (`JOIN FETCH ps.song s`). Luật phát hành đổi → playlist tự đổi theo, không ai phải nhớ sửa 2 nơi.
+
+#### A4.2. Lấy đúng 1 cột, đúng 1 dòng
+
+Ảnh bìa dự phòng của playlist = ảnh của bài đang phát hành **đầu tiên**. Không cần cả object `Song`, chỉ cần 1 chuỗi:
+```java
+@Query("SELECT s.coverUrl FROM PlaylistSong ps JOIN ps.song s WHERE ... ORDER BY ps.addedAt ASC, ps.id ASC")
+List<String> findPlayableCoverUrls(@Param("playlistId") Long playlistId,
+                                   @Param("now") LocalDateTime now,
+                                   Pageable pageable);
+```
+- `SELECT s.coverUrl`: kết quả là danh sách **chuỗi**, không phải danh sách entity.
+- Gọi với `PageRequest.of(0, 1)` → Spring thêm `LIMIT 1` → lấy đúng 1 dòng (mẹo "top N" ở `SONG_MODULE.md` A5.5).
+- Truyền `Pageable` mà kiểu trả về là `List` (không phải `Page`) → Spring **không** chạy câu đếm tổng, đỡ 1 câu SQL.
+
+---
+
+### A5. Xóa hàng loạt và thứ tự xóa khi có khóa ngoại
+
+Bảng `playlist_songs` có khóa ngoại trỏ tới `playlists`. MySQL **không cho xóa** 1 playlist khi vẫn còn dòng `playlist_songs` trỏ tới nó (lỗi khóa ngoại). Nên phải xóa **con trước, cha sau**:
+
+```java
+@Modifying
+@Query("DELETE FROM PlaylistSong ps WHERE ps.playlist.id = :playlistId")
+int deleteAllByPlaylistId(@Param("playlistId") Long playlistId);
+```
+- 1 câu `DELETE ... WHERE playlist_id = ?` xóa **mọi** dòng của playlist, thay vì đọc lên từng dòng rồi xóa từng cái (200 bài = 200 câu).
+- `@Modifying`: câu thay đổi dữ liệu (`SONG_MODULE.md` A6).
+- Không ghi `@Transactional` ở đây vì method gọi nó (`deletePlaylist`) đã có `@Transactional`.
+
+#### `flush()`: "ghi xuống database ngay bây giờ"
+
+Trong 1 transaction, Hibernate thường **gom** các thay đổi lại, đợi tới lúc commit (cuối method) mới gửi xuống MySQL. `flush()` bắt Hibernate gửi **ngay**.
+
+```java
+playlistSongRepository.deleteAllByPlaylistId(playlistId);   // xóa con
+playlistRepository.delete(playlist);                        // xóa cha (Hibernate mới "ghi nhớ", chưa gửi)
+playlistRepository.flush();                                 // gửi DELETE xuống MySQL ngay
+fileStorageService.delete(coverUrl);                        // chỉ chạy nếu dòng trên không lỗi
+```
+Nếu MySQL từ chối câu `DELETE` (vì 1 lý do nào đó), lỗi xảy ra **ngay ở `flush()`**, trước khi xóa file ảnh. Không có `flush()` thì lỗi chỉ lộ ra lúc commit, **sau khi** ảnh đã bị xóa → playlist còn mà ảnh mất.
+
+---
+
+### A6. Báo lỗi 403 từ trong Service: `AccessDeniedException`
+
+Ở module User và Song, 403 chỉ đến từ `@PreAuthorize` (sai role). Nhưng ở Playlist, **mọi** người dùng đã đăng nhập đều có quyền gọi API sửa playlist; vấn đề là "**playlist này có phải của bạn không**". Câu hỏi đó cần đọc database, chỉ Service mới trả lời được:
+
+```java
+if (!playlist.getOwner().getId().equals(ownerId)) {
+    throw new AccessDeniedException("You are not the owner of this playlist");
+}
+```
+- `AccessDeniedException` là loại lỗi có sẵn của Spring Security.
+- `GlobalExceptionHandler` có handler riêng cho nó → **403** `You do not have permission to access this resource` (câu cố định của handler, không phải câu trong `throw`).
+
+Vì sao 403 mà không phải 400? 403 nghĩa là "biết bạn là ai, nhưng bạn không được làm việc này", đúng nghĩa nhất với tình huống "sửa playlist của người khác". Bình thường frontend không hiện nút sửa khi `isOwner = false`, nên lỗi này chỉ xảy ra khi ai đó tự gọi API. (Khác với module Song: Artist gửi id bài của người khác thì nhận 400 `Song does not exist`, xem `SONG_MODULE.md` C13.1.)
+
+---
+
+### A7. `Boolean` khác `boolean`, và tên trường bắt đầu bằng `is`
+
+#### A7.1. `Boolean` (object) và `boolean` (nguyên thủy)
+
+| | `boolean` | `Boolean` |
+|---|---|---|
+| Giá trị | `true` / `false` | `true` / `false` / **`null`** |
+| Dùng ở | Entity `Playlist.isPublic` (cột NOT NULL, luôn có giá trị) | DTO request (cần phân biệt "không gửi" với "gửi `false`") |
+
+- `CreatePlaylistRequest.isPublic` là `Boolean` **không có** `@NotNull`: không gửi → `null` → Service hiểu là **riêng tư**.
+- `UpdatePlaylistRequest.isPublic` là `Boolean` **có** `@NotNull`: sửa thì bắt buộc gửi rõ, tránh lỡ tay biến playlist công khai thành riêng tư.
+- Đổi `Boolean` → quyết định: `Boolean.TRUE.equals(isPublic)` = "đúng là `true` thì `true`, còn lại (`false` hoặc `null`) đều `false`". An toàn với `null` (`SONG_MODULE.md` C11.2).
+
+#### A7.2. Tên trường JSON / form-data do **tên getter / setter** quyết định
+
+Jackson và Spring không nhìn tên field, mà nhìn tên method:
+- `getIsPublic()` → trường JSON **`isPublic`**. `setIsPublic(...)` → key form-data **`isPublic`**.
+- Nếu viết theo kiểu quen thuộc của Java `isPublic()` (cho `boolean`) thì Jackson hiểu là trường tên **`public`** (bỏ chữ `is`).
+
+Vì vậy các DTO của Playlist **cố ý** đặt getter là `getIsPublic()`, `getIsOwner()`, `getHasCustomCover()`, để JSON giữ nguyên tên `isPublic`, `isOwner`, `hasCustomCover` (mục 9.5). Riêng Entity `Playlist` dùng `isPublic()` / `setPublic()` kiểu Java bình thường, vì Entity không bao giờ đi ra JSON.
+
+---
+
+### A8. Service trả thẳng DTO
+
+Module User và Song: Service trả **Entity**, Controller dùng Mapper đổi sang DTO. `PlaylistService` thì trả thẳng **DTO** (`PlaylistDetailResponse`, `List<PlaylistSummaryResponse>`).
+
+Lý do: để dựng được response, cần thêm dữ liệu **ngoài** Entity `Playlist`: danh sách bài đang phát hành, số bài, ảnh bìa dự phòng, "người xem có phải chủ không". Những thứ này cần truy vấn thêm, mà truy vấn là việc của Service. Nên Service tự gom đủ rồi đóng gói luôn. Controller chỉ còn nhiệm vụ nhận request và trả kết quả.
+
+Cả 2 cách đều đúng. Quy tắc dự án đang theo: **Controller không gọi Repository**. Hễ việc dựng response cần đọc thêm database thì để Service làm.
+
+---
+
+**Hết Phần A.** Đọc tiếp Phần B (mục 2 → 10, nghiệp vụ và API) hoặc sang Phần C (đọc code).
+
+---
+
+## PHẦN B — NGHIỆP VỤ VÀ API
+
+Phần này mô tả module làm gì, theo luật nào, API và JSON ra sao, mà không cần đọc code. Gặp từ lạ → tra Phần A (của tài liệu này, hoặc của `USER_MODULE.md`, `SONG_MODULE.md`). Muốn xem đoạn code thật tương ứng → Phần C.
 
 ---
 
@@ -1070,6 +1329,1034 @@ Message `Song does not exist: <id>` có số ở cuối → so sánh bằng `sta
 
 ---
 
+## PHẦN C — ĐỌC CODE TỪNG FILE CỦA MODULE PLAYLIST
+
+### C0. Cách đọc phần này
+
+- Code trích là code thật trên nhánh `main`, đã **bỏ comment** và dòng `import`. File thật có comment tiếng Việt rất chi tiết, nên mở song song trong IntelliJ.
+- `// ...` = đoạn lặp lại, đã lược. Chú thích `// ①`... do tài liệu thêm.
+- Getter / setter viết tay theo 1 khuôn như module User (`USER_MODULE.md` A5.2), chỉ nhắc khi có điểm đặc biệt.
+- Module chỉ có **12 file**, đọc từ dưới lên:
+
+```
+C1  Playlist                     (bảng playlists)
+C2  PlaylistSong                 (bảng playlist_songs)
+C3  PlaylistRepository
+C4  PlaylistSongRepository
+C5  DTO request                  (CreatePlaylistRequest, UpdatePlaylistRequest)
+C6  DTO response                 (Summary, Detail, PlaylistSongResponse)
+C7  PlaylistMapper
+C8  PlaylistService — hàm phụ trợ
+C9  PlaylistService — tạo playlist
+C10 PlaylistService — xem danh sách, xem chi tiết
+C11 PlaylistService — sửa thông tin, ảnh bìa
+C12 PlaylistService — thêm / bỏ bài
+C13 PlaylistService — xóa playlist
+C14 PlaylistController
+C15 Theo dấu: tạo → thêm bài → bài bị ẩn → xem lại → xóa
+C16 Ví dụ luyện tập: tự thêm 1 API mới
+C17 Bài tập tự kiểm tra (có đáp án)
+```
+
+---
+
+### C1. `entity/Playlist.java` — bảng `playlists`
+
+```java
+@Entity
+@Table(name = "playlists")
+public class Playlist {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User owner;
+
+    @Column(nullable = false, length = 100)
+    private String name;
+
+    @Column(length = 300)
+    private String description;
+
+    @Column(name = "is_public", nullable = false)
+    private boolean isPublic = false;
+
+    @Column(name = "cover_url", length = 255)
+    private String coverUrl;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
+    public void markUpdated() {
+        updatedAt = LocalDateTime.now();
+    }
+
+    // ... getter, setter; riêng isPublic: getter tên isPublic(), setter tên setPublic(...)
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| `owner` — `@ManyToOne` LAZY, cột `user_id` | Chủ playlist. Field Java tên `owner` (dễ hiểu nghĩa), cột database tên `user_id` (quy ước chung) |
+| `name` 100, `description` 300 | Khớp `@Size` của DTO. `description` được trống |
+| `boolean isPublic = false` | Kiểu nguyên thủy (cột NOT NULL, A7.1). Mặc định **riêng tư** |
+| Tên field `isPublic` (không phải `public`) | `public` là từ khóa của Java, không đặt làm tên biến được. Cột trong MySQL ghi rõ `is_public`, lưu 0 / 1 |
+| `coverUrl` | **Ảnh bìa riêng** người dùng tải lên. `null` = không có ảnh riêng → dùng ảnh bài đầu tiên (mục 7.5) |
+| `@PrePersist` / `@PreUpdate` | Tự điền thời gian (`SONG_MODULE.md` A8) |
+| `markUpdated()` | Method nghiệp vụ nhỏ: chủ động đặt lại `updatedAt`. Cần vì **thêm / bỏ bài** chỉ đổi bảng `playlist_songs`, bảng `playlists` không có gì thay đổi → Hibernate sẽ không chạy `UPDATE` → `@PreUpdate` không chạy → `updatedAt` đứng yên. Gọi `markUpdated()` làm object "có thay đổi" → `save` chạy `UPDATE` → playlist được tính là "vừa sửa" |
+| Không có `@Version` | 2 tab cùng sửa thì lần sau ghi đè lần trước (mục 14, 16.1) |
+
+---
+
+### C2. `entity/PlaylistSong.java` — bảng `playlist_songs`
+
+```java
+@Entity
+@Table(
+        name = "playlist_songs",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_playlist_songs_playlist_song", columnNames = {"playlist_id", "song_id"})
+        }
+)
+public class PlaylistSong {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "playlist_id", nullable = false)
+    private Playlist playlist;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "song_id", nullable = false)
+    private Song song;
+
+    @Column(name = "added_at", nullable = false, updatable = false)
+    private LocalDateTime addedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        addedAt = LocalDateTime.now();
+    }
+
+    protected PlaylistSong() {}
+
+    public PlaylistSong(Playlist playlist, Song song) {
+        this.playlist = playlist;
+        this.song = song;
+    }
+
+    // ... chỉ có getter, không có setter
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| Entity riêng cho bảng nối | Vì cần thêm cột `added_at` (A1) |
+| `@UniqueConstraint(... {"playlist_id", "song_id"})` | Không cho 1 bài nằm 2 lần trong cùng 1 playlist (A2) |
+| 2 quan hệ `@ManyToOne` | Mỗi dòng thuộc 1 playlist, trỏ tới 1 bài |
+| `addedAt`, `updatable = false` + `@PrePersist` | Tự điền lúc thêm, không bao giờ đổi. Là căn cứ **sắp thứ tự bài** (thêm trước đứng trước) |
+| `protected PlaylistSong() {}` | Hibernate **bắt buộc** cần 1 constructor không tham số để tạo object khi đọc từ database lên. Class đã tự viết constructor có tham số nên Java không tự tạo constructor rỗng nữa → phải tự viết. Để `protected` (không phải `public`): Hibernate vẫn dùng được, còn code ở package khác (như `service`) không gọi được `new PlaylistSong()` rỗng, tránh tạo ra 1 dòng thiếu playlist hoặc thiếu bài |
+| `public PlaylistSong(Playlist, Song)` | Cách **duy nhất** để code tạo dòng mới: phải có đủ playlist và bài |
+| Không có setter | 1 dòng đã tạo thì không "chuyển" sang playlist khác hay bài khác được. Muốn đổi → xóa rồi tạo mới |
+
+---
+
+### C3. `repository/PlaylistRepository.java`
+
+```java
+public interface PlaylistRepository extends JpaRepository<Playlist, Long> {
+
+    long countByOwnerId(Long ownerId);
+
+    @Query("SELECT p FROM Playlist p JOIN FETCH p.owner WHERE p.id = :playlistId")
+    Optional<Playlist> findWithOwnerById(@Param("playlistId") Long playlistId);
+
+    @Query("SELECT p FROM Playlist p JOIN FETCH p.owner o "
+            + "WHERE o.id = :ownerId "
+            + "ORDER BY p.createdAt DESC, p.id DESC")
+    List<Playlist> findMyPlaylists(@Param("ownerId") Long ownerId);
+
+    @Query("SELECT p FROM Playlist p JOIN FETCH p.owner o "
+            + "WHERE o.id = :ownerId "
+            + "AND p.isPublic = true "
+            + "AND o.accountStatus = com.winhmm.myspotify.enums.AccountStatus.ACTIVE "
+            + "ORDER BY p.createdAt DESC, p.id DESC")
+    List<Playlist> findPublicPlaylists(@Param("ownerId") Long ownerId);
+}
+```
+
+| Method | Ý nghĩa | Dùng cho |
+|---|---|---|
+| `countByOwnerId` | `SELECT COUNT(*) FROM playlists WHERE user_id = ?`. Tên method bắt đầu bằng `count` → Spring sinh câu **đếm**, trả `long` | Kiểm tra giới hạn 50 playlist |
+| `findWithOwnerById` | Tìm 1 playlist theo id, **đọc kèm chủ** (A3) | Xem chi tiết; mọi thao tác sửa (để kiểm tra chủ) |
+| `findMyPlaylists` | Mọi playlist của 1 người (công khai + riêng tư), mới tạo trước | "Playlist của tôi" |
+| `findPublicPlaylists` | Chỉ playlist **công khai**, và chủ phải đang `ACTIVE` | Trang cá nhân người khác |
+| `ORDER BY p.createdAt DESC, p.id DESC` | Mới tạo lên trước; 2 playlist tạo cùng 1 thời điểm thì id lớn hơn (tạo sau) lên trước → thứ tự **luôn cố định** giữa các lần gọi | |
+| `JOIN FETCH p.owner o` | Đọc kèm chủ **và** đặt bí danh `o` để dùng tiếp trong `WHERE` | |
+
+Trong JPQL, `p.isPublic` là tên **field Java** (không phải tên cột `is_public`, `SONG_MODULE.md` A4.1).
+
+---
+
+### C4. `repository/PlaylistSongRepository.java`
+
+```java
+public interface PlaylistSongRepository extends JpaRepository<PlaylistSong, Long> {
+
+    boolean existsByPlaylistIdAndSongId(Long playlistId, Long songId);
+
+    long countByPlaylistId(Long playlistId);
+
+    Optional<PlaylistSong> findByPlaylistIdAndSongId(Long playlistId, Long songId);
+```
+3 method sinh từ tên (`USER_MODULE.md` A9.5). `PlaylistId` = đi từ field `playlist` sang `id`; `SongId` = `song.id`.
+
+| Method | SQL tương đương (gọn) | Dùng cho |
+|---|---|---|
+| `existsByPlaylistIdAndSongId` | `SELECT 1 ... WHERE playlist_id = ? AND song_id = ? LIMIT 1` | Bài đã có trong playlist chưa |
+| `countByPlaylistId` | `SELECT COUNT(*) ... WHERE playlist_id = ?` | Giới hạn 200 bài. Đếm **mọi** dòng, kể cả bài không còn phát hành (mục 16.1 dòng 3) |
+| `findByPlaylistIdAndSongId` | `SELECT * ... WHERE playlist_id = ? AND song_id = ?` | Tìm dòng để bỏ bài khỏi playlist |
+
+```java
+    @Query("SELECT ps FROM PlaylistSong ps JOIN FETCH ps.song s "
+            + "WHERE ps.playlist.id = :playlistId AND " + SongRepository.PUBLISHED_CONDITION
+            + " ORDER BY ps.addedAt ASC, ps.id ASC")
+    List<PlaylistSong> findPlayableSongs(@Param("playlistId") Long playlistId,
+                                         @Param("now") LocalDateTime now);
+
+    @Query("SELECT COUNT(ps) FROM PlaylistSong ps JOIN ps.song s "
+            + "WHERE ps.playlist.id = :playlistId AND " + SongRepository.PUBLISHED_CONDITION)
+    long countPlayableSongs(@Param("playlistId") Long playlistId,
+                            @Param("now") LocalDateTime now);
+
+    @Query("SELECT s.coverUrl FROM PlaylistSong ps JOIN ps.song s "
+            + "WHERE ps.playlist.id = :playlistId AND " + SongRepository.PUBLISHED_CONDITION
+            + " ORDER BY ps.addedAt ASC, ps.id ASC")
+    List<String> findPlayableCoverUrls(@Param("playlistId") Long playlistId,
+                                       @Param("now") LocalDateTime now,
+                                       Pageable pageable);
+```
+
+| Method | Ý nghĩa |
+|---|---|
+| `findPlayableSongs` | Các dòng của playlist mà bài **đang phát hành**, đọc kèm bài (`JOIN FETCH ps.song s`), **thêm trước đứng trước**. Đây là danh sách hiện ra ở trang chi tiết |
+| `countPlayableSongs` | **Đếm** số bài đang phát hành. `JOIN ps.song s` (không `FETCH`): chỉ cần để lọc, không cần đọc bài |
+| `findPlayableCoverUrls` | Ảnh bìa của các bài đang phát hành, cùng thứ tự. Gọi với `PageRequest.of(0, 1)` để lấy **ảnh đầu tiên** (A4.2) |
+| `" ORDER BY ..."` | Có dấu cách ở đầu, vì `PUBLISHED_CONDITION` kết thúc không có dấu cách (`SONG_MODULE.md` A4.2) |
+| Bí danh bài là `s` | Bắt buộc, để khớp `PUBLISHED_CONDITION` (A4.1) |
+| Bài không còn phát hành | Không bị xóa khỏi `playlist_songs`, chỉ bị **lọc ra** lúc đọc. Phát hành lại → tự hiện lại **đúng vị trí cũ** (vì `addedAt` không đổi) |
+
+```java
+    @Modifying
+    @Query("DELETE FROM PlaylistSong ps WHERE ps.playlist.id = :playlistId")
+    int deleteAllByPlaylistId(@Param("playlistId") Long playlistId);
+}
+```
+Xóa mọi dòng của 1 playlist trong 1 câu (A5).
+
+---
+
+### C5. DTO request
+
+#### C5.1. `CreatePlaylistRequest` — tạo playlist (form-data)
+
+```java
+public class CreatePlaylistRequest {
+
+    @NotBlank(message = "Name is required")
+    @Size(max = 100, message = "Name must not exceed 100 characters")
+    private String name;
+
+    @Size(max = 300, message = "Description must not exceed 300 characters")
+    private String description;
+
+    private Boolean isPublic;
+
+    @NotEmpty(message = "At least 1 song is required")
+    @Size(max = 200, message = "Maximum 200 songs per playlist")
+    private List<Long> songIds = new ArrayList<>();
+
+    private MultipartFile cover;
+
+    public Boolean getIsPublic() { return isPublic; }
+    public void setIsPublic(Boolean isPublic) { this.isPublic = isPublic; }
+
+    public void setSongIds(List<Long> songIds) {
+        this.songIds = (songIds != null) ? songIds : new ArrayList<>();
+    }
+
+    // ... getter, setter khác
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| Form-data (không phải JSON) | Vì có thể kèm ảnh bìa (`SONG_MODULE.md` A11) |
+| `Boolean isPublic` không có nhãn | Không gửi → `null` → riêng tư (A7.1) |
+| `setIsPublic(...)` | Tên setter quyết định **tên key form-data** là `isPublic` (A7.2) |
+| `@NotEmpty` trên `List` | Danh sách phải có **ít nhất 1 phần tử**. (`@NotBlank` chỉ dùng cho chuỗi) |
+| `@Size(max = 200)` trên `List` | Tối đa 200 phần tử (tính cả id trùng; Service bỏ trùng rồi đếm lại) |
+| `songIds` gửi thế nào | Lặp key `songIds = 40`, `songIds = 12`, hoặc 1 key `songIds = 40,12` (`SONG_MODULE.md` A11.3) |
+| Setter `songIds` đổi `null` thành rỗng | Phòng hờ, giống `UploadSongRequest` |
+| `MultipartFile cover` không nhãn | Ảnh bìa tùy chọn; kiểm tra định dạng ở `FileStorageService` |
+
+#### C5.2. `UpdatePlaylistRequest` — sửa thông tin (JSON)
+
+```java
+public class UpdatePlaylistRequest {
+
+    @NotBlank(message = "Name is required")
+    @Size(max = 100, message = "Name must not exceed 100 characters")
+    private String name;
+
+    @Size(max = 300, message = "Description must not exceed 300 characters")
+    private String description;
+
+    @NotNull(message = "isPublic is required")
+    private Boolean isPublic;
+
+    // ... getter, setter (getIsPublic / setIsPublic)
+}
+```
+- JSON vì không có file. Đổi ảnh bìa là API riêng.
+- **Thay toàn bộ** 3 thông tin: không gửi `description` = xóa mô tả (mục 8.5).
+- `isPublic` bắt buộc (A7.1).
+
+---
+
+### C6. DTO response
+
+| DTO | Dùng ở | Field |
+|---|---|---|
+| `PlaylistSummaryResponse` | Danh sách (của tôi, công khai của 1 người) | `id`, `name`, `coverUrl`, `isPublic`, `ownerId`, `ownerName`, `songCount`, `createdAt`, `updatedAt` |
+| `PlaylistDetailResponse` | Chi tiết 1 playlist; kết quả của mọi thao tác sửa | Như trên, thêm `description`, `hasCustomCover`, `isOwner`, `songs` |
+| `PlaylistSongResponse` | 1 phần tử của `songs` | `song` (`SongResponse` của module Song), `addedAt` |
+
+Hai DTO lớn dùng Builder viết tay (`SONG_MODULE.md` C8.1). Điểm đặc biệt là tên getter:
+```java
+    public boolean getIsPublic() { return isPublic; }
+    public boolean getHasCustomCover() { return hasCustomCover; }
+    public boolean getIsOwner() { return isOwner; }
+```
+Viết `getIsPublic()` chứ không phải `isPublic()` → JSON giữ đúng tên `isPublic` (A7.2, mục 9.5).
+
+Vì sao danh sách dùng **Summary** (ít trường) còn chi tiết dùng **Detail**? Danh sách 50 playlist mà mỗi cái kèm 200 bài thì response khổng lồ. Danh sách chỉ cần đủ để vẽ 1 ô (tên, ảnh, số bài); bấm vào mới tải chi tiết.
+
+---
+
+### C7. `mapper/PlaylistMapper.java`
+
+```java
+public class PlaylistMapper {
+
+    private PlaylistMapper() {}
+
+    public static PlaylistSummaryResponse toSummaryResponse(Playlist playlist, long songCount, String coverUrl) {
+        return PlaylistSummaryResponse.builder()
+                .id(playlist.getId())
+                .name(playlist.getName())
+                .coverUrl(coverUrl)
+                .isPublic(playlist.isPublic())
+                .ownerId(playlist.getOwner().getId())
+                .ownerName(playlist.getOwner().getUsername())
+                .songCount(songCount)
+                .createdAt(playlist.getCreatedAt())
+                .updatedAt(playlist.getUpdatedAt())
+                .build();
+    }
+```
+- `songCount`, `coverUrl` được **truyền vào** (Service đã tính sẵn bằng truy vấn), không lấy từ Entity.
+- `ownerName` = **username** của chủ (không phải nghệ danh: mọi người dùng đều tạo được playlist, không chỉ nghệ sĩ).
+
+```java
+    public static PlaylistDetailResponse toDetailResponse(Playlist playlist, List<PlaylistSong> items, boolean isOwner) {
+        List<PlaylistSongResponse> songs = new ArrayList<>();
+        for (PlaylistSong item : items) {
+            songs.add(toPlaylistSongResponse(item));
+        }
+
+        String coverUrl = playlist.getCoverUrl();
+        if (coverUrl == null && !items.isEmpty()) {
+            coverUrl = items.get(0).getSong().getCoverUrl();
+        }
+
+        return PlaylistDetailResponse.builder()
+                .id(playlist.getId())
+                .name(playlist.getName())
+                .description(playlist.getDescription())
+                .coverUrl(coverUrl)
+                .hasCustomCover(playlist.getCoverUrl() != null)
+                .isPublic(playlist.isPublic())
+                .ownerId(playlist.getOwner().getId())
+                .ownerName(playlist.getOwner().getUsername())
+                .isOwner(isOwner)
+                .songCount(songs.size())
+                .createdAt(playlist.getCreatedAt())
+                .updatedAt(playlist.getUpdatedAt())
+                .songs(songs)
+                .build();
+    }
+
+    public static PlaylistSongResponse toPlaylistSongResponse(PlaylistSong item) {
+        return new PlaylistSongResponse(SongMapper.toSongResponse(item.getSong()), item.getAddedAt());
+    }
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| `items` | Đã là danh sách bài **đang phát hành**, đúng thứ tự (`findPlayableSongs`) |
+| Tính `coverUrl` | Có ảnh riêng → dùng; không có → ảnh bài đầu tiên; playlist rỗng → `null` |
+| `hasCustomCover` | Dựa trên ảnh **riêng** (`playlist.getCoverUrl()`), không phải `coverUrl` sau khi tính. Frontend dùng để quyết định có hiện nút "Gỡ ảnh bìa" không |
+| `songCount(songs.size())` | Đếm bài **hiện ra được**, không phải mọi dòng trong bảng |
+| `SongMapper.toSongResponse(...)` | Dùng lại mapper của module Song: bài trong playlist có **đúng cùng dạng JSON** với bài ở mọi chỗ khác, frontend dùng chung 1 component hiển thị bài |
+
+---
+
+### C8. `PlaylistService` — khai báo và hàm phụ trợ
+
+```java
+@Service
+public class PlaylistService {
+
+    private static final int MAX_PLAYLISTS_PER_USER = 50;
+    private static final int MAX_SONGS_PER_PLAYLIST = 200;
+    private static final String COVER_FOLDER = "playlists";
+
+    private final PlaylistRepository playlistRepository;
+    private final PlaylistSongRepository playlistSongRepository;
+    private final SongRepository songRepository;
+    private final UserRepository userRepository;
+    private final FileStorageService fileStorageService;
+
+    // ... constructor nhận 5 bean trên
+```
+Đọc các hàm phụ trợ (cuối file) trước, vì method nào cũng dùng.
+
+```java
+    private User getUser(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User does not exist"));
+    }
+
+    private Playlist getOwnedPlaylist(Long ownerId, Long playlistId) {
+        Playlist playlist = playlistRepository.findWithOwnerById(playlistId)
+                .orElseThrow(() -> new IllegalArgumentException("Playlist does not exist"));
+        if (!playlist.getOwner().getId().equals(ownerId)) {
+            throw new AccessDeniedException("You are not the owner of this playlist");
+        }
+        return playlist;
+    }
+```
+- `getOwnedPlaylist`: **chốt bảo mật** của mọi thao tác sửa. Không có playlist → 400; có nhưng của người khác → **403** (A6).
+- `.equals(...)` chứ không phải `==`: `getId()` trả `Long` (object). So 2 object `Long` bằng `==` là so "có phải cùng 1 object trong bộ nhớ không", với số lớn hơn 127 sẽ ra **sai** dù giá trị bằng nhau. Luôn dùng `.equals` để so giá trị.
+
+```java
+    private List<Song> loadPlayableSongs(List<Long> songIds) {
+        Set<Long> uniqueIds = new LinkedHashSet<>();                                  // ①
+        if (songIds != null) {
+            for (Long songId : songIds) {
+                if (songId != null) {
+                    uniqueIds.add(songId);
+                }
+            }
+        }
+        if (uniqueIds.isEmpty()) {
+            throw new IllegalArgumentException("At least 1 song is required");
+        }
+        if (uniqueIds.size() > MAX_SONGS_PER_PLAYLIST) {
+            throw new IllegalArgumentException(
+                    "Maximum " + MAX_SONGS_PER_PLAYLIST + " songs per playlist");
+        }
+
+        Map<Long, Song> songsById = new HashMap<>();                                  // ②
+        for (Song song : songRepository.findPublishedByIds(uniqueIds, LocalDateTime.now())) {
+            songsById.put(song.getId(), song);
+        }
+
+        List<Song> result = new ArrayList<>();                                        // ③
+        for (Long songId : uniqueIds) {
+            Song song = songsById.get(songId);
+            if (song == null) {
+                throw new IllegalArgumentException("Song does not exist: " + songId);
+            }
+            result.add(song);
+        }
+        return result;
+    }
+```
+| Bước | Giải thích |
+|---|---|
+| ① `LinkedHashSet` | **Bỏ trùng mà vẫn giữ thứ tự** người dùng chọn (`[40, 12, 40]` → `40, 12`). Bỏ ô `null`. Đếm lại sau khi bỏ trùng |
+| ② | Lấy mọi bài **đang phát hành** trong **1 câu** `IN` (dùng lại truy vấn của module Song) |
+| ③ | Duyệt theo thứ tự đã chọn. Id nào không có trong kết quả (không tồn tại hoặc không phát hành) → báo **đúng id đó** (`Song does not exist: 99`) để frontend biết bài nào lỗi |
+| Trả `List<Song>` đúng thứ tự | Lúc lưu, bài đứng trước được lưu trước → `addedAt` sớm hơn → hiện trước |
+
+```java
+    private String cleanDescription(String description) {
+        if (description == null || description.isBlank()) {
+            return null;
+        }
+        return description.trim();
+    }
+```
+Mô tả rỗng hoặc toàn dấu cách → lưu `null` (không lưu chuỗi rỗng). Có chữ → bỏ dấu cách 2 đầu. Tên playlist thì không cần hàm này vì `@NotBlank` đã chặn tên rỗng, chỉ cần `trim()`.
+
+```java
+    private PlaylistDetailResponse buildDetail(Playlist playlist, Long viewerId) {
+        List<PlaylistSong> items = playlistSongRepository.findPlayableSongs(playlist.getId(), LocalDateTime.now());
+        boolean isOwner = playlist.getOwner().getId().equals(viewerId);
+        return PlaylistMapper.toDetailResponse(playlist, items, isOwner);
+    }
+
+    private List<PlaylistSummaryResponse> toSummaries(List<Playlist> playlists) {
+        LocalDateTime now = LocalDateTime.now();
+        List<PlaylistSummaryResponse> result = new ArrayList<>();
+        for (Playlist playlist : playlists) {
+            long songCount = playlistSongRepository.countPlayableSongs(playlist.getId(), now);
+            String coverUrl = resolveCover(playlist, now);
+            result.add(PlaylistMapper.toSummaryResponse(playlist, songCount, coverUrl));
+        }
+        return result;
+    }
+
+    private String resolveCover(Playlist playlist, LocalDateTime now) {
+        if (playlist.getCoverUrl() != null) {
+            return playlist.getCoverUrl();
+        }
+        List<String> covers = playlistSongRepository.findPlayableCoverUrls(
+                playlist.getId(), now, PageRequest.of(0, 1));
+        return covers.isEmpty() ? null : covers.get(0);
+    }
+```
+| Hàm | Giải thích |
+|---|---|
+| `buildDetail` | Hàm **dùng chung** để dựng response chi tiết: lấy bài đang phát hành → xác định người xem có phải chủ không → gọi mapper. Hầu hết method public đều kết thúc bằng hàm này |
+| `toSummaries` | Mỗi playlist: đếm bài + tìm ảnh bìa → đổi sang Summary. `now` lấy **1 lần** cho cả danh sách → mọi playlist được tính theo cùng 1 mốc thời gian |
+| `resolveCover` | Có ảnh riêng → dùng luôn, **không tốn câu SQL**. Không có → hỏi database ảnh của bài đầu tiên (`LIMIT 1`) |
+| Số câu SQL | Mỗi playlist trong danh sách tốn 1–2 câu phụ (đếm + ảnh). 50 playlist → tối đa ~100 câu. Chấp nhận được với giới hạn 50 (mục 16.1 dòng 4) |
+
+---
+
+### C9. `createPlaylist` — tạo playlist
+
+```java
+    @Transactional
+    public PlaylistDetailResponse createPlaylist(Long ownerId, String name, String description,
+                                                 Boolean isPublic, List<Long> songIds,
+                                                 MultipartFile coverFile) {
+        // GIAI ĐOẠN 1: kiểm tra
+        User owner = getUser(ownerId);
+        if (playlistRepository.countByOwnerId(ownerId) >= MAX_PLAYLISTS_PER_USER) {
+            throw new IllegalArgumentException(
+                    "Maximum " + MAX_PLAYLISTS_PER_USER + " playlists per account");
+        }
+        List<Song> songs = loadPlayableSongs(songIds);
+
+        // GIAI ĐOẠN 2: lưu ảnh bìa (nếu có)
+        String coverUrl = null;
+        if (coverFile != null && !coverFile.isEmpty()) {
+            coverUrl = fileStorageService.saveImage(coverFile, COVER_FOLDER);
+        }
+
+        try {
+            // GIAI ĐOẠN 3: lưu database
+            Playlist playlist = new Playlist();
+            playlist.setOwner(owner);
+            playlist.setName(name.trim());
+            playlist.setDescription(cleanDescription(description));
+            playlist.setPublic(Boolean.TRUE.equals(isPublic));
+            playlist.setCoverUrl(coverUrl);
+            Playlist saved = playlistRepository.save(playlist);
+
+            List<PlaylistSong> items = new ArrayList<>();
+            for (Song song : songs) {
+                items.add(new PlaylistSong(saved, song));
+            }
+            playlistSongRepository.saveAll(items);
+
+            return buildDetail(saved, ownerId);
+        } catch (RuntimeException exception) {
+            // GIAI ĐOẠN 4: lỗi → dọn ảnh
+            fileStorageService.delete(coverUrl);
+            throw exception;
+        }
+    }
+```
+(Chú thích `// GIAI ĐOẠN` do tài liệu thêm.)
+
+| Phần | Giải thích |
+|---|---|
+| `@Transactional` | Lưu 1 dòng `playlists` + nhiều dòng `playlist_songs` là **1 khối**. Lỗi giữa chừng (ví dụ dòng thứ 3) → **hủy hết**, không để lại playlist dở dang (mục 14) |
+| Giai đoạn 1 | Mọi kiểm tra không cần file làm **trước**, sai thì chưa tốn công lưu ảnh |
+| Giai đoạn 2 | Ảnh sai định dạng / quá 2 MB → lỗi ngay, chưa có gì để dọn |
+| `save(playlist)` → `saved` | `INSERT` → MySQL cấp id. `saved` mang id đó, dùng để tạo các dòng nối |
+| `saveAll(items)` | Lưu cả danh sách dòng nối. Thứ tự lưu = thứ tự bài đã chọn → `addedAt` tăng dần theo đúng thứ tự |
+| `buildDetail(saved, ownerId)` | Đọc lại danh sách bài **trong cùng transaction** (Hibernate tự ghi các dòng vừa thêm xuống trước khi chạy câu đọc, nên đọc ra đủ) |
+| Giai đoạn 4 | Database **tự** hoàn tác nhờ `@Transactional`; nhưng file ảnh trên ổ đĩa thì phải **tự tay** dọn (`USER_MODULE.md` A9.7) |
+
+---
+
+### C10. Xem danh sách và chi tiết
+
+```java
+    public List<PlaylistSummaryResponse> getMyPlaylists(Long ownerId) {
+        return toSummaries(playlistRepository.findMyPlaylists(ownerId));
+    }
+
+    public List<PlaylistSummaryResponse> getPublicPlaylists(Long userId) {
+        return toSummaries(playlistRepository.findPublicPlaylists(userId));
+    }
+```
+2 method 1 dòng: mọi điều kiện lọc nằm trong câu truy vấn (C3). Xem playlist công khai của 1 người không tồn tại / bị khóa → mảng rỗng `[]` (không báo lỗi).
+
+```java
+    public PlaylistDetailResponse getPlaylistDetail(Long viewerId, Long playlistId) {
+        Playlist playlist = playlistRepository.findWithOwnerById(playlistId)
+                .orElseThrow(() -> new IllegalArgumentException("Playlist does not exist"));
+        boolean isOwner = playlist.getOwner().getId().equals(viewerId);
+        if (!isOwner) {
+            if (playlist.getOwner().getAccountStatus() != AccountStatus.ACTIVE) {
+                throw new IllegalArgumentException("Playlist does not exist");
+            }
+            if (!playlist.isPublic()) {
+                throw new IllegalArgumentException("This playlist is private");
+            }
+        }
+        return buildDetail(playlist, viewerId);
+    }
+```
+
+| Người xem | Playlist | Kết quả |
+|---|---|---|
+| Chủ | Bất kỳ | ✔ Xem được (kể cả riêng tư) |
+| Người khác | Chủ đã bị khóa / vô hiệu hóa / xóa | 400 `Playlist does not exist` (như thể không tồn tại) |
+| Người khác | Riêng tư | 400 `This playlist is private` |
+| Người khác | Công khai, chủ đang hoạt động | ✔ Xem được, `isOwner = false` |
+
+Kiểm tra "chủ còn hoạt động" **trước** "công khai hay không": tài khoản bị khóa thì không lộ cả thông tin "playlist này riêng tư".
+
+---
+
+### C11. Sửa thông tin, ảnh bìa
+
+```java
+    public PlaylistDetailResponse updatePlaylist(Long ownerId, Long playlistId, String name,
+                                                 String description, Boolean isPublic) {
+        Playlist playlist = getOwnedPlaylist(ownerId, playlistId);
+        playlist.setName(name.trim());
+        playlist.setDescription(cleanDescription(description));
+        playlist.setPublic(Boolean.TRUE.equals(isPublic));
+        Playlist saved = playlistRepository.save(playlist);
+        return buildDetail(saved, ownerId);
+    }
+```
+Thay **cả 3** thông tin mỗi lần (mục 8.5). Không có `@Transactional`: chỉ 1 lần ghi.
+
+```java
+    public PlaylistDetailResponse updateCover(Long ownerId, Long playlistId, MultipartFile coverFile) {
+        Playlist playlist = getOwnedPlaylist(ownerId, playlistId);
+        String oldCoverUrl = playlist.getCoverUrl();
+        String newCoverUrl = fileStorageService.saveImage(coverFile, COVER_FOLDER);   // ①
+        Playlist saved;
+        try {
+            playlist.setCoverUrl(newCoverUrl);
+            saved = playlistRepository.save(playlist);                                 // ②
+        } catch (RuntimeException exception) {
+            fileStorageService.delete(newCoverUrl);
+            throw exception;
+        }
+        fileStorageService.delete(oldCoverUrl);                                        // ③
+        return buildDetail(saved, ownerId);
+    }
+
+    public PlaylistDetailResponse removeCover(Long ownerId, Long playlistId) {
+        Playlist playlist = getOwnedPlaylist(ownerId, playlistId);
+        String oldCoverUrl = playlist.getCoverUrl();
+        if (oldCoverUrl == null) {
+            throw new IllegalArgumentException("Playlist has no custom cover");
+        }
+        playlist.setCoverUrl(null);
+        Playlist saved = playlistRepository.save(playlist);
+        fileStorageService.delete(oldCoverUrl);
+        return buildDetail(saved, ownerId);
+    }
+```
+- Đổi ảnh: khuôn quen thuộc "**lưu mới → ghi database → xóa cũ**; ghi database lỗi thì xóa mới" (`USER_MODULE.md` C18.3). Ở đây `try` chỉ bọc đúng bước ② (bước có thể lỗi), bước ③ nằm ngoài → nếu xóa ảnh cũ có trục trặc gì thì cũng không xóa nhầm ảnh mới.
+- `Playlist saved;` khai báo trước `try`, gán bên trong: để dùng được biến này **sau** khối `try`.
+- Gỡ ảnh: chỉ gỡ được khi đang có ảnh riêng. Gỡ xong, playlist tự quay về ảnh của bài đầu tiên.
+
+---
+
+### C12. Thêm và bỏ bài
+
+```java
+    @Transactional
+    public PlaylistDetailResponse addSong(Long ownerId, Long playlistId, Long songId) {
+        Playlist playlist = getOwnedPlaylist(ownerId, playlistId);                       // ①
+        Song song = songRepository.findPublishedById(songId, LocalDateTime.now())
+                .orElseThrow(() -> new IllegalArgumentException("Song does not exist"));  // ②
+        if (playlistSongRepository.existsByPlaylistIdAndSongId(playlistId, songId)) {
+            throw new IllegalArgumentException("Song is already in this playlist");     // ③
+        }
+        if (playlistSongRepository.countByPlaylistId(playlistId) >= MAX_SONGS_PER_PLAYLIST) {
+            throw new IllegalArgumentException(
+                    "Maximum " + MAX_SONGS_PER_PLAYLIST + " songs per playlist");       // ④
+        }
+        playlistSongRepository.save(new PlaylistSong(playlist, song));                   // ⑤
+        playlist.markUpdated();                                                          // ⑥
+        playlistRepository.save(playlist);
+        return buildDetail(playlist, ownerId);
+    }
+```
+
+| Bước | Giải thích |
+|---|---|
+| ① | Phải là chủ (400 / 403) |
+| ② | Chỉ thêm được bài **đang phát hành** |
+| ③ | Đã có → 400. Hai request cùng lúc cùng lọt qua bước này → ràng buộc duy nhất của database chặn request thứ 2 → **409** (A2) |
+| ④ | Đủ 200 dòng → không thêm được (đếm mọi dòng, kể cả bài đang bị ẩn) |
+| ⑤ | `INSERT` 1 dòng nối, `addedAt` = bây giờ → bài mới luôn ở **cuối** playlist |
+| ⑥ | Đánh dấu playlist "vừa sửa" (C1) rồi lưu → `UPDATE playlists SET updated_at = ...` |
+| `@Transactional` | Thêm dòng nối và cập nhật `updatedAt` cùng thành công hoặc cùng hủy |
+
+```java
+    @Transactional
+    public PlaylistDetailResponse removeSong(Long ownerId, Long playlistId, Long songId) {
+        Playlist playlist = getOwnedPlaylist(ownerId, playlistId);
+        PlaylistSong item = playlistSongRepository.findByPlaylistIdAndSongId(playlistId, songId)
+                .orElseThrow(() -> new IllegalArgumentException("Song is not in this playlist"));
+        playlistSongRepository.delete(item);
+        playlist.markUpdated();
+        playlistRepository.save(playlist);
+        return buildDetail(playlist, ownerId);
+    }
+```
+- **Không** kiểm tra bài còn phát hành hay không: bỏ được cả bài đang bị ẩn (nếu biết id), để dọn chỗ.
+- `delete(item)`: xóa **thật** dòng nối (`DELETE`). Bài hát không bị ảnh hưởng gì.
+
+---
+
+### C13. `deletePlaylist` — xóa playlist
+
+```java
+    @Transactional
+    public void deletePlaylist(Long ownerId, Long playlistId) {
+        Playlist playlist = getOwnedPlaylist(ownerId, playlistId);
+        String coverUrl = playlist.getCoverUrl();
+        playlistSongRepository.deleteAllByPlaylistId(playlistId);   // xóa con trước
+        playlistRepository.delete(playlist);                        // rồi xóa cha
+        playlistRepository.flush();                                 // ghi xuống MySQL ngay
+        fileStorageService.delete(coverUrl);                        // cuối cùng mới xóa file
+    }
+```
+Giải thích chi tiết ở A5:
+- **Xóa thật** (không phải xóa mềm như bài hát hay tài khoản): playlist là dữ liệu cá nhân, không có giá trị lịch sử cần giữ.
+- Thứ tự **con → cha** vì khóa ngoại.
+- `flush()` để mọi lỗi database lộ ra **trước** khi xóa file ảnh.
+- `coverUrl` được lấy ra **trước** khi xóa playlist (sau khi xóa thì không đọc được nữa).
+- `delete(null)` không làm gì: playlist không có ảnh riêng thì bước cuối tự bỏ qua. Ảnh của các **bài hát** không bao giờ bị xóa ở đây.
+
+---
+
+### C14. `controller/PlaylistController.java`
+
+```java
+@RestController
+@RequestMapping("/api/playlists")
+public class PlaylistController {
+
+    private final PlaylistService playlistService;
+    private final UserService userService;
+
+    // ... constructor
+
+    private Long me(Authentication authentication) {
+        return userService.getByEmail(authentication.getName()).getId();
+    }
+
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<PlaylistDetailResponse> createPlaylist(Authentication authentication,
+                                                                 @Valid @ModelAttribute CreatePlaylistRequest request) {
+        PlaylistDetailResponse response = playlistService.createPlaylist(
+                me(authentication),
+                request.getName(),
+                request.getDescription(),
+                request.getIsPublic(),
+                request.getSongIds(),
+                request.getCover());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<List<PlaylistSummaryResponse>> getMyPlaylists(Authentication authentication) {
+        return ResponseEntity.ok(playlistService.getMyPlaylists(me(authentication)));
+    }
+
+    @GetMapping("/users/{userId}")
+    public ResponseEntity<List<PlaylistSummaryResponse>> getPublicPlaylists(@PathVariable Long userId) {
+        return ResponseEntity.ok(playlistService.getPublicPlaylists(userId));
+    }
+
+    @GetMapping("/{playlistId}")
+    public ResponseEntity<PlaylistDetailResponse> getPlaylist(Authentication authentication,
+                                                              @PathVariable Long playlistId) {
+        return ResponseEntity.ok(playlistService.getPlaylistDetail(me(authentication), playlistId));
+    }
+
+    @PostMapping("/{playlistId}/songs/{songId}")
+    public ResponseEntity<PlaylistDetailResponse> addSong(Authentication authentication,
+                                                          @PathVariable Long playlistId,
+                                                          @PathVariable Long songId) {
+        return ResponseEntity.ok(playlistService.addSong(me(authentication), playlistId, songId));
+    }
+
+    // ... updatePlaylist (JSON), updateCover (form-data "cover"), removeCover,
+    //     removeSong, deletePlaylist: cùng 1 khuôn
+}
+```
+
+| Code | Giải thích |
+|---|---|
+| Không có `@PreAuthorize` | **Mọi role** (USER, ARTIST, ADMIN) đều dùng được. "Chỉ chủ được sửa" kiểm tra trong Service (A6). `SecurityConfig` đã bắt phải đăng nhập |
+| `@PostMapping(consumes = MULTIPART_FORM_DATA_VALUE)` không có đường dẫn | Xử lý đúng `POST /api/playlists` |
+| `/me` và `/{playlistId}` | Cùng dạng `GET /api/playlists/<gì đó>`; đường dẫn cố định `/me` được ưu tiên (`SONG_MODULE.md` C18) |
+| `/users/{userId}` | Không cần `Authentication`: kết quả không phụ thuộc ai đang xem |
+| `/{playlistId}/songs/{songId}` | **2** biến trên đường dẫn, mỗi biến 1 `@PathVariable`, tên khớp tên trong ngoặc nhọn. Không cần body |
+| Controller rất mỏng | Service đã trả DTO (A8), Controller chỉ gọi và trả |
+
+Bảng 10 API (tiền tố `/api/playlists`):
+
+| API | Service | Body |
+|---|---|---|
+| `POST` (gốc) | `createPlaylist` | form-data: `name`, `description`, `isPublic`, `songIds`, `cover` |
+| `GET /me` | `getMyPlaylists` | |
+| `GET /users/{userId}` | `getPublicPlaylists` | |
+| `GET /{playlistId}` | `getPlaylistDetail` | |
+| `PUT /{playlistId}` | `updatePlaylist` | JSON `UpdatePlaylistRequest` |
+| `PUT /{playlistId}/cover` | `updateCover` | form-data `cover` |
+| `DELETE /{playlistId}/cover` | `removeCover` | |
+| `POST /{playlistId}/songs/{songId}` | `addSong` | |
+| `DELETE /{playlistId}/songs/{songId}` | `removeSong` | |
+| `DELETE /{playlistId}` | `deletePlaylist` | → `{"message": "Playlist deleted"}` |
+
+---
+
+### C15. Theo dấu: tạo → thêm bài → bài bị ẩn → xem lại → xóa
+
+Lan (id 7) tạo playlist "Nhạc chill" với 2 bài 40 và 12.
+
+#### Bước 1 — Tạo
+
+```http
+POST /api/playlists
+Authorization: Bearer <token của Lan>
+Content-Type: multipart/form-data
+
+name = Nhạc chill
+songIds = 40,12
+```
+```
+JwtAuthenticationFilter, RateLimitFilter, luật URL (cần đăng nhập) ✔       (USER_MODULE.md C25)
+Spring điền CreatePlaylistRequest; @Valid: name ✔, songIds có 2 phần tử ✔
+me(): SELECT * FROM users WHERE email = 'lan@gmail.com'                     → 7
+PlaylistService.createPlaylist (C9)                                         → BEGIN
+  SELECT * FROM users WHERE id = 7
+  SELECT COUNT(*) FROM playlists WHERE user_id = 7                          → 4 (< 50 ✔)
+  SELECT ... FROM songs WHERE id IN (40, 12) AND <đã phát hành>             → đủ 2 bài ✔
+  (không có ảnh → bỏ qua lưu ảnh)
+  INSERT INTO playlists (user_id, name, description, is_public, cover_url, created_at, updated_at)
+         VALUES (7, 'Nhạc chill', NULL, 0, NULL, <bây giờ>, <bây giờ>)      → id 3
+  INSERT INTO playlist_songs (playlist_id, song_id, added_at) VALUES (3, 40, 21:00:00.100)
+  INSERT INTO playlist_songs (playlist_id, song_id, added_at) VALUES (3, 12, 21:00:00.105)
+  buildDetail: SELECT ps.*, s.* FROM playlist_songs ps JOIN songs s ...
+               WHERE ps.playlist_id = 3 AND <đã phát hành> ORDER BY ps.added_at, ps.id
+                                                                            → COMMIT
+200 { id: 3, name: "Nhạc chill", isPublic: false, isOwner: true, songCount: 2,
+      coverUrl: <ảnh bài 40>, hasCustomCover: false, songs: [ bài 40, bài 12 ] }
+```
+
+#### Bước 2 — Thêm bài 25
+
+```http
+POST /api/playlists/3/songs/25
+```
+```
+PlaylistService.addSong (C12)                                               → BEGIN
+  SELECT p.*, u.* FROM playlists p JOIN users u ... WHERE p.id = 3          → chủ là 7 = Lan ✔
+  SELECT ... FROM songs WHERE id = 25 AND <đã phát hành>                    ✔
+  SELECT 1 FROM playlist_songs WHERE playlist_id = 3 AND song_id = 25       → chưa có ✔
+  SELECT COUNT(*) FROM playlist_songs WHERE playlist_id = 3                 → 2 (< 200 ✔)
+  INSERT INTO playlist_songs (3, 25, <bây giờ>)
+  UPDATE playlists SET updated_at = <bây giờ>, ... WHERE id = 3             (markUpdated)
+                                                                            → COMMIT
+200 { ..., songCount: 3, songs: [ 40, 12, 25 ] }
+```
+
+#### Bước 3 — Nghệ sĩ của bài 40 ẩn bài
+
+Module Song: `UPDATE songs SET status = 'HIDDEN' ... WHERE id = 40`. **Không** có code nào của Playlist chạy. Dòng `(3, 40)` trong `playlist_songs` vẫn còn nguyên.
+
+#### Bước 4 — Lan mở lại playlist
+
+```http
+GET /api/playlists/3
+```
+```
+findPlayableSongs: bài 40 không còn thỏa <đã phát hành> → bị lọc ra
+200 { ..., songCount: 2, coverUrl: <ảnh bài 12>, songs: [ 12, 25 ] }
+```
+Ảnh bìa tự đổi sang ảnh bài 12 (giờ là bài đầu tiên đang phát hành). Nghệ sĩ hiện lại bài 40 → bài 40 tự quay về **đứng đầu** (vì `added_at` của nó sớm nhất).
+
+#### Bước 5 — Bạn của Lan (id 9) thử sửa
+
+```http
+PUT /api/playlists/3
+Authorization: Bearer <token của bạn Lan>
+
+{"name": "Của tôi", "isPublic": true}
+```
+```
+getOwnedPlaylist: chủ là 7, người gọi là 9 → AccessDeniedException
+GlobalExceptionHandler → 403 {"message": "You do not have permission to access this resource"}
+(chưa có gì bị thay đổi)
+```
+
+#### Bước 6 — Lan xóa playlist
+
+```http
+DELETE /api/playlists/3
+```
+```
+PlaylistService.deletePlaylist (C13)                                        → BEGIN
+  getOwnedPlaylist ✔
+  DELETE FROM playlist_songs WHERE playlist_id = 3                          → xóa 3 dòng (cả dòng bài 40)
+  DELETE FROM playlists WHERE id = 3                                        (gửi ngay nhờ flush)
+  (không có ảnh riêng → bỏ qua xóa file)
+                                                                            → COMMIT
+200 {"message": "Playlist deleted"}
+```
+Bài 40, 12, 25 vẫn nguyên vẹn trong bảng `songs`.
+
+---
+
+### C16. Ví dụ luyện tập: tự thêm 1 API mới
+
+> ⚠️ **Đây là bài tập**, code dưới đây **không có** trong dự án.
+
+**Yêu cầu giả định:** nút "Công khai / Riêng tư" bật tắt nhanh trên trang chi tiết, không phải gửi lại tên và mô tả như API sửa.
+API: `PUT /api/playlists/{playlistId}/visibility`, body JSON `{"isPublic": true}`.
+
+**Bước 1 — DTO request mới** (`dto/playlist/UpdateVisibilityRequest.java`):
+```java
+public class UpdateVisibilityRequest {
+
+    @NotNull(message = "isPublic is required")
+    private Boolean isPublic;
+
+    public Boolean getIsPublic() { return isPublic; }
+    public void setIsPublic(Boolean isPublic) { this.isPublic = isPublic; }
+}
+```
+Getter / setter tên `getIsPublic` / `setIsPublic` để key JSON là `isPublic` (A7.2).
+
+**Bước 2 — Service** (`PlaylistService.java`, thêm method):
+```java
+public PlaylistDetailResponse updateVisibility(Long ownerId, Long playlistId, boolean isPublic) {
+    Playlist playlist = getOwnedPlaylist(ownerId, playlistId);   // dùng lại chốt bảo mật: chỉ chủ
+    playlist.setPublic(isPublic);
+    Playlist saved = playlistRepository.save(playlist);
+    return buildDetail(saved, ownerId);                          // dùng lại hàm dựng response
+}
+```
+
+**Bước 3 — Controller** (`PlaylistController.java`, thêm method):
+```java
+@PutMapping("/{playlistId}/visibility")
+public ResponseEntity<PlaylistDetailResponse> updateVisibility(Authentication authentication,
+                                                               @PathVariable Long playlistId,
+                                                               @Valid @RequestBody UpdateVisibilityRequest request) {
+    return ResponseEntity.ok(playlistService.updateVisibility(
+            me(authentication), playlistId, request.getIsPublic()));
+}
+```
+
+**Bước 4 — Database?** Không đổi gì.
+
+**Bước 5 — Test bằng Postman:**
+
+| Thử | Mong đợi |
+|---|---|
+| Chủ playlist, `{"isPublic": true}` | 200, `isPublic: true` |
+| Chủ playlist, body `{}` | 400 `isPublic is required` |
+| Chủ playlist, `{"isPublic": "abc"}` | 400 `Invalid request data` |
+| Người khác | 403 |
+| Playlist id không tồn tại | 400 `Playlist does not exist` |
+| Người khác gọi `GET /api/playlists/users/{idChủ}` sau khi bật công khai | Thấy playlist này |
+
+**Bước 6 — Git:** nhánh riêng → commit → Pull Request (`USER_MODULE.md` C26).
+
+---
+
+### C17. Bài tập tự kiểm tra (có đáp án)
+
+1. Vì sao bảng nối playlist – bài hát là 1 entity riêng (`PlaylistSong`) chứ không dùng `@ManyToMany` như nghệ sĩ feat?
+2. Bấm "Thêm vào playlist" 2 lần thật nhanh cho cùng 1 bài. 2 request nhận gì?
+3. `findWithOwnerById` khác `findById` có sẵn ở điểm nào? Vì sao cần?
+4. Bạn của Lan gọi `DELETE /api/playlists/3` (playlist của Lan). Mã gì? Message gì?
+5. Tạo playlist với `songIds = 40,40,12`. Playlist có mấy bài?
+6. Tạo playlist với `songIds = 40,99` mà bài 99 đang bị ẩn. Kết quả? Có playlist nào được tạo ra không?
+7. Tạo playlist kèm ảnh bìa hợp lệ nhưng có 1 bài không tồn tại. File ảnh có bị bỏ lại trên ổ đĩa không?
+8. Playlist có 3 bài, bài đầu tiên bị Admin gỡ. `coverUrl` (khi không có ảnh riêng) và `songCount` thay đổi thế nào?
+9. Thêm bài vào playlist thì `updatedAt` của playlist có đổi không? Nhờ dòng code nào?
+10. Vì sao JSON có trường `isPublic` chứ không phải `public`, dù Entity dùng getter `isPublic()`?
+11. Tạo playlist mà không gửi key `isPublic`. Playlist công khai hay riêng tư?
+12. Trong `deletePlaylist`, nếu bỏ dòng `deleteAllByPlaylistId(...)` thì chuyện gì xảy ra?
+13. Trong `deletePlaylist`, `flush()` để làm gì?
+14. Tài khoản của Lan bị Admin khóa. Người khác mở playlist công khai của Lan nhận gì?
+
+**Đáp án**
+
+1. Mỗi dòng nối cần thêm cột `added_at` (để sắp thứ tự bài). `@ManyToMany` chỉ tạo bảng 2 cột, không chứa được cột thêm (A1).
+2. Request đầu 200. Request sau: thường là 400 `Song is already in this playlist`; nếu 2 request trùng đúng thời điểm (cùng qua bước kiểm tra) thì ràng buộc duy nhất chặn → **409** `Data already exists` (A2, C12).
+3. `findWithOwnerById` dùng `JOIN FETCH p.owner`: đọc kèm chủ playlist trong cùng 1 câu SQL. Mọi thao tác đều cần kiểm tra chủ ngay sau đó, nên tránh được 1 câu SQL phụ (A3).
+4. **403** `You do not have permission to access this resource`: `getOwnedPlaylist` ném `AccessDeniedException` (A6, C8).
+5. **2 bài** (40, 12): `LinkedHashSet` bỏ trùng, giữ thứ tự (C8).
+6. **400** `Song does not exist: 99`. **Không**: lỗi ở giai đoạn kiểm tra, chưa ghi gì (C8, C9).
+7. Lỗi xảy ra ở giai đoạn 1 (`loadPlayableSongs`), **trước khi** lưu ảnh → ảnh chưa từng được lưu. (Nếu lỗi xảy ra sau khi lưu ảnh, khối `catch` sẽ xóa ảnh, C9.)
+8. `coverUrl` tự đổi sang ảnh của bài thứ 2 (giờ là bài đầu đang phát hành); `songCount` từ 3 xuống 2. Dòng nối vẫn còn trong database (C4, C7).
+9. **Có**, nhờ `playlist.markUpdated()` rồi `playlistRepository.save(playlist)`. Không có dòng này thì bảng `playlists` không thay đổi gì, `@PreUpdate` không chạy (C1, C12).
+10. Entity **không bao giờ** đi ra JSON. JSON được tạo từ DTO, và DTO cố ý đặt getter `getIsPublic()` → Jackson ra trường `isPublic` (A7.2, C6).
+11. **Riêng tư**: `null` → `Boolean.TRUE.equals(null)` = `false` (A7.1).
+12. MySQL từ chối xóa playlist vì còn dòng `playlist_songs` trỏ tới (khóa ngoại) → lỗi → transaction rollback → không xóa được gì (A5).
+13. Bắt Hibernate gửi câu `DELETE` xuống MySQL **ngay**, để nếu có lỗi thì lỗi xảy ra **trước** khi xóa file ảnh bìa (A5, C13).
+14. **400** `Playlist does not exist` khi mở chi tiết; danh sách playlist công khai của Lan trả mảng rỗng `[]` (C3, C10).
+
+---
+
+## PHẦN D — FRONTEND, TEST, VẬN HÀNH VÀ PHỤ LỤC
+
+---
+
 ## 11. HƯỚNG DẪN CHO FRONTEND
 
 ### 11.0. Hướng dẫn cho AI đọc phần này (nếu dùng AI viết code frontend)
@@ -1665,6 +2952,22 @@ Nhánh tính năng (VD playlist) → Pull Request → merge vào main
 - **Xóa hẳn 1 tài khoản** bằng SQL: phải xóa `playlist_songs` của các playlist của họ → xóa `playlists` → rồi mới xóa `users`. (Bình thường tài khoản chỉ bị xóa mềm.)
 - **Xóa playlist bằng SQL**: xóa `playlist_songs` trước, rồi `playlists`. File ảnh bìa riêng phải tự xóa tay trên VPS.
 
+### 15.4. Chạy thử trên máy của bạn (MỚI)
+
+1. Chạy được backend trên máy theo `USER_MODULE.md` mục 21.7.
+2. Có ít nhất vài bài **đang phát hành** để cho vào playlist: làm theo `SONG_MODULE.md` mục 24.5 (tạo nghệ sĩ → đăng bài → Admin duyệt).
+3. Lần chạy đầu, `ddl-auto=update` tự tạo 2 bảng `playlists`, `playlist_songs`. Kiểm tra trong MySQL:
+   ```sql
+   SHOW CREATE TABLE playlist_songs;
+   ```
+   Phải thấy dòng `UNIQUE KEY uk_playlist_songs_playlist_song (playlist_id, song_id)` và 2 khóa ngoại.
+4. Chạy kịch bản Postman ở mục 12.2. Sau mỗi bước, nhìn lại dữ liệu:
+   ```sql
+   SELECT id, user_id, name, is_public, cover_url, updated_at FROM playlists;
+   SELECT * FROM playlist_songs ORDER BY playlist_id, added_at;
+   ```
+5. Thử tình huống "bài bị ẩn" bằng tài khoản nghệ sĩ (`PUT /api/artist/songs/{id}/hide`), rồi mở lại playlist: bài biến mất, nhưng dòng trong `playlist_songs` vẫn còn (C15 bước 3, 4).
+
 ---
 
 ## 16. GIỚI HẠN ĐÃ BIẾT VÀ HƯỚNG PHÁT TRIỂN
@@ -1698,6 +3001,15 @@ Nhánh tính năng (VD playlist) → Pull Request → merge vào main
 ---
 
 ## 17. CÂU HỎI THƯỜNG GẶP
+
+**H: Mình chưa học Spring Boot, đọc từ đâu?**
+Đ: Phần A của `USER_MODULE.md` (kiến thức chung) → Phần A của `SONG_MODULE.md` (truy vấn, upload file) → Phần A của tài liệu này → lộ trình đầu tiên ở mục 1. Module Playlist nhỏ (12 file) nên là module dễ đọc trọn vẹn nhất để luyện.
+
+**H: Vì sao chỉ cần đăng nhập là gọi được API sửa playlist, không có `@PreAuthorize`?**
+Đ: Mọi role đều được có playlist. Câu hỏi "playlist này có phải của bạn không" cần đọc database nên kiểm tra trong Service (`getOwnedPlaylist`), sai thì 403 (A6, C8).
+
+**H: Trong `PlaylistSongRepository` gõ thiếu bí danh `s` (viết `JOIN FETCH ps.song` không có `s`) thì sao?**
+Đ: `PUBLISHED_CONDITION` dùng `s.status`, `s.releaseAt`... không có bí danh `s` → câu JPQL sai → ứng dụng **không khởi động được** (A4.1).
 
 **H: Tạo playlist mà không chọn bài được không?**
 Đ: Không. Tạo bắt buộc có ít nhất 1 bài (giống Spotify gợi ý bài lúc tạo). Tạo xong có thể bỏ hết bài.
@@ -1811,3 +3123,17 @@ Nhánh tính năng (VD playlist) → Pull Request → merge vào main
 - `docs/GENRE_FRONTEND.md` — thể loại nhạc (trường `genreId`, `genreName` trong `SongResponse`).
 - Swagger: `http://157.66.100.87:8080/swagger-ui.html` — thử API trực tiếp trên trình duyệt.
 - Comment trong từng file code của module — giải thích chi tiết từng dòng, viết cho người chưa học Spring.
+
+### 18.5. Bản đồ file → mục giải thích
+
+| File | Nghiệp vụ (Phần B) | Giải thích code (Phần C) |
+|---|---|---|
+| `entity/Playlist.java` | 6.1, 7 | C1, A7 |
+| `entity/PlaylistSong.java` | 6.2, 7.4 | C2, A1, A2 |
+| `repository/PlaylistRepository.java` | 7.6 | C3, A3 |
+| `repository/PlaylistSongRepository.java` | 7.3, 7.4, 7.5 | C4, A4, A5 |
+| `dto/playlist/CreatePlaylistRequest.java`, `UpdatePlaylistRequest.java` | 8.1, 8.5 | C5, A7 |
+| `dto/playlist/PlaylistSummaryResponse.java`, `PlaylistDetailResponse.java`, `PlaylistSongResponse.java` | 9 | C6, A7.2 |
+| `mapper/PlaylistMapper.java` | 7.5, 9 | C7 |
+| `service/PlaylistService.java` | 7, 8 | C8 → C13, A5, A6, A8 |
+| `controller/PlaylistController.java` | 4, 8 | C14 |
